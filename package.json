@@ -1,0 +1,32 @@
+{
+  "name": "relayon",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Relayon — serverless-native webhook relay platform",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "postinstall": "npm run db:generate",
+    "dev:dashboard": "npm run start --workspace=dashboard",
+    "dev:api": "npm run dev --workspace=api",
+    "dev:ingress": "npm run dev --workspace=ingress",
+    "build:dashboard": "npm run build --workspace=dashboard",
+    "build:api": "npm run build --workspace=api",
+    "build:ingress": "npm run build --workspace=ingress",
+    "db:generate": "npm run generate --workspace=db",
+    "db:migrate": "npm run migrate --workspace=db",
+    "db:deploy": "npm run migrate:deploy --workspace=db",
+    "dev:workers": "npm run dev --workspace=workers",
+"build:workers": "npm run build --workspace=workers",
+    "db:studio": "npm run studio --workspace=db",
+    "db:reset": "npm run reset --workspace=db",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

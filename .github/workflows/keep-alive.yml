@@ -1,0 +1,15 @@
+name: Keep Alive
+
+on:
+  schedule:
+    - cron: '0 */12 * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping production health endpoints
+        run: |
+          curl -fsS --max-time 30 https://relayon-api.vercel.app/api/health || true
+          curl -fsS --max-time 30 https://relayon-ingress.vercel.app/health || true
