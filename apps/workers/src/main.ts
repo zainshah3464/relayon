@@ -22,12 +22,20 @@ async function bootstrap(): Promise<void> {
   const port = Number(
     process.env['PORT'] ?? process.env['WORKERS_PORT'] ?? 3003,
   );
-  await app.listen(port);
 
-  Logger.log(
-    `🚀 Relayon Workers → http://localhost:${port}/internal`,
-    'Bootstrap',
-  );
+  // Vercel serverless sets VERCEL=1 — skip app.listen() there
+  if (!process.env['VERCEL']) {
+    await app.listen(port);
+    Logger.log(
+      `🚀 Relayon Workers → http://localhost:${port}/internal`,
+      'Bootstrap',
+    );
+  } else {
+    Logger.log(
+      '🚀 Relayon Workers running in serverless mode',
+      'Bootstrap',
+    );
+  }
 }
 
 bootstrap();
