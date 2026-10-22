@@ -8,7 +8,7 @@
     "packages/*"
   ],
   "scripts": {
-    "postinstall": "npx prisma generate --schema=./packages/db/prisma/schema.prisma",
+    "postinstall": "prisma generate --schema=./packages/db/prisma/schema.prisma",
     "dev:dashboard": "npm run start --workspace=dashboard",
     "dev:api": "npm run dev --workspace=api",
     "dev:ingress": "npm run dev --workspace=ingress",
