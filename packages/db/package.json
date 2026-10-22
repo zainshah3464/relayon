@@ -10,9 +10,8 @@
     "reset": "prisma migrate reset --force"
   },
   "dependencies": {
-    "@prisma/client": "^6.2.0"
-  },
-  "devDependencies": {
+    "@prisma/client": "^6.2.0",
     "prisma": "^6.2.0"
-  }
+  },
+  "devDependencies": {}
 }

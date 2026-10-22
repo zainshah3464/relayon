@@ -25,8 +25,7 @@ export class GroqService {
     private readonly config: ConfigService,
     private readonly redis: RedisService,
   ) {
-    const timeoutMs =
-      config.get<number>('GROQ_TIMEOUT_MS') ?? 20_000;
+    const timeoutMs = parseInt(config.get<string>('GROQ_TIMEOUT_MS') ?? '20000', 10);
 
     this.client = new Groq({
       apiKey: config.getOrThrow<string>('GROQ_API_KEY'),

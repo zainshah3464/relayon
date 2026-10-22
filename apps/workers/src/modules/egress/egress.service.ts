@@ -39,8 +39,7 @@ export class EgressService {
     private readonly redis: RedisService,
     private readonly circuit: CircuitBreakerService,
   ) {
-    this.adapterTimeoutMs =
-      this.config.get<number>('ADAPTER_TIMEOUT_MS') ?? 15_000;
+    this.adapterTimeoutMs = parseInt(this.config.get<string>('ADAPTER_TIMEOUT_MS') ?? '15000', 10);
   }
 
   async deliverBatch(): Promise<DeliverBatchResult> {
