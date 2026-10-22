@@ -8,9 +8,11 @@ import { z } from 'zod';
 loadEnv({ path: resolve(__dirname, '../.env.local') });
 
 const EnvSchema = z.object({
-  NODE_ENV: z
-    .enum(['development', 'production', 'test'])
-    .default('development'),
+ NODE_ENV: z
+  .string()
+  .transform((v) => v.trim())
+  .pipe(z.enum(['development', 'production', 'test']))
+  .default('development'),
   INGRESS_PORT: z.coerce.number().int().positive().default(3002),
   CORS_ORIGIN: z.string().default('http://localhost:4200'),
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),

@@ -1,4 +1,4 @@
-import { NestFactory, INestApplication } from '@nestjs/core';
+import { NestFactory, NestApplication } from '@nestjs/core';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
@@ -8,8 +8,8 @@ initSentry('relayon-workers');
 
 let cachedServer: any = null;
 
-async function createApp(): Promise<INestApplication> {
-  const app = await NestFactory.create(AppModule, {
+async function createApp(): Promise<NestApplication> {
+  const app = await NestFactory.create<NestApplication>(AppModule, {
     logger: ['error', 'warn', 'log'],
   });
   app.setGlobalPrefix('internal');
