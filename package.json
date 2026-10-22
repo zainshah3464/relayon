@@ -8,28 +8,31 @@
     "packages/*"
   ],
   "scripts": {
-    "postinstall": "npm run db:generate",
+    "postinstall": "npx prisma generate --schema=./packages/db/prisma/schema.prisma",
     "dev:dashboard": "npm run start --workspace=dashboard",
     "dev:api": "npm run dev --workspace=api",
     "dev:ingress": "npm run dev --workspace=ingress",
+    "dev:workers": "npm run dev --workspace=workers",
     "build:dashboard": "npm run build --workspace=dashboard",
     "build:api": "npm run build --workspace=api",
     "build:ingress": "npm run build --workspace=ingress",
+    "build:workers": "npm run build --workspace=workers",
     "db:generate": "npm run generate --workspace=db",
     "db:migrate": "npm run migrate --workspace=db",
     "db:deploy": "npm run migrate:deploy --workspace=db",
-    "dev:workers": "npm run dev --workspace=workers",
-    "build:workers": "npm run build --workspace=workers",
     "db:studio": "npm run studio --workspace=db",
     "db:reset": "npm run reset --workspace=db",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present"
+    "test": "npm run test --workspaces --if-present",
+    "smoke": "node scripts/smoke-test.mjs",
+    "deploy:db": "npm run db:deploy"
   },
   "dependencies": {
     "prisma": "6.19.3",
     "@prisma/client": "6.19.3"
   },
+  "devDependencies": {},
   "engines": {
     "node": ">=20.0.0"
   }
