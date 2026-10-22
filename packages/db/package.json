@@ -3,15 +3,15 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "generate": "npx prisma generate",
+    "generate": "prisma generate",
     "migrate": "prisma migrate dev",
     "migrate:deploy": "prisma migrate deploy",
     "studio": "prisma studio",
     "reset": "prisma migrate reset --force"
   },
   "dependencies": {
-    "@prisma/client": "^6.2.0",
-    "prisma": "^6.2.0"
+    "@prisma/client": "6.19.3",
+    "prisma": "6.19.3"
   },
   "devDependencies": {}
 }
