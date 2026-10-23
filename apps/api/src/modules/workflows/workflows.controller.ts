@@ -79,4 +79,20 @@ export class WorkflowsController {
   ) {
     return this.workflows.importYaml(user.tenantId, body.yaml ?? '');
   }
+
+  @Post(':id/preview-transform')
+  @HttpCode(HttpStatus.OK)
+  previewTransform(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() body: { expression?: string; samplePayload?: unknown },
+  ) {
+    // Ownership check
+    return this.workflows.get(user.tenantId, id).then(() =>
+      this.workflows.previewTransform(
+        body.expression ?? '',
+        body.samplePayload ?? {},
+      ),
+    );
+  }
 }

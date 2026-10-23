@@ -1,7 +1,19 @@
+import { Injectable } from '@nestjs/common';
+import { DestinationAdapter } from './plugin.decorator';
 import type { AdapterResult, DeliveryAdapter, DeliveryContext } from './types';
 
 const TIMEOUT_MS = 10_000;
 
+@Injectable()
+@DestinationAdapter({
+  type: 'http',
+  displayName: 'HTTP Webhook',
+  configSchema: {
+    required: ['url'],
+    optional: ['method', 'headers'],
+  },
+  supportsIdempotency: true,
+})
 export class HttpAdapter implements DeliveryAdapter {
   readonly type = 'http';
 
@@ -63,7 +75,7 @@ export class HttpAdapter implements DeliveryAdapter {
         latencyMs: Date.now() - started,
         responseBody: '',
         error: err instanceof Error ? err.message : String(err),
-        retryable: true, // network errors and timeouts are retryable
+        retryable: true,
       };
     } finally {
       clearTimeout(timer);

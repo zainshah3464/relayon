@@ -8,12 +8,16 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { EgressService } from './egress.service';
+import { AdapterRegistry } from './adapters/registry';
 import { CronSecretGuard } from '../../common/guards/cron-secret.guard';
 
 @Controller()
 @UseGuards(CronSecretGuard)
 export class EgressController {
-  constructor(private readonly egress: EgressService) {}
+  constructor(
+    private readonly egress: EgressService,
+    private readonly adapters: AdapterRegistry,
+  ) {}
 
   @Post('deliver')
   @HttpCode(HttpStatus.OK)
@@ -30,5 +34,10 @@ export class EgressController {
   @Get('egress/stats')
   async stats() {
     return this.egress.getStats();
+  }
+
+  @Get('adapters')
+  adaptersList() {
+    return this.adapters.list();
   }
 }

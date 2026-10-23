@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { load, dump } from 'js-yaml';
+import jsonata from 'jsonata';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateWorkflowDto } from './dto/create-workflow.dto';
@@ -201,6 +202,73 @@ export class WorkflowsService {
       name: created.name,
       destinationsCreated: created.destinations?.length ?? 0,
     };
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // TRANSFORM PREVIEW
+  // ─────────────────────────────────────────────────────────────
+
+  /**
+   * Compile + evaluate a JSONata expression against a sample payload.
+   * Compile-once per call, 2000ms timeout. Used by the workflow editor
+   * to validate transforms before saving.
+   */
+  async previewTransform(
+    expression: string,
+    samplePayload: unknown,
+  ): Promise<{
+    ok: boolean;
+    result: unknown;
+    error: string | null;
+    durationMs: number;
+  }> {
+    const started = Date.now();
+    if (!expression || !expression.trim()) {
+      return {
+        ok: false,
+        result: null,
+        error: 'Expression is empty',
+        durationMs: 0,
+      };
+    }
+
+    let compiled: jsonata.Expression;
+    try {
+      compiled = jsonata(expression);
+    } catch (err) {
+      return {
+        ok: false,
+        result: null,
+        error: `Compile error: ${err instanceof Error ? err.message : String(err)}`,
+        durationMs: Date.now() - started,
+      };
+    }
+
+    try {
+      const result = await Promise.race<unknown>([
+        compiled.evaluate(samplePayload),
+        new Promise<never>((_, reject) =>
+          setTimeout(
+            () => reject(new Error('Expression exceeded 2000ms timeout')),
+            2000,
+          ),
+        ),
+      ]);
+
+      return {
+        ok: true,
+        result: result === undefined ? null : result,
+        error: null,
+        durationMs: Date.now() - started,
+      };
+    } catch (err) {
+      return {
+        ok: false,
+        result: null,
+        error: err instanceof Error ? err.message : String(err),
+        durationMs: Date.now() - started,
+      };
+    }
   }
 
   private redactConfig(

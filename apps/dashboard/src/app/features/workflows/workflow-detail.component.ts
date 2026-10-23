@@ -1,7 +1,13 @@
 import { Component, inject, signal, OnInit, input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { HttpClient } from '@angular/common/http';
+import {
+  FormBuilder,
+  FormsModule,
+  ReactiveFormsModule,
+  Validators,
+} from '@angular/forms';
 import {
   WorkflowsService,
   Workflow,
@@ -13,7 +19,7 @@ import { environment } from '../../../environments/environment';
 @Component({
   selector: 'app-workflow-detail',
   standalone: true,
-  imports: [CommonModule, RouterLink, ReactiveFormsModule],
+  imports: [CommonModule, RouterLink, ReactiveFormsModule, FormsModule],
   template: `
     <div class="space-y-6">
       <div class="flex items-center justify-between">
@@ -44,6 +50,46 @@ import { environment } from '../../../environments/environment';
           <code class="block text-xs font-mono text-relay-cyan bg-surface-2 p-3 rounded overflow-x-auto">
             {{ ingressUrl }}/webhook/{{ wf.tenantId }}/{{ wf.id }}
           </code>
+        </div>
+
+        <!-- Transform editor -->
+        <div class="card">
+          <div class="flex justify-between items-center mb-3">
+            <h2 class="text-sm font-medium text-white">Transform expression (JSONata)</h2>
+            <button (click)="toggleTransform()" class="text-xs text-relay-cyan hover:underline">
+              {{ showTransform() ? 'Hide' : 'Edit' }}
+            </button>
+          </div>
+
+          @if (showTransform()) {
+            <textarea
+              [(ngModel)]="transformExpr"
+              rows="4"
+              class="input font-mono text-xs"
+              placeholder="&#123; 'event_type': type, 'amount': data.amount / 100 &#125;"
+            ></textarea>
+            <div class="flex gap-2 mt-2">
+              <button (click)="previewTransform()" [disabled]="previewing()" class="btn-secondary text-xs">
+                {{ previewing() ? 'Testing...' : 'Test with sample payload' }}
+              </button>
+              <button (click)="saveTransform()" [disabled]="savingTransform()" class="btn-primary text-xs">
+                {{ savingTransform() ? 'Saving...' : 'Save expression' }}
+              </button>
+            </div>
+
+            @if (previewResult(); as r) {
+              <div class="mt-3">
+                @if (r.ok) {
+                  <p class="text-xs text-signal-green mb-1">✓ Valid · {{ r.durationMs }}ms</p>
+                  <pre class="bg-surface-2 p-3 rounded text-xs overflow-x-auto text-relay-cyan">{{ r.result | json }}</pre>
+                } @else {
+                  <p class="text-xs text-signal-rose">✗ {{ r.error }}</p>
+                }
+              </div>
+            }
+          } @else {
+            <code class="text-xs text-muted font-mono">{{ workflow()?.transformExpression || 'No transform configured' }}</code>
+          }
         </div>
 
         <div class="card grid grid-cols-3 gap-4">
@@ -182,6 +228,7 @@ export class WorkflowDetailComponent implements OnInit {
   readonly id = input.required<string>();
   private svc = inject(WorkflowsService);
   private fb = inject(FormBuilder);
+  private http = inject(HttpClient);
 
   readonly ingressUrl = environment.ingressUrl;
 
@@ -194,6 +241,21 @@ export class WorkflowDetailComponent implements OnInit {
   showCreateDest = signal(false);
   savingDest = signal(false);
   destError = signal<string | null>(null);
+
+  showTransform = signal(false);
+  transformExpr = '';
+  previewing = signal(false);
+  savingTransform = signal(false);
+  previewResult = signal<{ ok: boolean; result: unknown; error: string | null; durationMs: number } | null>(null);
+
+  private readonly samplePayload = {
+    type: 'checkout.session.completed',
+    data: {
+      amount: 5000,
+      currency: 'usd',
+      customer: { email: 'test@example.com' },
+    },
+  };
 
   destForm = this.fb.nonNullable.group({
     type: ['http' as DestinationType, Validators.required],
@@ -338,6 +400,61 @@ export class WorkflowDetailComponent implements OnInit {
     if (!confirm(`Delete destination "${d.name}"?`)) return;
     this.svc.removeDestination(d.id).subscribe({
       next: () => this.loadDestinations(),
+    });
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // TRANSFORM EDITOR
+  // ─────────────────────────────────────────────────────────────
+
+  toggleTransform(): void {
+    const wf = this.workflow();
+    if (!this.showTransform() && wf) {
+      this.transformExpr = wf.transformExpression ?? '';
+      this.previewResult.set(null);
+    }
+    this.showTransform.set(!this.showTransform());
+  }
+
+  previewTransform(): void {
+    const wf = this.workflow();
+    if (!wf) return;
+    this.previewing.set(true);
+    this.previewResult.set(null);
+
+    this.http
+      .post<{ ok: boolean; result: unknown; error: string | null; durationMs: number }>(
+        `${environment.apiUrl}/api/workflows/${wf.id}/preview-transform`,
+        { expression: this.transformExpr, samplePayload: this.samplePayload },
+      )
+      .subscribe({
+        next: (r) => {
+          this.previewResult.set(r);
+          this.previewing.set(false);
+        },
+        error: (err) => {
+          this.previewResult.set({
+            ok: false,
+            result: null,
+            error: err?.error?.message ?? 'Preview failed',
+            durationMs: 0,
+          });
+          this.previewing.set(false);
+        },
+      });
+  }
+
+  saveTransform(): void {
+    const wf = this.workflow();
+    if (!wf) return;
+    this.savingTransform.set(true);
+
+    this.svc.update(wf.id, { transformExpression: this.transformExpr }).subscribe({
+      next: (updated) => {
+        this.workflow.set(updated);
+        this.savingTransform.set(false);
+      },
+      error: () => this.savingTransform.set(false),
     });
   }
 }

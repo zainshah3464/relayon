@@ -5,17 +5,35 @@ import {
   Overview,
   DeliveryStats,
   CostAnalytics,
+  TimeSeriesResponse,
 } from '../../core/api/analytics.service';
+import { TimeSeriesChartComponent } from '../../shared/charts/time-series-chart.component';
+
+type Range = '24h' | '7d' | '30d';
 
 @Component({
   selector: 'app-analytics',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, TimeSeriesChartComponent],
   template: `
     <div class="space-y-6">
-      <div>
-        <h1 class="text-2xl font-bold tracking-tightest text-white">Analytics</h1>
-        <p class="text-sm text-muted mt-1">Event volume, delivery health, latency, and estimated costs.</p>
+      <div class="flex items-center justify-between">
+        <div>
+          <h1 class="text-2xl font-bold tracking-tightest text-white">Analytics</h1>
+          <p class="text-sm text-muted mt-1">Event volume, delivery health, latency, and estimated costs.</p>
+        </div>
+        <div class="flex gap-1">
+          @for (r of ranges; track r) {
+            <button
+              (click)="setRange(r)"
+              class="px-3 py-1 rounded text-xs"
+              [class.bg-relay-violet]="range() === r"
+              [class.text-white]="range() === r"
+              [class.text-muted]="range() !== r"
+              [class.hover:bg-surface-2]="range() !== r"
+            >{{ r }}</button>
+          }
+        </div>
       </div>
 
       @if (loading()) {
@@ -23,6 +41,14 @@ import {
       } @else if (error()) {
         <div class="card text-sm text-signal-rose">{{ error() }}</div>
       } @else {
+        @if (series(); as s) {
+          <app-time-series-chart
+            title="Events & deliveries"
+            subtitle="Hourly / daily buckets — hover any point for details"
+            [data]="s.buckets"
+          />
+        }
+
         @if (overview(); as o) {
           <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div class="card">
@@ -56,30 +82,11 @@ import {
                 <p class="text-xs text-muted mt-1">Approximation based on payload size and delivery attempts.</p>
               </div>
               <div class="text-right">
-                <p class="text-2xl font-bold text-signal-green">\${{ c.cost.totalUsd }}</p>
-                <p class="text-xs text-muted">Groq \${{ c.cost.groqUsd }} · Redis \${{ c.cost.redisUsd }}</p>
+                <p class="text-2xl font-bold text-signal-green">&#36;{{ c.cost.totalUsd }}</p>
+                <p class="text-xs text-muted">Groq &#36;{{ c.cost.groqUsd }} · Redis &#36;{{ c.cost.redisUsd }}</p>
               </div>
             </div>
-
-            <div class="grid grid-cols-3 gap-4 mb-4">
-              <div class="bg-surface-2 p-3 rounded">
-                <p class="text-xs uppercase text-muted">Events</p>
-                <p class="text-xl font-bold text-white">{{ c.events.total }}</p>
-              </div>
-              <div class="bg-surface-2 p-3 rounded">
-                <p class="text-xs uppercase text-muted">Enriched</p>
-                <p class="text-xl font-bold text-white">{{ c.events.enriched }}</p>
-                <p class="text-xs text-muted">{{ c.events.cacheHits }} cache hits</p>
-              </div>
-              <div class="bg-surface-2 p-3 rounded">
-                <p class="text-xs uppercase text-muted">~Tokens</p>
-                <p class="text-xl font-bold text-white">{{ c.events.estimatedTokens.toLocaleString() }}</p>
-              </div>
-            </div>
-
-            @if (c.perDestination.length === 0) {
-              <p class="text-sm text-muted">No deliveries in the last {{ c.windowDays }} days.</p>
-            } @else {
+            @if (c.perDestination.length > 0) {
               <table class="w-full text-sm">
                 <thead class="text-xs uppercase text-muted">
                   <tr>
@@ -96,21 +103,13 @@ import {
                       <td class="py-2 font-mono text-xs text-white">{{ row.destinationType }} · {{ row.destinationId.slice(0, 8) }}</td>
                       <td class="py-2 text-right text-white">{{ row.totalDeliveries }}</td>
                       <td class="py-2 text-right text-white">{{ row.totalAttempts }}</td>
-                      <td class="py-2 text-right" [class.text-signal-amber]="row.retryRate > 20" [class.text-muted]="row.retryRate <= 20">
-                        {{ row.retryRate }}%
-                      </td>
-                      <td class="py-2 text-right text-muted">\${{ row.estimatedRedisCostUsd }}</td>
+                      <td class="py-2 text-right" [class.text-signal-amber]="row.retryRate > 20" [class.text-muted]="row.retryRate <= 20">{{ row.retryRate }}%</td>
+                      <td class="py-2 text-right text-muted">&#36;{{ row.estimatedRedisCostUsd }}</td>
                     </tr>
                   }
                 </tbody>
               </table>
             }
-
-            <div class="mt-3 text-xs text-muted space-y-1">
-              @for (note of c.notes; track note) {
-                <p>· {{ note }}</p>
-              }
-            </div>
           </div>
         }
       }
@@ -120,9 +119,13 @@ import {
 export class AnalyticsComponent implements OnInit {
   private svc = inject(AnalyticsService);
 
+  readonly ranges: Range[] = ['24h', '7d', '30d'];
+  range = signal<Range>('24h');
+
   overview = signal<Overview | null>(null);
   delivery = signal<DeliveryStats | null>(null);
   cost = signal<CostAnalytics | null>(null);
+  series = signal<TimeSeriesResponse | null>(null);
   loading = signal(true);
   error = signal<string | null>(null);
 
@@ -130,8 +133,15 @@ export class AnalyticsComponent implements OnInit {
     this.load();
   }
 
+  setRange(r: Range): void {
+    this.range.set(r);
+    this.loadSeries();
+  }
+
   load(): void {
     this.loading.set(true);
+    this.error.set(null);
+
     this.svc.overview().subscribe({
       next: (o) => {
         this.overview.set(o);
@@ -141,7 +151,7 @@ export class AnalyticsComponent implements OnInit {
             this.svc.cost().subscribe({
               next: (c) => {
                 this.cost.set(c);
-                this.loading.set(false);
+                this.loadSeries();
               },
               error: (err) => {
                 this.error.set(err?.error?.message ?? 'Failed to load cost analytics');
@@ -157,6 +167,19 @@ export class AnalyticsComponent implements OnInit {
       },
       error: (err) => {
         this.error.set(err?.error?.message ?? 'Failed to load overview');
+        this.loading.set(false);
+      },
+    });
+  }
+
+  private loadSeries(): void {
+    this.svc.timeSeries(this.range()).subscribe({
+      next: (s) => {
+        this.series.set(s);
+        this.loading.set(false);
+      },
+      error: (err) => {
+        this.error.set(err?.error?.message ?? 'Failed to load time-series');
         this.loading.set(false);
       },
     });

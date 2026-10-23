@@ -5,7 +5,7 @@ import { MongoService } from '../mongo/mongo.service';
 import { RedisService } from '../redis/redis.service';
 import { CircuitBreakerService } from './circuit-breaker.service';
 import { parseRetryPolicy, getBackoffMs } from './retry-policy';
-import { getAdapter } from './adapters/registry';
+import { AdapterRegistry } from './adapters/registry';
 import type { AdapterResult, DeliveryContext } from './adapters/types';
 import {
   EGRESS_PENDING_QUEUE,
@@ -38,6 +38,7 @@ export class EgressService {
     private readonly mongo: MongoService,
     private readonly redis: RedisService,
     private readonly circuit: CircuitBreakerService,
+    private readonly adapters: AdapterRegistry,
   ) {
     this.adapterTimeoutMs = parseInt(this.config.get<string>('ADAPTER_TIMEOUT_MS') ?? '15000', 10);
   }
@@ -280,8 +281,8 @@ export class EgressService {
       const payload =
         event.transformedPayload ?? event.enrichedPayload ?? event.rawPayload;
 
-      const adapter = getAdapter(destination.type);
-      if (!adapter) {
+      const registered = this.adapters.get(destination.type);
+      if (!registered) {
         await this.moveToDlq(
           claimed._id.toString(),
           `No adapter registered for type '${destination.type}'`,
@@ -291,6 +292,8 @@ export class EgressService {
         result.dlq++;
         return;
       }
+
+      const adapter = registered.instance;
 
       const config = (destination.config ?? {}) as Record<string, unknown>;
       const ctx: DeliveryContext = {

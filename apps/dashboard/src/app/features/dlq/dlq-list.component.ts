@@ -25,6 +25,9 @@ import { EventsService, Delivery } from '../../core/api/events.service';
             <button (click)="bulkReplay()" [disabled]="bulkLoading()" class="btn-primary">
               {{ bulkLoading() ? 'Replaying...' : 'Replay selected' }}
             </button>
+            <button (click)="bulkDiscard()" [disabled]="bulkLoading()" class="btn-secondary text-signal-rose">
+              Discard selected
+            </button>
             <button (click)="clearSelection()" class="btn-secondary">Clear</button>
           </div>
         </div>
@@ -191,6 +194,30 @@ export class DlqListComponent implements OnInit {
             reason: err?.error?.message ?? 'Request failed',
           })),
         });
+      },
+    });
+  }
+
+  bulkDiscard(): void {
+    const ids = Array.from(this.selected());
+    if (ids.length === 0) return;
+    if (!confirm(`Permanently discard ${ids.length} DLQ entries?`)) return;
+
+    this.bulkLoading.set(true);
+    this.svc.bulkDiscardDlq(ids).subscribe({
+      next: (res) => {
+        this.bulkLoading.set(false);
+        this.bulkResult.set({
+          total: res.total,
+          replayed: 0,
+          failed: res.failed,
+          failures: [],
+        });
+        this.load();
+      },
+      error: (err) => {
+        this.bulkLoading.set(false);
+        this.error.set(err?.error?.message ?? 'Bulk discard failed');
       },
     });
   }

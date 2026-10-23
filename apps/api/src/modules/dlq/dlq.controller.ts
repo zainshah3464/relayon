@@ -52,6 +52,15 @@ export class DlqController {
     return this.dlq.bulkReplay(user.tenantId, dto.ids);
   }
 
+  @Post('bulk-discard')
+  @HttpCode(HttpStatus.OK)
+  bulkDiscard(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: BulkReplayDto,
+  ) {
+    return this.dlq.bulkDiscard(user.tenantId, dto.ids);
+  }
+
   @Post(':id/replay')
   @HttpCode(HttpStatus.OK)
   replay(@CurrentUser() user: JwtUser, @Param('id') id: string) {

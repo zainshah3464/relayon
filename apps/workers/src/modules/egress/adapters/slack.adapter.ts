@@ -1,7 +1,17 @@
+import { Injectable } from '@nestjs/common';
+import { DestinationAdapter } from './plugin.decorator';
 import type { AdapterResult, DeliveryAdapter, DeliveryContext } from './types';
 
 const TIMEOUT_MS = 10_000;
 
+@Injectable()
+@DestinationAdapter({
+  type: 'slack',
+  displayName: 'Slack',
+  configSchema: {
+    required: ['webhookUrl'],
+  },
+})
 export class SlackAdapter implements DeliveryAdapter {
   readonly type = 'slack';
 

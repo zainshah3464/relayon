@@ -181,4 +181,127 @@ export class AnalyticsService {
       ],
     };
   }
+
+  /**
+   * Time-series rollup for charts. Buckets events + deliveries by
+   * hour (24h range) or day (7d/30d range) using $dateTrunc.
+   */
+  async timeSeries(
+    tenantId: string,
+    range: '24h' | '7d' | '30d' = '24h',
+  ) {
+    const config = {
+      '24h': { sinceMs: 24 * 3600_000, unit: 'hour' as const, buckets: 24 },
+      '7d': { sinceMs: 7 * 24 * 3600_000, unit: 'day' as const, buckets: 7 },
+      '30d': { sinceMs: 30 * 24 * 3600_000, unit: 'day' as const, buckets: 30 },
+    }[range];
+
+    const since = new Date(Date.now() - config.sinceMs);
+
+    const eventBuckets = await this.mongo.eventModel.aggregate([
+      { $match: { tenantId, receivedAt: { $gte: since } } },
+      {
+        $group: {
+          _id: {
+            $dateTrunc: {
+              date: '$receivedAt',
+              unit: config.unit,
+            },
+          },
+          events: { $sum: 1 },
+          failed: {
+            $sum: { $cond: [{ $eq: ['$status', 'failed'] }, 1, 0] },
+          },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]);
+
+    const deliveryBuckets = await this.mongo.deliveryModel.aggregate([
+      { $match: { tenantId, createdAt: { $gte: since } } },
+      {
+        $group: {
+          _id: {
+            $dateTrunc: {
+              date: '$createdAt',
+              unit: config.unit,
+            },
+          },
+          delivered: {
+            $sum: { $cond: [{ $eq: ['$status', 'delivered'] }, 1, 0] },
+          },
+          dlq: {
+            $sum: { $cond: [{ $eq: ['$status', 'dlq'] }, 1, 0] },
+          },
+          attempts: { $sum: { $ifNull: ['$attemptCount', 0] } },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]);
+
+    // Merge on bucket key
+    const merged = new Map<
+      string,
+      { ts: string; events: number; failed: number; delivered: number; dlq: number; attempts: number }
+    >();
+
+    for (const b of eventBuckets) {
+      const key = (b._id as Date).toISOString();
+      merged.set(key, {
+        ts: key,
+        events: b.events as number,
+        failed: b.failed as number,
+        delivered: 0,
+        dlq: 0,
+        attempts: 0,
+      });
+    }
+    for (const b of deliveryBuckets) {
+      const key = (b._id as Date).toISOString();
+      const existing = merged.get(key) ?? {
+        ts: key,
+        events: 0,
+        failed: 0,
+        delivered: 0,
+        dlq: 0,
+        attempts: 0,
+      };
+      existing.delivered = b.delivered as number;
+      existing.dlq = b.dlq as number;
+      existing.attempts = b.attempts as number;
+      merged.set(key, existing);
+    }
+
+    // Fill gaps — frontend ko continuous buckets chahiye
+    const filled: Array<{
+      ts: string;
+      events: number;
+      failed: number;
+      delivered: number;
+      dlq: number;
+      attempts: number;
+    }> = [];
+    const stepMs = config.unit === 'hour' ? 3600_000 : 86_400_000;
+    const startMs = Math.floor(since.getTime() / stepMs) * stepMs;
+
+    for (let i = 0; i <= config.buckets; i++) {
+      const ts = new Date(startMs + i * stepMs).toISOString();
+      filled.push(
+        merged.get(ts) ?? {
+          ts,
+          events: 0,
+          failed: 0,
+          delivered: 0,
+          dlq: 0,
+          attempts: 0,
+        },
+      );
+    }
+
+    return {
+      range,
+      unit: config.unit,
+      buckets: filled,
+    };
+  }
 }

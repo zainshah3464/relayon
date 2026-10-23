@@ -57,6 +57,19 @@ export interface CostAnalytics {
   notes: string[];
 }
 
+export interface TimeSeriesResponse {
+  range: '24h' | '7d' | '30d';
+  unit: 'hour' | 'day';
+  buckets: Array<{
+    ts: string;
+    events: number;
+    failed: number;
+    delivered: number;
+    dlq: number;
+    attempts: number;
+  }>;
+}
+
 @Injectable({ providedIn: 'root' })
 export class AnalyticsService {
   private http = inject(HttpClient);
@@ -72,5 +85,11 @@ export class AnalyticsService {
 
   cost(): Observable<CostAnalytics> {
     return this.http.get<CostAnalytics>(`${this.base}/api/analytics/cost`);
+  }
+
+  timeSeries(range: '24h' | '7d' | '30d' = '24h'): Observable<TimeSeriesResponse> {
+    return this.http.get<TimeSeriesResponse>(
+      `${this.base}/api/analytics/timeseries?range=${range}`,
+    );
   }
 }

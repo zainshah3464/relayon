@@ -129,4 +129,14 @@ export class EventsService {
       `${this.base}/api/dlq/${id}`,
     );
   }
+
+  bulkDiscardDlq(
+    ids: string[],
+  ): Observable<{ total: number; discarded: number; failed: number }> {
+    return this.http.post<{
+      total: number;
+      discarded: number;
+      failed: number;
+    }>(`${this.base}/api/dlq/bulk-discard`, { ids });
+  }
 }

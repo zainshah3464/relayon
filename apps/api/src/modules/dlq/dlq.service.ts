@@ -116,6 +116,28 @@ export class DlqService {
     };
   }
 
+  async bulkDiscard(
+    tenantId: string,
+    ids: string[],
+  ): Promise<{ total: number; discarded: number; failed: number }> {
+    const uniqueIds = Array.from(new Set(ids)).slice(0, 100);
+    if (uniqueIds.length === 0) {
+      return { total: 0, discarded: 0, failed: 0 };
+    }
+
+    const result = await this.mongo.deliveryModel.deleteMany({
+      _id: { $in: uniqueIds },
+      tenantId,
+      status: 'dlq',
+    });
+
+    return {
+      total: uniqueIds.length,
+      discarded: result.deletedCount ?? 0,
+      failed: uniqueIds.length - (result.deletedCount ?? 0),
+    };
+  }
+
   async discard(tenantId: string, deliveryId: string) {
     const result = await this.mongo.deliveryModel.deleteOne({
       _id: deliveryId,

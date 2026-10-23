@@ -1,3 +1,5 @@
+import { Injectable } from '@nestjs/common';
+import { DestinationAdapter } from './plugin.decorator';
 import { createSign } from 'crypto';
 import { base64url } from './helpers';
 import type { AdapterResult, DeliveryAdapter, DeliveryContext } from './types';
@@ -6,6 +8,14 @@ const TIMEOUT_MS = 15_000;
 const SHEETS_SCOPE = 'https://www.googleapis.com/auth/spreadsheets';
 const TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token';
 
+@Injectable()
+@DestinationAdapter({
+  type: 'sheets',
+  displayName: 'Google Sheets',
+  configSchema: {
+    required: ['spreadsheetId', 'range', 'serviceAccountEmail', 'privateKey'],
+  },
+})
 export class SheetsAdapter implements DeliveryAdapter {
   readonly type = 'sheets';
 

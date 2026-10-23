@@ -4,6 +4,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { AuthService } from '../../core/auth/auth.service';
 import { environment } from '../../../environments/environment';
+import { ApiKeysComponent } from './api-keys.component';
 
 interface TenantInfo {
   id: string;
@@ -14,49 +15,76 @@ interface TenantInfo {
   quotaAiTokensPerMonth: number;
 }
 
+type Tab = 'workspace' | 'api-keys';
+
 @Component({
   selector: 'app-settings',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, ApiKeysComponent],
   template: `
-    <div class="space-y-6 max-w-2xl">
+    <div class="space-y-6 max-w-4xl">
       <div>
         <h1 class="text-2xl font-bold tracking-tightest text-white">Settings</h1>
-        <p class="text-sm text-muted mt-1">Workspace configuration.</p>
+        <p class="text-sm text-muted mt-1">Workspace configuration and API access.</p>
       </div>
 
-      @if (tenant(); as t) {
-        <div class="card">
-          <h2 class="text-sm font-medium text-white mb-4">Workspace</h2>
-          <form [formGroup]="form" (ngSubmit)="save()" class="space-y-4">
-            <div>
-              <label class="label">Name</label>
-              <input formControlName="name" class="input" />
-            </div>
-            <div>
-              <label class="label">Slug</label>
-              <input [value]="t.slug" disabled class="input opacity-60" />
-            </div>
-            <div>
-              <label class="label">Plan</label>
-              <input [value]="t.plan" disabled class="input opacity-60" />
-            </div>
-            <div class="flex gap-2">
-              <button type="submit" [disabled]="form.invalid || saving()" class="btn-primary">
-                {{ saving() ? 'Saving...' : 'Save changes' }}
-              </button>
-              @if (saved()) {
-                <span class="text-sm text-signal-green self-center">Saved</span>
-              }
-            </div>
-          </form>
-        </div>
+      <div class="flex gap-1 border-b border-hairline">
+        <button
+          (click)="tab.set('workspace')"
+          class="px-4 py-2 text-sm border-b-2 -mb-px"
+          [class.border-relay-violet]="tab() === 'workspace'"
+          [class.text-white]="tab() === 'workspace'"
+          [class.text-muted]="tab() !== 'workspace'"
+          [class.border-transparent]="tab() !== 'workspace'"
+        >Workspace</button>
+        <button
+          (click)="tab.set('api-keys')"
+          class="px-4 py-2 text-sm border-b-2 -mb-px"
+          [class.border-relay-violet]="tab() === 'api-keys'"
+          [class.text-white]="tab() === 'api-keys'"
+          [class.text-muted]="tab() !== 'api-keys'"
+          [class.border-transparent]="tab() !== 'api-keys'"
+        >API Keys</button>
+      </div>
 
-        <div class="card">
-          <h2 class="text-sm font-medium text-white mb-2">Quotas</h2>
-          <p class="text-xs text-muted">Events/month: {{ t.quotaEventsPerMonth.toLocaleString() }}</p>
-          <p class="text-xs text-muted">AI tokens/month: {{ t.quotaAiTokensPerMonth.toLocaleString() }}</p>
-        </div>
+      @if (tab() === 'workspace') {
+        @if (tenant(); as t) {
+          <div class="card">
+            <h2 class="text-sm font-medium text-white mb-4">Workspace</h2>
+            <form [formGroup]="form" (ngSubmit)="save()" class="space-y-4">
+              <div>
+                <label class="label">Name</label>
+                <input formControlName="name" class="input" />
+              </div>
+              <div>
+                <label class="label">Slug</label>
+                <input [value]="t.slug" disabled class="input opacity-60" />
+              </div>
+              <div>
+                <label class="label">Plan</label>
+                <input [value]="t.plan" disabled class="input opacity-60" />
+              </div>
+              <div class="flex gap-2">
+                <button type="submit" [disabled]="form.invalid || saving()" class="btn-primary">
+                  {{ saving() ? 'Saving...' : 'Save changes' }}
+                </button>
+                @if (saved()) {
+                  <span class="text-sm text-signal-green self-center">Saved</span>
+                }
+              </div>
+            </form>
+          </div>
+
+          <div class="card">
+            <h2 class="text-sm font-medium text-white mb-2">Quotas</h2>
+            <p class="text-xs text-muted">Events/month: {{ t.quotaEventsPerMonth.toLocaleString() }}</p>
+            <p class="text-xs text-muted">AI tokens/month: {{ t.quotaAiTokensPerMonth.toLocaleString() }}</p>
+          </div>
+        }
+      }
+
+      @if (tab() === 'api-keys') {
+        <app-api-keys />
       }
     </div>
   `,
@@ -66,6 +94,7 @@ export class SettingsComponent implements OnInit {
   private fb = inject(FormBuilder);
   private auth = inject(AuthService);
 
+  tab = signal<Tab>('workspace');
   tenant = signal<TenantInfo | null>(null);
   saving = signal(false);
   saved = signal(false);

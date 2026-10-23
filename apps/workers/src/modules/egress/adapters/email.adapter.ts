@@ -1,9 +1,19 @@
+import { Injectable } from '@nestjs/common';
+import { DestinationAdapter } from './plugin.decorator';
 import { escapeHtml } from './helpers';
 import type { AdapterResult, DeliveryAdapter, DeliveryContext } from './types';
 
 const TIMEOUT_MS = 15_000;
 const RESEND_ENDPOINT = 'https://api.resend.com/emails';
 
+@Injectable()
+@DestinationAdapter({
+  type: 'email',
+  displayName: 'Email (Resend)',
+  configSchema: {
+    required: ['apiKey', 'to', 'from'],
+  },
+})
 export class EmailAdapter implements DeliveryAdapter {
   readonly type = 'email';
 

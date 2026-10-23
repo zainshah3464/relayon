@@ -145,13 +145,17 @@ model Destination {
 // ═══════════════════════════════════════════════════════════════
 
 model ApiKey {
-  id         String    @id @default(uuid())
-  tenantId   String    @map("tenant_id")
-  name       String
-  keyHash    String    @unique @map("key_hash")
-  lastUsedAt DateTime? @map("last_used_at")
-  expiresAt  DateTime? @map("expires_at")
-  createdAt  DateTime  @default(now()) @map("created_at")
+  id          String    @id @default(uuid())
+  tenantId    String    @map("tenant_id")
+  name        String
+  prefix      String    @unique
+  keyHash     String    @unique @map("key_hash")
+  scopes      String[]  @default([])
+  environment String    @default("live") @map("environment")
+  lastUsedAt  DateTime? @map("last_used_at")
+  expiresAt   DateTime? @map("expires_at")
+  revokedAt   DateTime? @map("revoked_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 

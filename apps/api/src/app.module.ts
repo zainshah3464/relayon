@@ -10,6 +10,7 @@ import { DestinationsModule } from './modules/destinations/destinations.module';
 import { EventsModule } from './modules/events/events.module';
 import { DlqModule } from './modules/dlq/dlq.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
+import { ApiKeysModule } from './modules/api-keys/api-keys.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { AnalyticsModule } from './modules/analytics/analytics.module';
     EventsModule,
     DlqModule,
     AnalyticsModule,
+    ApiKeysModule,
   ],
 })
 export class AppModule {}
