@@ -8,7 +8,6 @@
     "packages/*"
   ],
   "scripts": {
-    "postinstall": "node ./node_modules/prisma/build/index.js generate --schema=./packages/db/prisma/schema.prisma",
     "dev:dashboard": "npm run start --workspace=dashboard",
     "dev:api": "npm run dev --workspace=api",
     "dev:ingress": "npm run dev --workspace=ingress",
