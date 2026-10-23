@@ -1,17 +1,19 @@
 import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { EventsService } from './events.service';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { JwtOrApiKeyGuard } from '../../common/guards/jwt-or-api-key.guard';
+import { RequireScopes } from '../../common/guards/api-key.guard';
 import {
   CurrentUser,
   type JwtUser,
 } from '../../common/decorators/current-user.decorator';
 
 @Controller('events')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtOrApiKeyGuard)
 export class EventsController {
   constructor(private readonly events: EventsService) {}
 
   @Get()
+  @RequireScopes('events:read')
   list(
     @CurrentUser() user: JwtUser,
     @Query('workflowId') workflowId?: string,
@@ -28,6 +30,7 @@ export class EventsController {
   }
 
   @Get(':id')
+  @RequireScopes('events:read')
   get(@CurrentUser() user: JwtUser, @Param('id') id: string) {
     return this.events.get(user.tenantId, id);
   }

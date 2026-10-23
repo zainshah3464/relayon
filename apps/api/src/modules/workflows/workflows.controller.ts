@@ -14,7 +14,8 @@ import {
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { WorkflowsService } from './workflows.service';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { JwtOrApiKeyGuard } from '../../common/guards/jwt-or-api-key.guard';
+import { RequireScopes } from '../../common/guards/api-key.guard';
 import {
   CurrentUser,
   type JwtUser,
@@ -23,26 +24,30 @@ import { CreateWorkflowDto } from './dto/create-workflow.dto';
 import { UpdateWorkflowDto } from './dto/update-workflow.dto';
 
 @Controller('workflows')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtOrApiKeyGuard)
 export class WorkflowsController {
   constructor(private readonly workflows: WorkflowsService) {}
 
   @Get()
+  @RequireScopes('workflows:read')
   list(@CurrentUser() user: JwtUser) {
     return this.workflows.list(user.tenantId);
   }
 
   @Get(':id')
+  @RequireScopes('workflows:read')
   get(@CurrentUser() user: JwtUser, @Param('id') id: string) {
     return this.workflows.get(user.tenantId, id);
   }
 
   @Post()
+  @RequireScopes('workflows:write')
   create(@CurrentUser() user: JwtUser, @Body() dto: CreateWorkflowDto) {
     return this.workflows.create(user.tenantId, dto);
   }
 
   @Patch(':id')
+  @RequireScopes('workflows:write')
   update(
     @CurrentUser() user: JwtUser,
     @Param('id') id: string,
@@ -53,12 +58,14 @@ export class WorkflowsController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
+  @RequireScopes('workflows:write')
   remove(@CurrentUser() user: JwtUser, @Param('id') id: string) {
     return this.workflows.remove(user.tenantId, id);
   }
 
   @Get(':id/export')
   @Header('Content-Type', 'application/x-yaml')
+  @RequireScopes('workflows:read')
   async export(
     @CurrentUser() user: JwtUser,
     @Param('id') id: string,
@@ -73,6 +80,7 @@ export class WorkflowsController {
   }
 
   @Post('import')
+  @RequireScopes('workflows:write')
   import(
     @CurrentUser() user: JwtUser,
     @Body() body: { yaml: string },
@@ -82,6 +90,7 @@ export class WorkflowsController {
 
   @Post(':id/preview-transform')
   @HttpCode(HttpStatus.OK)
+  @RequireScopes('workflows:write')
   previewTransform(
     @CurrentUser() user: JwtUser,
     @Param('id') id: string,
