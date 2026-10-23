@@ -116,8 +116,10 @@ model Workflow {
   createdAt           DateTime   @default(now()) @map("created_at")
   updatedAt           DateTime   @updatedAt @map("updated_at")
 
-  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant       Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   destinations Destination[]
+  schedule     WorkflowSchedule?
+  versions     WorkflowVersion[]
 
   @@index([tenantId])
   @@map("workflows")
@@ -161,4 +163,43 @@ model ApiKey {
 
   @@index([tenantId])
   @@map("api_keys")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SCHEDULES & VERSIONS
+// ═══════════════════════════════════════════════════════════════
+
+model WorkflowSchedule {
+  id              String    @id @default(uuid())
+  workflowId      String    @unique @map("workflow_id")
+  cronExpression  String    @map("cron_expression")
+  timezone        String    @default("UTC")
+  payloadTemplate Json      @default("{}") @map("payload_template")
+  isActive        Boolean   @default(true) @map("is_active")
+  lastRunAt       DateTime? @map("last_run_at")
+  nextRunAt       DateTime  @map("next_run_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  workflow Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@index([isActive, nextRunAt])
+  @@map("workflow_schedules")
+}
+
+model WorkflowVersion {
+  id         String   @id @default(uuid())
+  workflowId String   @map("workflow_id")
+  tenantId   String   @map("tenant_id")
+  version    Int
+  snapshot   Json
+  message    String?
+  createdBy  String?  @map("created_by")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  workflow Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@unique([workflowId, version])
+  @@index([tenantId, workflowId, version])
+  @@map("workflow_versions")
 }

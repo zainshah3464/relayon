@@ -1,12 +1,24 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { load, dump } from 'js-yaml';
 import jsonata from 'jsonata';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { WorkflowVersionsService } from './workflow-versions.service';
 import { CreateWorkflowDto } from './dto/create-workflow.dto';
 import { UpdateWorkflowDto } from './dto/update-workflow.dto';
 
-const SECRET_KEYS = new Set(['secret', 'apiKey', 'privateKey', 'webhookUrl']);
+const SECRET_KEYS = new Set([
+  'secret',
+  'apiKey',
+  'privateKey',
+  'webhookUrl',
+  'token',
+  'password',
+]);
 const SECRET_PLACEHOLDER_PREFIX = '${';
 
 interface WorkflowYaml {
@@ -19,6 +31,7 @@ interface WorkflowYaml {
     enrichmentEnabled: boolean;
     enrichmentPrompt: string | null;
     transformExpression: string | null;
+    routingRules: Array<{ when: string; destinationIds: string[] }>;
     isActive: boolean;
     destinations: Array<{
       type: string;
@@ -31,27 +44,39 @@ interface WorkflowYaml {
 
 @Injectable()
 export class WorkflowsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly versions: WorkflowVersionsService,
+  ) {}
 
   async list(tenantId: string) {
     return this.prisma.workflow.findMany({
       where: { tenantId },
       orderBy: { createdAt: 'desc' },
-      include: { _count: { select: { destinations: true } } },
+      include: {
+        _count: { select: { destinations: true } },
+        schedule: {
+          select: { cronExpression: true, isActive: true, nextRunAt: true },
+        },
+      },
     });
   }
 
   async get(tenantId: string, id: string) {
     const workflow = await this.prisma.workflow.findFirst({
       where: { id, tenantId },
-      include: { destinations: true },
+      include: { destinations: true, schedule: true },
     });
     if (!workflow) throw new NotFoundException('Workflow not found');
     return workflow;
   }
 
-  async create(tenantId: string, dto: CreateWorkflowDto) {
-    return this.prisma.workflow.create({
+  async create(
+    tenantId: string,
+    dto: CreateWorkflowDto,
+    actorId: string | null,
+  ) {
+    const created = await this.prisma.workflow.create({
       data: {
         tenantId,
         name: dto.name,
@@ -60,14 +85,24 @@ export class WorkflowsService {
         enrichmentEnabled: dto.enrichmentEnabled ?? false,
         enrichmentPrompt: dto.enrichmentPrompt,
         transformExpression: dto.transformExpression,
+        routingRules: (dto.routingRules ?? []) as Prisma.InputJsonValue,
         isActive: dto.isActive ?? true,
       },
     });
+
+    await this.versions.capture(created.id, tenantId, actorId, 'Initial version');
+    return created;
   }
 
-  async update(tenantId: string, id: string, dto: UpdateWorkflowDto) {
+  async update(
+    tenantId: string,
+    id: string,
+    dto: UpdateWorkflowDto,
+    actorId: string | null,
+  ) {
     await this.get(tenantId, id);
-    return this.prisma.workflow.update({
+
+    const updated = await this.prisma.workflow.update({
       where: { id },
       data: {
         ...(dto.name !== undefined && { name: dto.name }),
@@ -84,9 +119,21 @@ export class WorkflowsService {
         ...(dto.transformExpression !== undefined && {
           transformExpression: dto.transformExpression,
         }),
+        ...(dto.routingRules !== undefined && {
+          routingRules: dto.routingRules as Prisma.InputJsonValue,
+        }),
         ...(dto.isActive !== undefined && { isActive: dto.isActive }),
       },
     });
+
+    await this.versions.capture(
+      id,
+      tenantId,
+      actorId,
+      dto.name !== undefined ? `Renamed to "${dto.name}"` : 'Configuration updated',
+    );
+
+    return updated;
   }
 
   async remove(tenantId: string, id: string) {
@@ -95,9 +142,7 @@ export class WorkflowsService {
     return { deleted: true, id };
   }
 
-  // ─────────────────────────────────────────────────────────────
-  // YAML EXPORT
-  // ─────────────────────────────────────────────────────────────
+  // ── YAML export / import ──────────────────────────────────────
 
   async exportYaml(tenantId: string, workflowId: string): Promise<string> {
     const wf = await this.get(tenantId, workflowId);
@@ -108,18 +153,21 @@ export class WorkflowsService {
       metadata: { name: wf.name },
       spec: {
         sourceType: wf.sourceType,
-        sourceConfig: this.redactConfig(
+        sourceConfig: this.redactYamlConfig(
           (wf.sourceConfig ?? {}) as Record<string, unknown>,
           'SOURCE',
         ),
         enrichmentEnabled: wf.enrichmentEnabled,
         enrichmentPrompt: wf.enrichmentPrompt,
         transformExpression: wf.transformExpression,
+        routingRules: Array.isArray(wf.routingRules)
+          ? (wf.routingRules as Array<{ when: string; destinationIds: string[] }>)
+          : [],
         isActive: wf.isActive,
         destinations: wf.destinations.map((d) => ({
           type: d.type,
           name: d.name,
-          config: this.redactConfig(
+          config: this.redactYamlConfig(
             (d.config ?? {}) as Record<string, unknown>,
             d.type.toUpperCase(),
           ),
@@ -131,13 +179,10 @@ export class WorkflowsService {
     return dump(doc, { noRefs: true, lineWidth: 120 });
   }
 
-  // ─────────────────────────────────────────────────────────────
-  // YAML IMPORT
-  // ─────────────────────────────────────────────────────────────
-
   async importYaml(
     tenantId: string,
     yamlText: string,
+    actorId: string | null,
   ): Promise<{ id: string; name: string; destinationsCreated: number }> {
     let parsed: unknown;
     try {
@@ -168,10 +213,10 @@ export class WorkflowsService {
       throw new BadRequestException('spec.sourceType is required');
     }
 
-    const placeholderChecks = this.collectPlaceholders(doc);
-    if (placeholderChecks.length > 0) {
+    const placeholders = this.collectPlaceholders(doc);
+    if (placeholders.length > 0) {
       throw new BadRequestException(
-        `Unresolved secret placeholder(s): ${placeholderChecks.join(', ')}. Replace \${...} with real values before import.`,
+        `Unresolved secret placeholder(s): ${placeholders.join(', ')}`,
       );
     }
 
@@ -184,6 +229,7 @@ export class WorkflowsService {
         enrichmentEnabled: spec.enrichmentEnabled ?? false,
         enrichmentPrompt: spec.enrichmentPrompt ?? null,
         transformExpression: spec.transformExpression ?? null,
+        routingRules: (spec.routingRules ?? []) as Prisma.InputJsonValue,
         isActive: spec.isActive ?? true,
         destinations: {
           create: (spec.destinations ?? []).map((d) => ({
@@ -194,34 +240,24 @@ export class WorkflowsService {
           })),
         },
       },
-      include: { destinations: true },
+      include: { _count: { select: { destinations: true } } },
     });
+
+    await this.versions.capture(
+      created.id,
+      tenantId,
+      actorId,
+      'Imported from YAML',
+    );
 
     return {
       id: created.id,
       name: created.name,
-      destinationsCreated: created.destinations?.length ?? 0,
+      destinationsCreated: created._count.destinations,
     };
   }
 
-  // ─────────────────────────────────────────────────────────────
-  // TRANSFORM PREVIEW
-  // ─────────────────────────────────────────────────────────────
-
-  /**
-   * Compile + evaluate a JSONata expression against a sample payload.
-   * Compile-once per call, 2000ms timeout. Used by the workflow editor
-   * to validate transforms before saving.
-   */
-  async previewTransform(
-    expression: string,
-    samplePayload: unknown,
-  ): Promise<{
-    ok: boolean;
-    result: unknown;
-    error: string | null;
-    durationMs: number;
-  }> {
+  async previewTransform(expression: string, samplePayload: unknown) {
     const started = Date.now();
     if (!expression || !expression.trim()) {
       return {
@@ -254,7 +290,6 @@ export class WorkflowsService {
           ),
         ),
       ]);
-
       return {
         ok: true,
         result: result === undefined ? null : result,
@@ -271,16 +306,20 @@ export class WorkflowsService {
     }
   }
 
-  private redactConfig(
+  private redactYamlConfig(
     config: Record<string, unknown>,
     namespace: string,
   ): Record<string, unknown> {
     const out: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(config)) {
-      if (SECRET_KEYS.has(key) && value !== null && value !== '') {
+      if (SECRET_KEYS.has(key) && typeof value === 'string' && value.length > 0) {
         out[key] = `${SECRET_PLACEHOLDER_PREFIX}${namespace}_${key.toUpperCase()}}`;
-      } else if (value && typeof value === 'object' && !Array.isArray(value)) {
-        out[key] = this.redactConfig(
+      } else if (
+        value !== null &&
+        typeof value === 'object' &&
+        !Array.isArray(value)
+      ) {
+        out[key] = this.redactYamlConfig(
           value as Record<string, unknown>,
           namespace,
         );
@@ -294,7 +333,10 @@ export class WorkflowsService {
   private collectPlaceholders(doc: Partial<WorkflowYaml>): string[] {
     const found: string[] = [];
     const walk = (value: unknown, path: string): void => {
-      if (typeof value === 'string' && value.startsWith(SECRET_PLACEHOLDER_PREFIX)) {
+      if (
+        typeof value === 'string' &&
+        value.startsWith(SECRET_PLACEHOLDER_PREFIX)
+      ) {
         found.push(path);
       } else if (value && typeof value === 'object') {
         for (const [k, v] of Object.entries(value as Record<string, unknown>)) {

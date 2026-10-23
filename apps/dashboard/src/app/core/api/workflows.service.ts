@@ -9,8 +9,24 @@ export type DestinationType =
   | 'slack'
   | 'email'
   | 'sheets'
+  | 'discord'
+  | 'airtable'
+  | 'notion'
   | 'postgres'
   | 'mongodb';
+
+export interface WorkflowSchedule {
+  id: string;
+  workflowId: string;
+  cronExpression: string;
+  timezone: string;
+  payloadTemplate: Record<string, unknown>;
+  isActive: boolean;
+  lastRunAt: string | null;
+  nextRunAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
 
 export interface Workflow {
   id: string;
@@ -21,9 +37,11 @@ export interface Workflow {
   enrichmentEnabled: boolean;
   enrichmentPrompt: string | null;
   transformExpression: string | null;
+  routingRules: unknown;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  schedule?: WorkflowSchedule | null;
   _count?: { destinations: number };
 }
 
@@ -39,6 +57,18 @@ export interface Destination {
   updatedAt: string;
 }
 
+export interface WorkflowVersionSummary {
+  id: string;
+  version: number;
+  message: string | null;
+  createdBy: string | null;
+  createdAt: string;
+}
+
+export interface WorkflowVersionDetail extends WorkflowVersionSummary {
+  snapshot: Record<string, unknown>;
+}
+
 export interface CreateWorkflowPayload {
   name: string;
   sourceType: SourceType;
@@ -46,6 +76,7 @@ export interface CreateWorkflowPayload {
   enrichmentEnabled?: boolean;
   enrichmentPrompt?: string;
   transformExpression?: string;
+  routingRules?: Array<{ when: string; destinationIds: string[] }>;
   isActive?: boolean;
 }
 
@@ -54,6 +85,13 @@ export interface CreateDestinationPayload {
   name: string;
   config: Record<string, unknown>;
   enabled?: boolean;
+}
+
+export interface UpsertSchedulePayload {
+  cronExpression: string;
+  timezone?: string;
+  payloadTemplate?: Record<string, unknown>;
+  isActive?: boolean;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -89,12 +127,16 @@ export class WorkflowsService {
     });
   }
 
-  importYaml(yaml: string): Observable<{ id: string; name: string; destinationsCreated: number }> {
+  importYaml(
+    yaml: string,
+  ): Observable<{ id: string; name: string; destinationsCreated: number }> {
     return this.http.post<{ id: string; name: string; destinationsCreated: number }>(
       `${this.base}/api/workflows/import`,
       { yaml },
     );
   }
+
+  // ── Destinations ─────────────────────────────────────────────
 
   listDestinations(workflowId: string): Observable<Destination[]> {
     return this.http.get<Destination[]>(
@@ -125,6 +167,51 @@ export class WorkflowsService {
   removeDestination(id: string): Observable<{ deleted: boolean; id: string }> {
     return this.http.delete<{ deleted: boolean; id: string }>(
       `${this.base}/api/destinations/${id}`,
+    );
+  }
+
+  // ── Versions ─────────────────────────────────────────────────
+
+  listVersions(workflowId: string): Observable<WorkflowVersionSummary[]> {
+    return this.http.get<WorkflowVersionSummary[]>(
+      `${this.base}/api/workflows/${workflowId}/versions`,
+    );
+  }
+
+  getVersion(workflowId: string, version: number): Observable<WorkflowVersionDetail> {
+    return this.http.get<WorkflowVersionDetail>(
+      `${this.base}/api/workflows/${workflowId}/versions/${version}`,
+    );
+  }
+
+  restoreVersion(workflowId: string, version: number): Observable<Workflow> {
+    return this.http.post<Workflow>(
+      `${this.base}/api/workflows/${workflowId}/versions/${version}/restore`,
+      {},
+    );
+  }
+
+  // ── Schedule ─────────────────────────────────────────────────
+
+  getSchedule(workflowId: string): Observable<WorkflowSchedule | null> {
+    return this.http.get<WorkflowSchedule | null>(
+      `${this.base}/api/workflows/${workflowId}/schedule`,
+    );
+  }
+
+  upsertSchedule(
+    workflowId: string,
+    payload: UpsertSchedulePayload,
+  ): Observable<WorkflowSchedule> {
+    return this.http.put<WorkflowSchedule>(
+      `${this.base}/api/workflows/${workflowId}/schedule`,
+      payload,
+    );
+  }
+
+  deleteSchedule(workflowId: string): Observable<{ deleted: boolean }> {
+    return this.http.delete<{ deleted: boolean }>(
+      `${this.base}/api/workflows/${workflowId}/schedule`,
     );
   }
 }

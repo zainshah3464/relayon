@@ -7,6 +7,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  ParseIntPipe,
   Patch,
   Post,
   Res,
@@ -14,6 +15,7 @@ import {
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { WorkflowsService } from './workflows.service';
+import { WorkflowVersionsService } from './workflow-versions.service';
 import { JwtOrApiKeyGuard } from '../../common/guards/jwt-or-api-key.guard';
 import { RequireScopes } from '../../common/guards/api-key.guard';
 import {
@@ -26,7 +28,10 @@ import { UpdateWorkflowDto } from './dto/update-workflow.dto';
 @Controller('workflows')
 @UseGuards(JwtOrApiKeyGuard)
 export class WorkflowsController {
-  constructor(private readonly workflows: WorkflowsService) {}
+  constructor(
+    private readonly workflows: WorkflowsService,
+    private readonly versions: WorkflowVersionsService,
+  ) {}
 
   @Get()
   @RequireScopes('workflows:read')
@@ -43,7 +48,7 @@ export class WorkflowsController {
   @Post()
   @RequireScopes('workflows:write')
   create(@CurrentUser() user: JwtUser, @Body() dto: CreateWorkflowDto) {
-    return this.workflows.create(user.tenantId, dto);
+    return this.workflows.create(user.tenantId, dto, user.sub);
   }
 
   @Patch(':id')
@@ -53,19 +58,19 @@ export class WorkflowsController {
     @Param('id') id: string,
     @Body() dto: UpdateWorkflowDto,
   ) {
-    return this.workflows.update(user.tenantId, id, dto);
+    return this.workflows.update(user.tenantId, id, dto, user.sub);
   }
 
   @Delete(':id')
-  @HttpCode(HttpStatus.OK)
   @RequireScopes('workflows:write')
+  @HttpCode(HttpStatus.OK)
   remove(@CurrentUser() user: JwtUser, @Param('id') id: string) {
     return this.workflows.remove(user.tenantId, id);
   }
 
   @Get(':id/export')
-  @Header('Content-Type', 'application/x-yaml')
   @RequireScopes('workflows:read')
+  @Header('Content-Type', 'application/x-yaml')
   async export(
     @CurrentUser() user: JwtUser,
     @Param('id') id: string,
@@ -81,27 +86,51 @@ export class WorkflowsController {
 
   @Post('import')
   @RequireScopes('workflows:write')
-  import(
-    @CurrentUser() user: JwtUser,
-    @Body() body: { yaml: string },
-  ) {
-    return this.workflows.importYaml(user.tenantId, body.yaml ?? '');
+  import(@CurrentUser() user: JwtUser, @Body() body: { yaml: string }) {
+    return this.workflows.importYaml(user.tenantId, body.yaml ?? '', user.sub);
   }
 
   @Post(':id/preview-transform')
+  @RequireScopes('workflows:read')
   @HttpCode(HttpStatus.OK)
-  @RequireScopes('workflows:write')
-  previewTransform(
+  async previewTransform(
     @CurrentUser() user: JwtUser,
     @Param('id') id: string,
     @Body() body: { expression?: string; samplePayload?: unknown },
   ) {
-    // Ownership check
-    return this.workflows.get(user.tenantId, id).then(() =>
-      this.workflows.previewTransform(
-        body.expression ?? '',
-        body.samplePayload ?? {},
-      ),
+    await this.workflows.get(user.tenantId, id);
+    return this.workflows.previewTransform(
+      body.expression ?? '',
+      body.samplePayload ?? {},
     );
+  }
+
+  // ── Versioning ───────────────────────────────────────────────
+
+  @Get(':id/versions')
+  @RequireScopes('workflows:read')
+  listVersions(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.versions.list(user.tenantId, id);
+  }
+
+  @Get(':id/versions/:version')
+  @RequireScopes('workflows:read')
+  getVersion(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Param('version', ParseIntPipe) version: number,
+  ) {
+    return this.versions.get(user.tenantId, id, version);
+  }
+
+  @Post(':id/versions/:version/restore')
+  @RequireScopes('workflows:write')
+  @HttpCode(HttpStatus.OK)
+  restoreVersion(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Param('version', ParseIntPipe) version: number,
+  ) {
+    return this.versions.restore(user.tenantId, id, version, user.sub);
   }
 }

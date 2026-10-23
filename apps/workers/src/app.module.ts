@@ -5,6 +5,7 @@ import { MongoModule } from './modules/mongo/mongo.module';
 import { RedisModule } from './modules/redis/redis.module';
 import { ProcessingModule } from './modules/processing/processing.module';
 import { EgressModule } from './modules/egress/egress.module';
+import { ScheduleModule } from './modules/schedule/schedule.module';
 import { HealthModule } from './modules/health/health.module';
 
 @Module({
@@ -15,6 +16,7 @@ import { HealthModule } from './modules/health/health.module';
     RedisModule,
     ProcessingModule,
     EgressModule,
+    ScheduleModule,
     HealthModule,
   ],
 })

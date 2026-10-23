@@ -9,6 +9,8 @@ import { SlackAdapter } from './adapters/slack.adapter';
 import { EmailAdapter } from './adapters/email.adapter';
 import { SheetsAdapter } from './adapters/sheets.adapter';
 import { DiscordAdapter } from './adapters/discord.adapter';
+import { AirtableAdapter } from './adapters/airtable.adapter';
+import { NotionAdapter } from './adapters/notion.adapter';
 
 @Module({
   imports: [DiscoveryModule],
@@ -22,6 +24,8 @@ import { DiscordAdapter } from './adapters/discord.adapter';
     EmailAdapter,
     SheetsAdapter,
     DiscordAdapter,
+    AirtableAdapter,
+    NotionAdapter,
   ],
   exports: [EgressService, AdapterRegistry],
 })

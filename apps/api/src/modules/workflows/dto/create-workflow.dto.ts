@@ -1,4 +1,5 @@
 import {
+  IsArray,
   IsBoolean,
   IsIn,
   IsObject,
@@ -45,6 +46,10 @@ export class CreateWorkflowDto {
   @IsString()
   @MaxLength(2000)
   transformExpression?: string;
+
+  @IsOptional()
+  @IsArray()
+  routingRules?: Array<{ when: string; destinationIds: string[] }>;
 
   @IsOptional()
   @IsBoolean()
