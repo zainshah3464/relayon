@@ -1,8 +1,32 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { load, dump } from 'js-yaml';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateWorkflowDto } from './dto/create-workflow.dto';
 import { UpdateWorkflowDto } from './dto/update-workflow.dto';
+
+const SECRET_KEYS = new Set(['secret', 'apiKey', 'privateKey', 'webhookUrl']);
+const SECRET_PLACEHOLDER_PREFIX = '${';
+
+interface WorkflowYaml {
+  apiVersion: 'relayon/v1';
+  kind: 'Workflow';
+  metadata: { name: string };
+  spec: {
+    sourceType: string;
+    sourceConfig: Record<string, unknown>;
+    enrichmentEnabled: boolean;
+    enrichmentPrompt: string | null;
+    transformExpression: string | null;
+    isActive: boolean;
+    destinations: Array<{
+      type: string;
+      name: string;
+      config: Record<string, unknown>;
+      enabled: boolean;
+    }>;
+  };
+}
 
 @Injectable()
 export class WorkflowsService {
@@ -12,9 +36,7 @@ export class WorkflowsService {
     return this.prisma.workflow.findMany({
       where: { tenantId },
       orderBy: { createdAt: 'desc' },
-      include: {
-        _count: { select: { destinations: true } },
-      },
+      include: { _count: { select: { destinations: true } } },
     });
   }
 
@@ -23,9 +45,7 @@ export class WorkflowsService {
       where: { id, tenantId },
       include: { destinations: true },
     });
-    if (!workflow) {
-      throw new NotFoundException('Workflow not found');
-    }
+    if (!workflow) throw new NotFoundException('Workflow not found');
     return workflow;
   }
 
@@ -46,7 +66,6 @@ export class WorkflowsService {
 
   async update(tenantId: string, id: string, dto: UpdateWorkflowDto) {
     await this.get(tenantId, id);
-
     return this.prisma.workflow.update({
       where: { id },
       data: {
@@ -73,5 +92,149 @@ export class WorkflowsService {
     await this.get(tenantId, id);
     await this.prisma.workflow.delete({ where: { id } });
     return { deleted: true, id };
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // YAML EXPORT
+  // ─────────────────────────────────────────────────────────────
+
+  async exportYaml(tenantId: string, workflowId: string): Promise<string> {
+    const wf = await this.get(tenantId, workflowId);
+
+    const doc: WorkflowYaml = {
+      apiVersion: 'relayon/v1',
+      kind: 'Workflow',
+      metadata: { name: wf.name },
+      spec: {
+        sourceType: wf.sourceType,
+        sourceConfig: this.redactConfig(
+          (wf.sourceConfig ?? {}) as Record<string, unknown>,
+          'SOURCE',
+        ),
+        enrichmentEnabled: wf.enrichmentEnabled,
+        enrichmentPrompt: wf.enrichmentPrompt,
+        transformExpression: wf.transformExpression,
+        isActive: wf.isActive,
+        destinations: wf.destinations.map((d) => ({
+          type: d.type,
+          name: d.name,
+          config: this.redactConfig(
+            (d.config ?? {}) as Record<string, unknown>,
+            d.type.toUpperCase(),
+          ),
+          enabled: d.enabled,
+        })),
+      },
+    };
+
+    return dump(doc, { noRefs: true, lineWidth: 120 });
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // YAML IMPORT
+  // ─────────────────────────────────────────────────────────────
+
+  async importYaml(
+    tenantId: string,
+    yamlText: string,
+  ): Promise<{ id: string; name: string; destinationsCreated: number }> {
+    let parsed: unknown;
+    try {
+      parsed = load(yamlText);
+    } catch (err) {
+      throw new BadRequestException(
+        `Invalid YAML: ${err instanceof Error ? err.message : 'parse error'}`,
+      );
+    }
+
+    if (!parsed || typeof parsed !== 'object') {
+      throw new BadRequestException('YAML must be an object');
+    }
+
+    const doc = parsed as Partial<WorkflowYaml>;
+    if (doc.apiVersion !== 'relayon/v1' || doc.kind !== 'Workflow') {
+      throw new BadRequestException(
+        'Expected apiVersion "relayon/v1" and kind "Workflow"',
+      );
+    }
+
+    const spec = doc.spec;
+    const name = doc.metadata?.name;
+    if (!name || typeof name !== 'string') {
+      throw new BadRequestException('metadata.name is required');
+    }
+    if (!spec || typeof spec.sourceType !== 'string') {
+      throw new BadRequestException('spec.sourceType is required');
+    }
+
+    const placeholderChecks = this.collectPlaceholders(doc);
+    if (placeholderChecks.length > 0) {
+      throw new BadRequestException(
+        `Unresolved secret placeholder(s): ${placeholderChecks.join(', ')}. Replace \${...} with real values before import.`,
+      );
+    }
+
+    const created = await this.prisma.workflow.create({
+      data: {
+        tenantId,
+        name,
+        sourceType: spec.sourceType as never,
+        sourceConfig: (spec.sourceConfig ?? {}) as Prisma.InputJsonValue,
+        enrichmentEnabled: spec.enrichmentEnabled ?? false,
+        enrichmentPrompt: spec.enrichmentPrompt ?? null,
+        transformExpression: spec.transformExpression ?? null,
+        isActive: spec.isActive ?? true,
+        destinations: {
+          create: (spec.destinations ?? []).map((d) => ({
+            type: d.type as never,
+            name: d.name,
+            config: (d.config ?? {}) as Prisma.InputJsonValue,
+            enabled: d.enabled ?? true,
+          })),
+        },
+      },
+      include: { destinations: true },
+    });
+
+    return {
+      id: created.id,
+      name: created.name,
+      destinationsCreated: created.destinations?.length ?? 0,
+    };
+  }
+
+  private redactConfig(
+    config: Record<string, unknown>,
+    namespace: string,
+  ): Record<string, unknown> {
+    const out: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(config)) {
+      if (SECRET_KEYS.has(key) && value !== null && value !== '') {
+        out[key] = `${SECRET_PLACEHOLDER_PREFIX}${namespace}_${key.toUpperCase()}}`;
+      } else if (value && typeof value === 'object' && !Array.isArray(value)) {
+        out[key] = this.redactConfig(
+          value as Record<string, unknown>,
+          namespace,
+        );
+      } else {
+        out[key] = value;
+      }
+    }
+    return out;
+  }
+
+  private collectPlaceholders(doc: Partial<WorkflowYaml>): string[] {
+    const found: string[] = [];
+    const walk = (value: unknown, path: string): void => {
+      if (typeof value === 'string' && value.startsWith(SECRET_PLACEHOLDER_PREFIX)) {
+        found.push(path);
+      } else if (value && typeof value === 'object') {
+        for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+          walk(v, `${path}.${k}`);
+        }
+      }
+    };
+    walk(doc, '');
+    return found;
   }
 }

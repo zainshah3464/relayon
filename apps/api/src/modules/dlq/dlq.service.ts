@@ -1,6 +1,13 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { MongoService } from '../mongo/mongo.service';
 
+export interface BulkReplayResult {
+  total: number;
+  replayed: number;
+  failed: number;
+  failures: Array<{ id: string; reason: string }>;
+}
+
 @Injectable()
 export class DlqService {
   constructor(private readonly mongo: MongoService) {}
@@ -36,7 +43,6 @@ export class DlqService {
       .exec();
     if (!delivery) throw new NotFoundException('DLQ entry not found');
 
-    // Reset to pending — the egress worker will pick it up on next run
     await this.mongo.deliveryModel.updateOne(
       { _id: delivery._id },
       {
@@ -52,6 +58,62 @@ export class DlqService {
     );
 
     return { replayed: true, deliveryId: String(delivery._id) };
+  }
+
+  /**
+   * Bulk replay — atomic, capped at 100 IDs.
+   *
+   * Uses a single updateMany scoped to tenant + status='dlq'. Per-ID
+   * feedback is derived by querying which IDs actually changed. No
+   * partial-write surprises.
+   */
+  async bulkReplay(
+    tenantId: string,
+    ids: string[],
+  ): Promise<BulkReplayResult> {
+    if (ids.length === 0) {
+      return { total: 0, replayed: 0, failed: 0, failures: [] };
+    }
+
+    const uniqueIds = Array.from(new Set(ids)).slice(0, 100);
+
+    const before = await this.mongo.deliveryModel
+      .find({ _id: { $in: uniqueIds }, tenantId, status: 'dlq' })
+      .select({ _id: 1 })
+      .lean()
+      .exec();
+    const validIds = before.map((d) => String(d._id));
+    const validSet = new Set(validIds);
+
+    const failures: BulkReplayResult['failures'] = [];
+    for (const id of uniqueIds) {
+      if (!validSet.has(id)) {
+        failures.push({ id, reason: 'Not found, not owned, or not in DLQ' });
+      }
+    }
+
+    if (validIds.length > 0) {
+      await this.mongo.deliveryModel.updateMany(
+        { _id: { $in: validIds }, tenantId, status: 'dlq' },
+        {
+          $set: {
+            status: 'pending',
+            attemptCount: 0,
+            nextAttemptAt: new Date(),
+            error: null,
+            dlqReason: null,
+            dlqAt: null,
+          },
+        },
+      );
+    }
+
+    return {
+      total: uniqueIds.length,
+      replayed: validIds.length,
+      failed: failures.length,
+      failures,
+    };
   }
 
   async discard(tenantId: string, deliveryId: string) {

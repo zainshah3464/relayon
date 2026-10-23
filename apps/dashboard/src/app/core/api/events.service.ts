@@ -69,6 +69,13 @@ export interface ListResponse<T> {
   nextCursor: string | null;
 }
 
+export interface BulkReplayResult {
+  total: number;
+  replayed: number;
+  failed: number;
+  failures: Array<{ id: string; reason: string }>;
+}
+
 @Injectable({ providedIn: 'root' })
 export class EventsService {
   private http = inject(HttpClient);
@@ -107,6 +114,13 @@ export class EventsService {
     return this.http.post<{ replayed: boolean; deliveryId: string }>(
       `${this.base}/api/dlq/${id}/replay`,
       {},
+    );
+  }
+
+  bulkReplayDlq(ids: string[]): Observable<BulkReplayResult> {
+    return this.http.post<BulkReplayResult>(
+      `${this.base}/api/dlq/bulk-replay`,
+      { ids },
     );
   }
 

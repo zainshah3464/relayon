@@ -4,6 +4,7 @@ import {
   AnalyticsService,
   Overview,
   DeliveryStats,
+  CostAnalytics,
 } from '../../core/api/analytics.service';
 
 @Component({
@@ -14,7 +15,7 @@ import {
     <div class="space-y-6">
       <div>
         <h1 class="text-2xl font-bold tracking-tightest text-white">Analytics</h1>
-        <p class="text-sm text-muted mt-1">Event volume, delivery health, and latency.</p>
+        <p class="text-sm text-muted mt-1">Event volume, delivery health, latency, and estimated costs.</p>
       </div>
 
       @if (loading()) {
@@ -47,35 +48,69 @@ import {
           </div>
         }
 
-        @if (delivery(); as d) {
+        @if (cost(); as c) {
           <div class="card">
-            <h2 class="text-lg font-semibold text-white mb-4">Deliveries by destination (24h)</h2>
-            @if (d.byDestination.length === 0) {
-              <p class="text-sm text-muted">No deliveries in the last 24 hours.</p>
+            <div class="flex justify-between items-start mb-4">
+              <div>
+                <h2 class="text-lg font-semibold text-white">Estimated costs ({{ c.windowDays }}d)</h2>
+                <p class="text-xs text-muted mt-1">Approximation based on payload size and delivery attempts.</p>
+              </div>
+              <div class="text-right">
+                <p class="text-2xl font-bold text-signal-green">\${{ c.cost.totalUsd }}</p>
+                <p class="text-xs text-muted">Groq \${{ c.cost.groqUsd }} · Redis \${{ c.cost.redisUsd }}</p>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-3 gap-4 mb-4">
+              <div class="bg-surface-2 p-3 rounded">
+                <p class="text-xs uppercase text-muted">Events</p>
+                <p class="text-xl font-bold text-white">{{ c.events.total }}</p>
+              </div>
+              <div class="bg-surface-2 p-3 rounded">
+                <p class="text-xs uppercase text-muted">Enriched</p>
+                <p class="text-xl font-bold text-white">{{ c.events.enriched }}</p>
+                <p class="text-xs text-muted">{{ c.events.cacheHits }} cache hits</p>
+              </div>
+              <div class="bg-surface-2 p-3 rounded">
+                <p class="text-xs uppercase text-muted">~Tokens</p>
+                <p class="text-xl font-bold text-white">{{ c.events.estimatedTokens.toLocaleString() }}</p>
+              </div>
+            </div>
+
+            @if (c.perDestination.length === 0) {
+              <p class="text-sm text-muted">No deliveries in the last {{ c.windowDays }} days.</p>
             } @else {
               <table class="w-full text-sm">
                 <thead class="text-xs uppercase text-muted">
                   <tr>
                     <th class="text-left pb-2">Destination</th>
-                    <th class="text-right pb-2">Total</th>
-                    <th class="text-right pb-2">Delivered</th>
-                    <th class="text-right pb-2">DLQ</th>
-                    <th class="text-right pb-2">Avg latency</th>
+                    <th class="text-right pb-2">Deliveries</th>
+                    <th class="text-right pb-2">Attempts</th>
+                    <th class="text-right pb-2">Retry rate</th>
+                    <th class="text-right pb-2">Est. cost</th>
                   </tr>
                 </thead>
                 <tbody>
-                  @for (row of d.byDestination; track row._id) {
+                  @for (row of c.perDestination; track row.destinationId) {
                     <tr class="border-t border-hairline">
-                      <td class="py-2 font-mono text-xs text-white">{{ row.destinationType }} · {{ row._id.slice(0, 8) }}</td>
-                      <td class="py-2 text-right text-white">{{ row.total }}</td>
-                      <td class="py-2 text-right text-signal-green">{{ row.delivered }}</td>
-                      <td class="py-2 text-right" [class.text-signal-rose]="row.dlq > 0" [class.text-muted]="row.dlq === 0">{{ row.dlq }}</td>
-                      <td class="py-2 text-right text-muted">{{ row.avgLatencyMs ? (row.avgLatencyMs | number: '1.0-0') + 'ms' : '—' }}</td>
+                      <td class="py-2 font-mono text-xs text-white">{{ row.destinationType }} · {{ row.destinationId.slice(0, 8) }}</td>
+                      <td class="py-2 text-right text-white">{{ row.totalDeliveries }}</td>
+                      <td class="py-2 text-right text-white">{{ row.totalAttempts }}</td>
+                      <td class="py-2 text-right" [class.text-signal-amber]="row.retryRate > 20" [class.text-muted]="row.retryRate <= 20">
+                        {{ row.retryRate }}%
+                      </td>
+                      <td class="py-2 text-right text-muted">\${{ row.estimatedRedisCostUsd }}</td>
                     </tr>
                   }
                 </tbody>
               </table>
             }
+
+            <div class="mt-3 text-xs text-muted space-y-1">
+              @for (note of c.notes; track note) {
+                <p>· {{ note }}</p>
+              }
+            </div>
           </div>
         }
       }
@@ -87,6 +122,7 @@ export class AnalyticsComponent implements OnInit {
 
   overview = signal<Overview | null>(null);
   delivery = signal<DeliveryStats | null>(null);
+  cost = signal<CostAnalytics | null>(null);
   loading = signal(true);
   error = signal<string | null>(null);
 
@@ -102,7 +138,16 @@ export class AnalyticsComponent implements OnInit {
         this.svc.delivery().subscribe({
           next: (d) => {
             this.delivery.set(d);
-            this.loading.set(false);
+            this.svc.cost().subscribe({
+              next: (c) => {
+                this.cost.set(c);
+                this.loading.set(false);
+              },
+              error: (err) => {
+                this.error.set(err?.error?.message ?? 'Failed to load cost analytics');
+                this.loading.set(false);
+              },
+            });
           },
           error: (err) => {
             this.error.set(err?.error?.message ?? 'Failed to load delivery stats');

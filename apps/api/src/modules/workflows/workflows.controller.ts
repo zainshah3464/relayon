@@ -3,13 +3,16 @@ import {
   Controller,
   Delete,
   Get,
+  Header,
   HttpCode,
   HttpStatus,
   Param,
   Patch,
   Post,
+  Res,
   UseGuards,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { WorkflowsService } from './workflows.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import {
@@ -52,5 +55,28 @@ export class WorkflowsController {
   @HttpCode(HttpStatus.OK)
   remove(@CurrentUser() user: JwtUser, @Param('id') id: string) {
     return this.workflows.remove(user.tenantId, id);
+  }
+
+  @Get(':id/export')
+  @Header('Content-Type', 'application/x-yaml')
+  async export(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<string> {
+    const yaml = await this.workflows.exportYaml(user.tenantId, id);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="workflow-${id.slice(0, 8)}.yaml"`,
+    );
+    return yaml;
+  }
+
+  @Post('import')
+  import(
+    @CurrentUser() user: JwtUser,
+    @Body() body: { yaml: string },
+  ) {
+    return this.workflows.importYaml(user.tenantId, body.yaml ?? '');
   }
 }

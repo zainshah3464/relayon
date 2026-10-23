@@ -30,6 +30,33 @@ export interface DeliveryStats {
   byDestination: DeliveryByDestination[];
 }
 
+export interface CostAnalytics {
+  windowDays: number;
+  events: {
+    total: number;
+    enriched: number;
+    cacheHits: number;
+    estimatedTokens: number;
+  };
+  cost: {
+    groqUsd: number;
+    redisUsd: number;
+    totalUsd: number;
+  };
+  perDestination: Array<{
+    destinationId: string;
+    destinationType: string;
+    totalDeliveries: number;
+    totalAttempts: number;
+    retries: number;
+    retryRate: number;
+    delivered: number;
+    dlq: number;
+    estimatedRedisCostUsd: number;
+  }>;
+  notes: string[];
+}
+
 @Injectable({ providedIn: 'root' })
 export class AnalyticsService {
   private http = inject(HttpClient);
@@ -41,5 +68,9 @@ export class AnalyticsService {
 
   delivery(): Observable<DeliveryStats> {
     return this.http.get<DeliveryStats>(`${this.base}/api/analytics/delivery`);
+  }
+
+  cost(): Observable<CostAnalytics> {
+    return this.http.get<CostAnalytics>(`${this.base}/api/analytics/cost`);
   }
 }

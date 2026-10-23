@@ -20,4 +20,9 @@ export class AnalyticsController {
   delivery(@CurrentUser() user: JwtUser) {
     return this.analytics.delivery(user.tenantId);
   }
+
+  @Get('cost')
+  cost(@CurrentUser() user: JwtUser) {
+    return this.analytics.cost(user.tenantId);
+  }
 }

@@ -28,6 +28,9 @@ import { environment } from '../../../environments/environment';
         </div>
         <div class="flex gap-2">
           <button (click)="copyWebhookUrl()" class="btn-secondary">{{ copied() ? 'Copied!' : 'Copy webhook URL' }}</button>
+          <button (click)="exportYaml()" [disabled]="exporting()" class="btn-secondary">
+            {{ exporting() ? 'Exporting...' : 'Export YAML' }}
+          </button>
         </div>
       </div>
 
@@ -36,18 +39,13 @@ import { environment } from '../../../environments/environment';
       }
 
       @if (workflow(); as wf) {
-        <!-- Webhook URL -->
         <div class="card">
           <h2 class="text-sm font-medium text-white mb-2">Webhook URL</h2>
           <code class="block text-xs font-mono text-relay-cyan bg-surface-2 p-3 rounded overflow-x-auto">
             {{ ingressUrl }}/webhook/{{ wf.tenantId }}/{{ wf.id }}
           </code>
-          <p class="text-xs text-muted mt-2">
-            Configure this URL in your {{ wf.sourceType }} dashboard. Relayon verifies HMAC signature before accepting.
-          </p>
         </div>
 
-        <!-- Config summary -->
         <div class="card grid grid-cols-3 gap-4">
           <div>
             <p class="text-xs text-muted uppercase tracking-wider">AI Enrichment</p>
@@ -63,7 +61,6 @@ import { environment } from '../../../environments/environment';
           </div>
         </div>
 
-        <!-- Destinations -->
         <div>
           <div class="flex items-center justify-between mb-3">
             <h2 class="text-lg font-semibold text-white">Destinations</h2>
@@ -72,7 +69,7 @@ import { environment } from '../../../environments/environment';
 
           @if (destinations().length === 0) {
             <div class="card text-center py-8">
-              <p class="text-sm text-muted">No destinations yet. Add one to start delivering events.</p>
+              <p class="text-sm text-muted">No destinations yet.</p>
             </div>
           } @else {
             <div class="space-y-2">
@@ -92,9 +89,7 @@ import { environment } from '../../../environments/environment';
                     <button (click)="toggleDestination(d)" class="text-xs text-muted hover:text-white">
                       {{ d.enabled ? 'Disable' : 'Enable' }}
                     </button>
-                    <button (click)="deleteDestination(d)" class="text-xs text-signal-rose hover:underline">
-                      Delete
-                    </button>
+                    <button (click)="deleteDestination(d)" class="text-xs text-signal-rose hover:underline">Delete</button>
                   </div>
                 </div>
               }
@@ -103,7 +98,6 @@ import { environment } from '../../../environments/environment';
         </div>
       }
 
-      <!-- Create destination modal -->
       @if (showCreateDest()) {
         <div class="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" (click)="closeCreateDest()">
           <div class="card w-full max-w-lg" (click)="$event.stopPropagation()">
@@ -111,7 +105,7 @@ import { environment } from '../../../environments/environment';
             <form [formGroup]="destForm" (ngSubmit)="submitDest()" class="space-y-4">
               <div>
                 <label class="label">Type</label>
-                <select formControlName="type" (change)="onTypeChange()" class="input">
+                <select formControlName="type" class="input">
                   <option value="http">HTTP webhook</option>
                   <option value="slack">Slack</option>
                   <option value="email">Email (Resend)</option>
@@ -122,7 +116,6 @@ import { environment } from '../../../environments/environment';
                 <label class="label">Name</label>
                 <input formControlName="name" class="input" placeholder="Production alerts" />
               </div>
-
               @switch (destForm.controls.type.value) {
                 @case ('http') {
                   <div>
@@ -147,13 +140,13 @@ import { environment } from '../../../environments/environment';
                   </div>
                   <div>
                     <label class="label">From</label>
-                    <input formControlName="from" class="input" placeholder="Relayon <noreply@yourdomain.com>" />
+                    <input formControlName="from" class="input" />
                   </div>
                 }
                 @case ('sheets') {
                   <div>
                     <label class="label">Spreadsheet ID</label>
-                    <input formControlName="spreadsheetId" class="input font-mono" placeholder="1abc..." />
+                    <input formControlName="spreadsheetId" class="input font-mono" />
                   </div>
                   <div>
                     <label class="label">Range</label>
@@ -161,15 +154,14 @@ import { environment } from '../../../environments/environment';
                   </div>
                   <div>
                     <label class="label">Service account email</label>
-                    <input formControlName="serviceAccountEmail" class="input font-mono" placeholder="xxx@xxx.iam.gserviceaccount.com" />
+                    <input formControlName="serviceAccountEmail" class="input font-mono" />
                   </div>
                   <div>
                     <label class="label">Private key (PEM)</label>
-                    <textarea formControlName="privateKey" rows="4" class="input font-mono text-xs" placeholder="-----BEGIN PRIVATE KEY-----..."></textarea>
+                    <textarea formControlName="privateKey" rows="4" class="input font-mono text-xs"></textarea>
                   </div>
                 }
               }
-
               @if (destError()) {
                 <div class="text-sm text-signal-rose">{{ destError() }}</div>
               }
@@ -197,6 +189,7 @@ export class WorkflowDetailComponent implements OnInit {
   destinations = signal<Destination[]>([]);
   error = signal<string | null>(null);
   copied = signal(false);
+  exporting = signal(false);
 
   showCreateDest = signal(false);
   savingDest = signal(false);
@@ -247,6 +240,28 @@ export class WorkflowDetailComponent implements OnInit {
     });
   }
 
+  exportYaml(): void {
+    const wf = this.workflow();
+    if (!wf) return;
+    this.exporting.set(true);
+    this.svc.exportYaml(wf.id).subscribe({
+      next: (yaml) => {
+        const blob = new Blob([yaml], { type: 'application/x-yaml' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `workflow-${wf.id.slice(0, 8)}.yaml`;
+        a.click();
+        URL.revokeObjectURL(url);
+        this.exporting.set(false);
+      },
+      error: (err) => {
+        this.error.set(err?.error?.message ?? 'Export failed');
+        this.exporting.set(false);
+      },
+    });
+  }
+
   destinationSummary(d: Destination): string {
     const cfg = d.config as Record<string, unknown>;
     if (typeof cfg['url'] === 'string') return cfg['url'] as string;
@@ -264,23 +279,6 @@ export class WorkflowDetailComponent implements OnInit {
 
   closeCreateDest(): void {
     if (!this.savingDest()) this.showCreateDest.set(false);
-  }
-
-  onTypeChange(): void {
-    // Form values reset karo when type changes
-    const type = this.destForm.controls.type.value;
-    this.destForm.patchValue({
-      url: '',
-      webhookUrl: '',
-      apiKey: '',
-      to: '',
-      from: '',
-      spreadsheetId: '',
-      range: '',
-      serviceAccountEmail: '',
-      privateKey: '',
-    });
-    void type;
   }
 
   submitDest(): void {
@@ -316,11 +314,7 @@ export class WorkflowDetailComponent implements OnInit {
     this.destError.set(null);
 
     this.svc
-      .createDestination(this.id(), {
-        type: v.type,
-        name: v.name,
-        config,
-      })
+      .createDestination(this.id(), { type: v.type, name: v.name, config })
       .subscribe({
         next: () => {
           this.savingDest.set(false);

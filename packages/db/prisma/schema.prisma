@@ -111,6 +111,7 @@ model Workflow {
   enrichmentEnabled   Boolean    @default(false) @map("enrichment_enabled")
   enrichmentPrompt    String?    @map("enrichment_prompt")
   transformExpression String?    @map("transform_expression")
+  routingRules        Json       @default("[]") @map("routing_rules")
   isActive            Boolean    @default(true) @map("is_active")
   createdAt           DateTime   @default(now()) @map("created_at")
   updatedAt           DateTime   @updatedAt @map("updated_at")

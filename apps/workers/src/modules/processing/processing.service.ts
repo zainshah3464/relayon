@@ -5,6 +5,7 @@ import { MongoService } from '../mongo/mongo.service';
 import { RedisService } from '../redis/redis.service';
 import { GroqService, EnrichmentResult } from './groq.service';
 import { TransformService } from './transform.service';
+import { RoutingService } from './routing.service';
 import { logger } from '../../lib/logger';
 import {
   INCOMING_QUEUE,
@@ -48,6 +49,7 @@ export class ProcessingService {
     private readonly redis: RedisService,
     private readonly groq: GroqService,
     private readonly transform: TransformService,
+    private readonly routing: RoutingService,
   ) {}
 
   async processBatch(): Promise<BatchResult> {
@@ -312,12 +314,31 @@ export class ProcessingService {
       return 'ok';
     }
 
+    // ── 5a. Conditional routing — decide which destinations receive this event
+    const decision = await this.routing.decide(
+      (workflow as { routingRules?: unknown }).routingRules,
+      workflow.destinations,
+      transformedPayload,
+    );
+
+    if (decision.destinationIds.length === 0) {
+      this.logger.warn(
+        `routing.no_destinations: ${event.correlationId} (${decision.reason})`,
+      );
+      return 'ok';
+    }
+
+    const selectedDestinations = workflow.destinations.filter((d) =>
+      decision.destinationIds.includes(d.id),
+    );
+
+    // ── 5b. Persist delivery docs for the selected destinations only
     const deliveryTtl = new Date(
       Date.now() + DELIVERY_TTL_DAYS * 24 * 60 * 60 * 1000,
     );
 
     const deliveryDocs = await this.mongo.deliveryModel.insertMany(
-      workflow.destinations.map((d) => ({
+      selectedDestinations.map((d) => ({
         tenantId: event.tenantId,
         eventId: eventDoc._id.toString(),
         correlationId: event.correlationId,
@@ -335,9 +356,10 @@ export class ProcessingService {
       })),
     );
 
+    // ── 5c. Enqueue egress jobs
     const r = this.redis.raw;
-    for (let i = 0; i < workflow.destinations.length; i++) {
-      const dest = workflow.destinations[i];
+    for (let i = 0; i < selectedDestinations.length; i++) {
+      const dest = selectedDestinations[i];
       const delivery = deliveryDocs[i];
       const job: EgressJob = {
         tenantId: event.tenantId,

@@ -83,6 +83,19 @@ export class WorkflowsService {
     );
   }
 
+  exportYaml(id: string): Observable<string> {
+    return this.http.get(`${this.base}/api/workflows/${id}/export`, {
+      responseType: 'text',
+    });
+  }
+
+  importYaml(yaml: string): Observable<{ id: string; name: string; destinationsCreated: number }> {
+    return this.http.post<{ id: string; name: string; destinationsCreated: number }>(
+      `${this.base}/api/workflows/import`,
+      { yaml },
+    );
+  }
+
   listDestinations(workflowId: string): Observable<Destination[]> {
     return this.http.get<Destination[]>(
       `${this.base}/api/workflows/${workflowId}/destinations`,
