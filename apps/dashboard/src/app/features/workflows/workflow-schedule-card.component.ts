@@ -35,10 +35,12 @@ const PRESETS: Preset[] = [
         @if (schedule(); as s) {
           <span
             class="text-xs px-2 py-0.5 rounded"
-            [class.bg-signal-green/20]="s.isActive"
-            [class.text-signal-green]="s.isActive"
-            [class.bg-surface-2]="!s.isActive"
-            [class.text-muted]="!s.isActive"
+            [ngClass]="{
+              'bg-signal-green/20': s.isActive,
+              'text-signal-green': s.isActive,
+              'bg-surface-2': !s.isActive,
+              'text-muted': !s.isActive
+            }"
           >{{ s.isActive ? 'Active' : 'Paused' }}</span>
         }
       </div>
