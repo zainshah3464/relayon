@@ -8,7 +8,7 @@
     "packages/*"
   ],
   "scripts": {
-    "postinstall": "node ./node_modules/prisma/build/index.js generate --schema=./packages/db/prisma/schema.prisma",
+    "postinstall": "node -e \"const fs=require('fs');const p='./node_modules/prisma/build/index.js';if(fs.existsSync(p)){require('child_process').execSync('node '+p+' generate --schema=./packages/db/prisma/schema.prisma',{stdio:'inherit'})}else{console.log('[postinstall] Prisma not installed here — skipping generate')}\"",
     "dev:dashboard": "npm run start --workspace=dashboard",
     "dev:api": "npm run dev --workspace=api",
     "dev:ingress": "npm run dev --workspace=ingress",
