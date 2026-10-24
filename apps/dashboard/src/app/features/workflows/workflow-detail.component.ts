@@ -1,13 +1,8 @@
 import { Component, inject, signal, OnInit, input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
+import { FormBuilder, ReactiveFormsModule, Validators, FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
-import {
-  FormBuilder,
-  FormsModule,
-  ReactiveFormsModule,
-  Validators,
-} from '@angular/forms';
 import {
   WorkflowsService,
   Workflow,
@@ -15,13 +10,23 @@ import {
   DestinationType,
 } from '../../core/api/workflows.service';
 import { environment } from '../../../environments/environment';
+import { WorkflowScheduleCardComponent } from './workflow-schedule-card.component';
+import { WorkflowVersionsDrawerComponent } from './workflow-versions-drawer.component';
 
 @Component({
   selector: 'app-workflow-detail',
   standalone: true,
-  imports: [CommonModule, RouterLink, ReactiveFormsModule, FormsModule],
+  imports: [
+    CommonModule,
+    RouterLink,
+    ReactiveFormsModule,
+    FormsModule,
+    WorkflowScheduleCardComponent,
+    WorkflowVersionsDrawerComponent,
+  ],
   template: `
     <div class="space-y-6">
+      <!-- Header -->
       <div class="flex items-center justify-between">
         <div>
           <a routerLink="/workflows" class="text-xs text-muted hover:text-white">← All workflows</a>
@@ -33,9 +38,14 @@ import { environment } from '../../../environments/environment';
           }
         </div>
         <div class="flex gap-2">
-          <button (click)="copyWebhookUrl()" class="btn-secondary">{{ copied() ? 'Copied!' : 'Copy webhook URL' }}</button>
+          <button (click)="copyWebhookUrl()" class="btn-secondary">
+            {{ copied() ? 'Copied!' : 'Copy webhook URL' }}
+          </button>
           <button (click)="exportYaml()" [disabled]="exporting()" class="btn-secondary">
             {{ exporting() ? 'Exporting...' : 'Export YAML' }}
+          </button>
+          <button (click)="showVersions.set(true)" class="btn-secondary">
+            Version history
           </button>
         </div>
       </div>
@@ -45,12 +55,16 @@ import { environment } from '../../../environments/environment';
       }
 
       @if (workflow(); as wf) {
+        <!-- Webhook URL -->
         <div class="card">
           <h2 class="text-sm font-medium text-white mb-2">Webhook URL</h2>
           <code class="block text-xs font-mono text-relay-cyan bg-surface-2 p-3 rounded overflow-x-auto">
             {{ ingressUrl }}/webhook/{{ wf.tenantId }}/{{ wf.id }}
           </code>
         </div>
+
+        <!-- v1.3: Schedule Card -->
+        <app-workflow-schedule-card [workflowId]="wf.id" />
 
         <!-- Transform editor -->
         <div class="card">
@@ -92,6 +106,7 @@ import { environment } from '../../../environments/environment';
           }
         </div>
 
+        <!-- Config summary -->
         <div class="card grid grid-cols-3 gap-4">
           <div>
             <p class="text-xs text-muted uppercase tracking-wider">AI Enrichment</p>
@@ -107,6 +122,7 @@ import { environment } from '../../../environments/environment';
           </div>
         </div>
 
+        <!-- Destinations -->
         <div>
           <div class="flex items-center justify-between mb-3">
             <h2 class="text-lg font-semibold text-white">Destinations</h2>
@@ -142,11 +158,21 @@ import { environment } from '../../../environments/environment';
             </div>
           }
         </div>
+
+        <!-- v1.3: Version Drawer -->
+        @if (showVersions()) {
+          <app-workflow-versions-drawer
+            [workflowId]="id()"
+            (close)="showVersions.set(false)"
+            (restored)="onVersionRestored()"
+          />
+        }
       }
 
+      <!-- Create destination modal -->
       @if (showCreateDest()) {
         <div class="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" (click)="closeCreateDest()">
-          <div class="card w-full max-w-lg" (click)="$event.stopPropagation()">
+          <div class="card w-full max-w-lg max-h-[90vh] overflow-y-auto" (click)="$event.stopPropagation()">
             <h2 class="text-lg font-semibold text-white mb-4">Add destination</h2>
             <form [formGroup]="destForm" (ngSubmit)="submitDest()" class="space-y-4">
               <div>
@@ -156,6 +182,9 @@ import { environment } from '../../../environments/environment';
                   <option value="slack">Slack</option>
                   <option value="email">Email (Resend)</option>
                   <option value="sheets">Google Sheets</option>
+                  <option value="discord">Discord</option>
+                  <option value="airtable">Airtable</option>
+                  <option value="notion">Notion</option>
                 </select>
               </div>
               <div>
@@ -207,6 +236,41 @@ import { environment } from '../../../environments/environment';
                     <textarea formControlName="privateKey" rows="4" class="input font-mono text-xs"></textarea>
                   </div>
                 }
+                @case ('discord') {
+                  <div>
+                    <label class="label">Discord webhook URL</label>
+                    <input formControlName="webhookUrl" class="input font-mono" placeholder="https://discord.com/api/webhooks/..." />
+                  </div>
+                }
+                @case ('airtable') {
+                  <div>
+                    <label class="label">Personal access token</label>
+                    <input formControlName="apiKey" class="input font-mono" placeholder="pat..." />
+                  </div>
+                  <div>
+                    <label class="label">Base ID</label>
+                    <input formControlName="baseId" class="input font-mono" placeholder="appXXXXXXXXXXXXXX" />
+                  </div>
+                  <div>
+                    <label class="label">Table name</label>
+                    <input formControlName="tableName" class="input" placeholder="Leads" />
+                  </div>
+                }
+                @case ('notion') {
+                  <div>
+                    <label class="label">Integration token</label>
+                    <input formControlName="apiKey" class="input font-mono" placeholder="secret_..." />
+                  </div>
+                  <div>
+                    <label class="label">Data source ID</label>
+                    <input formControlName="dataSourceId" class="input font-mono" />
+                  </div>
+                  <div>
+                    <label class="label">Title property name</label>
+                    <input formControlName="titleProperty" class="input" placeholder="Name" />
+                  </div>
+                  <p class="text-xs text-muted">Share the database with your Notion integration, otherwise the API returns 404.</p>
+                }
               }
               @if (destError()) {
                 <div class="text-sm text-signal-rose">{{ destError() }}</div>
@@ -238,15 +302,22 @@ export class WorkflowDetailComponent implements OnInit {
   copied = signal(false);
   exporting = signal(false);
 
-  showCreateDest = signal(false);
-  savingDest = signal(false);
-  destError = signal<string | null>(null);
+  showVersions = signal(false);
 
   showTransform = signal(false);
   transformExpr = '';
   previewing = signal(false);
   savingTransform = signal(false);
-  previewResult = signal<{ ok: boolean; result: unknown; error: string | null; durationMs: number } | null>(null);
+  previewResult = signal<{
+    ok: boolean;
+    result: unknown;
+    error: string | null;
+    durationMs: number;
+  } | null>(null);
+
+  showCreateDest = signal(false);
+  savingDest = signal(false);
+  destError = signal<string | null>(null);
 
   private readonly samplePayload = {
     type: 'checkout.session.completed',
@@ -269,6 +340,10 @@ export class WorkflowDetailComponent implements OnInit {
     range: [''],
     serviceAccountEmail: [''],
     privateKey: [''],
+    baseId: [''],
+    tableName: [''],
+    dataSourceId: [''],
+    titleProperty: [''],
   });
 
   ngOnInit(): void {
@@ -324,12 +399,75 @@ export class WorkflowDetailComponent implements OnInit {
     });
   }
 
+  toggleTransform(): void {
+    const wf = this.workflow();
+    if (!this.showTransform() && wf) {
+      this.transformExpr = wf.transformExpression ?? '';
+      this.previewResult.set(null);
+    }
+    this.showTransform.set(!this.showTransform());
+  }
+
+  previewTransform(): void {
+    const wf = this.workflow();
+    if (!wf) return;
+    this.previewing.set(true);
+    this.previewResult.set(null);
+
+    this.http
+      .post<{
+        ok: boolean;
+        result: unknown;
+        error: string | null;
+        durationMs: number;
+      }>(`${environment.apiUrl}/api/workflows/${wf.id}/preview-transform`, {
+        expression: this.transformExpr,
+        samplePayload: this.samplePayload,
+      })
+      .subscribe({
+        next: (r) => {
+          this.previewResult.set(r);
+          this.previewing.set(false);
+        },
+        error: (err) => {
+          this.previewResult.set({
+            ok: false,
+            result: null,
+            error: err?.error?.message ?? 'Preview failed',
+            durationMs: 0,
+          });
+          this.previewing.set(false);
+        },
+      });
+  }
+
+  saveTransform(): void {
+    const wf = this.workflow();
+    if (!wf) return;
+    this.savingTransform.set(true);
+
+    this.svc.update(wf.id, { transformExpression: this.transformExpr }).subscribe({
+      next: (updated) => {
+        this.workflow.set(updated);
+        this.savingTransform.set(false);
+        this.showTransform.set(false);
+      },
+      error: () => this.savingTransform.set(false),
+    });
+  }
+
   destinationSummary(d: Destination): string {
     const cfg = d.config as Record<string, unknown>;
     if (typeof cfg['url'] === 'string') return cfg['url'] as string;
-    if (typeof cfg['webhookUrl'] === 'string') return 'Slack webhook';
+    if (typeof cfg['webhookUrl'] === 'string')
+      return (cfg['webhookUrl'] as string).startsWith('enc:v1:')
+        ? '•••••••• (encrypted)'
+        : 'Slack/Discord webhook';
     if (typeof cfg['to'] === 'string') return cfg['to'] as string;
+    if (Array.isArray(cfg['to'])) return (cfg['to'] as string[]).join(', ');
     if (typeof cfg['spreadsheetId'] === 'string') return `Sheets: ${cfg['spreadsheetId']}`;
+    if (typeof cfg['baseId'] === 'string') return `Airtable: ${cfg['baseId']}`;
+    if (typeof cfg['dataSourceId'] === 'string') return `Notion: ${cfg['dataSourceId']}`;
     return '—';
   }
 
@@ -370,24 +508,39 @@ export class WorkflowDetailComponent implements OnInit {
           privateKey: v.privateKey,
         };
         break;
+      case 'discord':
+        config = { webhookUrl: v.webhookUrl };
+        break;
+      case 'airtable':
+        config = {
+          apiKey: v.apiKey,
+          baseId: v.baseId,
+          tableName: v.tableName,
+        };
+        break;
+      case 'notion':
+        config = {
+          apiKey: v.apiKey,
+          dataSourceId: v.dataSourceId,
+          titleProperty: v.titleProperty,
+        };
+        break;
     }
 
     this.savingDest.set(true);
     this.destError.set(null);
 
-    this.svc
-      .createDestination(this.id(), { type: v.type, name: v.name, config })
-      .subscribe({
-        next: () => {
-          this.savingDest.set(false);
-          this.showCreateDest.set(false);
-          this.loadDestinations();
-        },
-        error: (err) => {
-          this.savingDest.set(false);
-          this.destError.set(err?.error?.message ?? 'Failed to add destination');
-        },
-      });
+    this.svc.createDestination(this.id(), { type: v.type, name: v.name, config }).subscribe({
+      next: () => {
+        this.savingDest.set(false);
+        this.showCreateDest.set(false);
+        this.loadDestinations();
+      },
+      error: (err) => {
+        this.savingDest.set(false);
+        this.destError.set(err?.error?.message ?? 'Failed to add destination');
+      },
+    });
   }
 
   toggleDestination(d: Destination): void {
@@ -403,58 +556,8 @@ export class WorkflowDetailComponent implements OnInit {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────
-  // TRANSFORM EDITOR
-  // ─────────────────────────────────────────────────────────────
-
-  toggleTransform(): void {
-    const wf = this.workflow();
-    if (!this.showTransform() && wf) {
-      this.transformExpr = wf.transformExpression ?? '';
-      this.previewResult.set(null);
-    }
-    this.showTransform.set(!this.showTransform());
-  }
-
-  previewTransform(): void {
-    const wf = this.workflow();
-    if (!wf) return;
-    this.previewing.set(true);
-    this.previewResult.set(null);
-
-    this.http
-      .post<{ ok: boolean; result: unknown; error: string | null; durationMs: number }>(
-        `${environment.apiUrl}/api/workflows/${wf.id}/preview-transform`,
-        { expression: this.transformExpr, samplePayload: this.samplePayload },
-      )
-      .subscribe({
-        next: (r) => {
-          this.previewResult.set(r);
-          this.previewing.set(false);
-        },
-        error: (err) => {
-          this.previewResult.set({
-            ok: false,
-            result: null,
-            error: err?.error?.message ?? 'Preview failed',
-            durationMs: 0,
-          });
-          this.previewing.set(false);
-        },
-      });
-  }
-
-  saveTransform(): void {
-    const wf = this.workflow();
-    if (!wf) return;
-    this.savingTransform.set(true);
-
-    this.svc.update(wf.id, { transformExpression: this.transformExpr }).subscribe({
-      next: (updated) => {
-        this.workflow.set(updated);
-        this.savingTransform.set(false);
-      },
-      error: () => this.savingTransform.set(false),
-    });
+  onVersionRestored(): void {
+    this.showVersions.set(false);
+    this.load();
   }
 }
