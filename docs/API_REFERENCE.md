@@ -1,10 +1,3 @@
-# 📄 File 2 — `docs/API_REFERENCE.md` (v1.5 Updated)
-
-Bhai, yeh **complete updated version** hai. Aapke v1.0 ke base pe v1.1-v1.5 ke saare naye endpoints included. Poora file replace karo.
-
----
-
-```markdown
 # Relayon — API Reference
 
 > **Complete reference for Relayon's HTTP APIs.**
