@@ -1,4 +1,5 @@
 import {
+  Body,
   Controller,
   Get,
   HttpCode,
@@ -39,5 +40,18 @@ export class EgressController {
   @Get('adapters')
   adaptersList() {
     return this.adapters.list();
+  }
+
+  @Post('egress/dry-run')
+  @HttpCode(HttpStatus.OK)
+  dryRun(
+    @Body()
+    body: {
+      type?: string;
+      config?: Record<string, unknown>;
+      tenantId?: string;
+    },
+  ) {
+    return this.egress.dryRun(body);
   }
 }

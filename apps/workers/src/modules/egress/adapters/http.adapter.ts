@@ -24,6 +24,37 @@ export class HttpAdapter implements DeliveryAdapter {
       return this.error("missing or invalid 'url' in config", started);
     }
 
+    if (ctx.config['__dryRun'] === true) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+      try {
+        const res = await fetch(url, {
+          method: 'HEAD',
+          headers: { 'X-Relayon-Dry-Run': 'true' },
+          signal: controller.signal,
+        });
+        return {
+          success: res.status < 500,
+          statusCode: res.status,
+          latencyMs: Date.now() - started,
+          responseBody: '',
+          error: res.status >= 500 ? `Reachable but returned ${res.status}` : null,
+          retryable: false,
+        };
+      } catch (err) {
+        return {
+          success: false,
+          statusCode: 0,
+          latencyMs: Date.now() - started,
+          responseBody: '',
+          error: err instanceof Error ? err.message : String(err),
+          retryable: false,
+        };
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+
     const method = this.parseMethod(ctx.config['method']);
 
     const headers: Record<string, string> = {

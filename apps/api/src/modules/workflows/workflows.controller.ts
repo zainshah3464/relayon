@@ -133,4 +133,15 @@ export class WorkflowsController {
   ) {
     return this.versions.restore(user.tenantId, id, version, user.sub);
   }
+
+  @Get(':id/versions/:a/diff/:b')
+  @RequireScopes('workflows:read')
+  diffVersions(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Param('a', ParseIntPipe) a: number,
+    @Param('b', ParseIntPipe) b: number,
+  ) {
+    return this.versions.diff(user.tenantId, id, a, b);
+  }
 }

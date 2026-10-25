@@ -37,4 +37,10 @@ export class ApiKeysController {
   revoke(@CurrentUser() user: JwtUser, @Param('id') id: string) {
     return this.keys.revoke(user.tenantId, id);
   }
+
+  @Post(':id/rotate')
+  @HttpCode(HttpStatus.OK)
+  rotate(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.keys.rotate(user.tenantId, id);
+  }
 }

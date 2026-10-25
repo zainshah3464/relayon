@@ -31,6 +31,61 @@ export const SECRET_CONFIG_KEYS = new Set([
   'postgres_url',
 ]);
 
+export const METADATA_CONFIG_KEYS = new Set([
+  'url',
+  'method',
+  'table',
+  'database',
+  'collection',
+  'baseId',
+  'tableName',
+  'dataSourceId',
+  'titleProperty',
+  'spreadsheetId',
+  'range',
+  'to',
+  'from',
+  'subject',
+  'username',
+  'onConflict',
+  'upsertKey',
+  'ssl',
+  'typecast',
+  'notionVersion',
+  'environment',
+]);
+
+export function encryptConfigAll(
+  config: Record<string, unknown>,
+  tenantId: string,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(config)) {
+    if (METADATA_CONFIG_KEYS.has(key)) {
+      out[key] = value;
+      continue;
+    }
+    if (typeof value === 'string' && value.length > 0) {
+      out[key] = isEncrypted(value) ? value : encryptValue(value, tenantId);
+    } else if (
+      value !== null &&
+      typeof value === 'object' &&
+      !Array.isArray(value)
+    ) {
+      out[key] = encryptConfigAll(value as Record<string, unknown>, tenantId);
+    } else if (Array.isArray(value)) {
+      out[key] = value.map((item) =>
+        typeof item === 'string' && item.length > 0 && !isEncrypted(item)
+          ? encryptValue(item, tenantId)
+          : item,
+      );
+    } else {
+      out[key] = value;
+    }
+  }
+  return out;
+}
+
 export const REDACTED = '••••••••';
 
 interface KeyringEntry {

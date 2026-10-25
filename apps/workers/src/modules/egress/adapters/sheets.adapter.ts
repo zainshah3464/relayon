@@ -42,6 +42,32 @@ export class SheetsAdapter implements DeliveryAdapter {
     try {
       const token = await this.getAccessToken(saEmail, privateKey);
 
+      if (ctx.config['__dryRun'] === true) {
+        try {
+          const res = await fetch(
+            `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}?fields=properties.title`,
+            { headers: { Authorization: `Bearer ${token}` } },
+          );
+          return {
+            success: res.ok,
+            statusCode: res.status,
+            latencyMs: Date.now() - started,
+            responseBody: res.ok ? 'Spreadsheet accessible' : 'Access denied',
+            error: res.ok ? null : `Sheets: ${res.status}`,
+            retryable: false,
+          };
+        } catch (err) {
+          return {
+            success: false,
+            statusCode: 0,
+            latencyMs: Date.now() - started,
+            responseBody: '',
+            error: err instanceof Error ? err.message : String(err),
+            retryable: false,
+          };
+        }
+      }
+
       const url =
         `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}` +
         `/values/${encodeURIComponent(range)}:append` +

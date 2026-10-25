@@ -20,6 +20,7 @@ import {
   CreateDestinationDto,
   UpdateDestinationDto,
 } from './dto/destination.dto';
+import { ValidateDestinationDto } from './dto/validate-destination.dto';
 
 @Controller()
 @UseGuards(JwtAuthGuard)
@@ -41,6 +42,15 @@ export class DestinationsController {
     @Body() dto: CreateDestinationDto,
   ) {
     return this.destinations.create(user.tenantId, workflowId, dto);
+  }
+
+  @Post('destinations/validate')
+  @HttpCode(HttpStatus.OK)
+  validate(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: ValidateDestinationDto,
+  ) {
+    return this.destinations.validate(user.tenantId, dto);
   }
 
   @Patch('destinations/:id')

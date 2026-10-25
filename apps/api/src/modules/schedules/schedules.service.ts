@@ -110,6 +110,49 @@ export class SchedulesService {
     };
   }
 
+  /**
+   * Pause or resume all schedules belonging to the tenant.
+   * On resume, recomputes nextRunAt for each — paused schedules
+   * would otherwise fire immediately on resume (their nextRunAt is in the past).
+   */
+  async bulkSetActive(
+    tenantId: string,
+    active: boolean,
+  ): Promise<{ updated: number }> {
+    const workflows = await this.prisma.workflow.findMany({
+      where: { tenantId },
+      select: { id: true },
+    });
+    const workflowIds = workflows.map((w) => w.id);
+
+    const schedules = await this.prisma.workflowSchedule.findMany({
+      where: { workflowId: { in: workflowIds } },
+    });
+
+    if (schedules.length === 0) return { updated: 0 };
+
+    if (!active) {
+      const result = await this.prisma.workflowSchedule.updateMany({
+        where: { workflowId: { in: workflowIds }, isActive: true },
+        data: { isActive: false },
+      });
+      return { updated: result.count };
+    }
+
+    // Resume: recompute nextRunAt per schedule
+    let updated = 0;
+    for (const s of schedules) {
+      if (s.isActive) continue;
+      const nextRunAt = this.nextRun(s.cronExpression, s.timezone);
+      await this.prisma.workflowSchedule.update({
+        where: { id: s.id },
+        data: { isActive: true, nextRunAt },
+      });
+      updated++;
+    }
+    return { updated };
+  }
+
   /** Validates a cron expression and returns the next fire time. */
   nextRun(cronExpression: string, timezone = 'UTC'): Date {
     try {

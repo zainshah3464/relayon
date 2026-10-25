@@ -275,12 +275,47 @@ import { WorkflowVersionsDrawerComponent } from './workflow-versions-drawer.comp
               @if (destError()) {
                 <div class="text-sm text-signal-rose">{{ destError() }}</div>
               }
-              <div class="flex justify-end gap-2 pt-2">
-                <button type="button" (click)="closeCreateDest()" class="btn-secondary">Cancel</button>
-                <button type="submit" [disabled]="destForm.invalid || savingDest()" class="btn-primary">
-                  {{ savingDest() ? 'Adding...' : 'Add' }}
+              <div class="flex justify-between gap-2 pt-2">
+                <button
+                  type="button"
+                  (click)="validateDest()"
+                  [disabled]="validating() || destForm.invalid"
+                  class="btn-secondary"
+                >
+                  {{ validating() ? 'Testing...' : 'Test connection' }}
                 </button>
+                <div class="flex gap-2">
+                  <button type="button" (click)="closeCreateDest()" class="btn-secondary">Cancel</button>
+                  <button type="submit" [disabled]="destForm.invalid || savingDest()" class="btn-primary">
+                    {{ savingDest() ? 'Adding...' : 'Add' }}
+                  </button>
+                </div>
               </div>
+
+              @if (validationResult(); as r) {
+                <div
+                  class="rounded-lg border p-3 text-xs mt-2"
+                  [ngClass]="{
+                    'border-signal-green/30': r.ok,
+                    'bg-signal-green/5': r.ok,
+                    'border-signal-rose/30': !r.ok,
+                    'bg-signal-rose/5': !r.ok
+                  }"
+                >
+                  <p [class.text-signal-green]="r.ok" [class.text-signal-rose]="!r.ok" class="font-medium">
+                    {{ r.ok ? '✓ Connection verified' : '✗ Validation failed' }}
+                  </p>
+                  @if (r.dryRun) {
+                    <p class="text-muted mt-1">{{ r.dryRun.detail }} · {{ r.dryRun.latencyMs }}ms</p>
+                  }
+                  @for (e of r.errors; track $index) {
+                    <p class="text-signal-rose mt-1">{{ e.field }}: {{ e.message }}</p>
+                  }
+                  @for (w of r.warnings; track $index) {
+                    <p class="text-signal-amber mt-1">⚠ {{ w }}</p>
+                  }
+                </div>
+              }
             </form>
           </div>
         </div>
@@ -318,6 +353,15 @@ export class WorkflowDetailComponent implements OnInit {
   showCreateDest = signal(false);
   savingDest = signal(false);
   destError = signal<string | null>(null);
+
+  validating = signal(false);
+  validationResult = signal<{
+    ok: boolean;
+    layer: string;
+    errors: Array<{ field: string; message: string }>;
+    warnings: string[];
+    dryRun: { attempted: boolean; success: boolean; latencyMs: number; detail: string } | null;
+  } | null>(null);
 
   private readonly samplePayload = {
     type: 'checkout.session.completed',
@@ -474,6 +518,7 @@ export class WorkflowDetailComponent implements OnInit {
   openCreateDest(): void {
     this.destForm.reset();
     this.destError.set(null);
+    this.validationResult.set(null);
     this.showCreateDest.set(true);
   }
 
@@ -481,51 +526,68 @@ export class WorkflowDetailComponent implements OnInit {
     if (!this.savingDest()) this.showCreateDest.set(false);
   }
 
-  submitDest(): void {
-    if (this.destForm.invalid || this.savingDest()) return;
+  validateDest(): void {
+    if (this.destForm.invalid || this.validating()) return;
     const v = this.destForm.getRawValue();
+    const config = this.buildDestinationConfig(v);
 
-    let config: Record<string, unknown> = {};
+    this.validating.set(true);
+    this.validationResult.set(null);
+
+    this.svc.validateDestination({ type: v.type, config, dryRun: true }).subscribe({
+      next: (r) => {
+        this.validationResult.set(r);
+        this.validating.set(false);
+      },
+      error: (err) => {
+        this.validationResult.set({
+          ok: false,
+          layer: 'schema',
+          errors: [{ field: 'request', message: err?.error?.message ?? 'Validation failed' }],
+          warnings: [],
+          dryRun: null,
+        });
+        this.validating.set(false);
+      },
+    });
+  }
+
+  private buildDestinationConfig(
+    v: ReturnType<typeof this.destForm.getRawValue>,
+  ): Record<string, unknown> {
     switch (v.type) {
       case 'http':
-        config = { url: v.url, method: 'POST' };
-        break;
+        return { url: v.url, method: 'POST' };
       case 'slack':
-        config = { webhookUrl: v.webhookUrl };
-        break;
+        return { webhookUrl: v.webhookUrl };
       case 'email':
-        config = {
+        return {
           apiKey: v.apiKey,
           to: v.to.split(',').map((s) => s.trim()).filter(Boolean),
           from: v.from,
         };
-        break;
       case 'sheets':
-        config = {
+        return {
           spreadsheetId: v.spreadsheetId,
           range: v.range,
           serviceAccountEmail: v.serviceAccountEmail,
           privateKey: v.privateKey,
         };
-        break;
       case 'discord':
-        config = { webhookUrl: v.webhookUrl };
-        break;
+        return { webhookUrl: v.webhookUrl };
       case 'airtable':
-        config = {
-          apiKey: v.apiKey,
-          baseId: v.baseId,
-          tableName: v.tableName,
-        };
-        break;
+        return { apiKey: v.apiKey, baseId: v.baseId, tableName: v.tableName };
       case 'notion':
-        config = {
-          apiKey: v.apiKey,
-          dataSourceId: v.dataSourceId,
-          titleProperty: v.titleProperty,
-        };
-        break;
+        return { apiKey: v.apiKey, dataSourceId: v.dataSourceId, titleProperty: v.titleProperty };
+      default:
+        return {};
     }
+  }
+
+  submitDest(): void {
+    if (this.destForm.invalid || this.savingDest()) return;
+    const v = this.destForm.getRawValue();
+    const config = this.buildDestinationConfig(v);
 
     this.savingDest.set(true);
     this.destError.set(null);

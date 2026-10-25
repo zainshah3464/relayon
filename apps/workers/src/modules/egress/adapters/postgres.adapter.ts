@@ -53,6 +53,34 @@ export class PostgresAdapter implements DeliveryAdapter, OnModuleDestroy {
 
     const pool = this.getPool(ctx.destinationId, connectionString, ssl === true);
 
+    if (ctx.config['__dryRun'] === true) {
+      try {
+        const client = await pool.connect();
+        try {
+          await client.query('SELECT 1');
+          return {
+            success: true,
+            statusCode: 200,
+            latencyMs: Date.now() - started,
+            responseBody: JSON.stringify({ dryRun: true, reachable: true }),
+            error: null,
+            retryable: false,
+          };
+        } finally {
+          client.release();
+        }
+      } catch (err) {
+        return {
+          success: false,
+          statusCode: 0,
+          latencyMs: Date.now() - started,
+          responseBody: '',
+          error: err instanceof Error ? err.message : String(err),
+          retryable: false,
+        };
+      }
+    }
+
     try {
       const { sql, values } = this.buildQuery(
         table,

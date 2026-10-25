@@ -66,6 +66,31 @@ export class MongoDbAdapter implements DeliveryAdapter, OnModuleDestroy {
 
     try {
       const client = await this.getClient(ctx.destinationId, connectionString);
+
+      if (ctx.config['__dryRun'] === true) {
+        try {
+          const db: Db = client.db(database);
+          await db.command({ ping: 1 });
+          return {
+            success: true,
+            statusCode: 200,
+            latencyMs: Date.now() - started,
+            responseBody: JSON.stringify({ dryRun: true, reachable: true }),
+            error: null,
+            retryable: false,
+          };
+        } catch (err) {
+          return {
+            success: false,
+            statusCode: 0,
+            latencyMs: Date.now() - started,
+            responseBody: '',
+            error: err instanceof Error ? err.message : String(err),
+            retryable: false,
+          };
+        }
+      }
+
       const db: Db = client.db(database);
       const coll = db.collection(collection);
 

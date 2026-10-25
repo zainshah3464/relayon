@@ -34,6 +34,32 @@ export class EmailAdapter implements DeliveryAdapter {
       return this.error("missing 'from' field", started);
     }
 
+    if (ctx.config['__dryRun'] === true) {
+      try {
+        const res = await fetch('https://api.resend.com/api-keys', {
+          method: 'GET',
+          headers: { Authorization: `Bearer ${apiKey}` },
+        });
+        return {
+          success: res.ok,
+          statusCode: res.status,
+          latencyMs: Date.now() - started,
+          responseBody: res.ok ? 'Resend key valid' : 'Invalid Resend key',
+          error: res.ok ? null : `Resend: ${res.status}`,
+          retryable: false,
+        };
+      } catch (err) {
+        return {
+          success: false,
+          statusCode: 0,
+          latencyMs: Date.now() - started,
+          responseBody: '',
+          error: err instanceof Error ? err.message : String(err),
+          retryable: false,
+        };
+      }
+    }
+
     const recipients = Array.isArray(to) ? to : [to];
     const subject =
       typeof ctx.config['subject'] === 'string'

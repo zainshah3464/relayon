@@ -182,6 +182,100 @@ export class EgressService {
     return { replayed: true, message: 'Delivery re-queued' };
   }
 
+  /**
+   * Validate a destination config by running its adapter against a
+   * small synthetic payload. Adapters that detect `__dryRun` in config
+   * MUST skip real writes (HTTP adapter honours the X-Relayon-Dry-Run
+   * header; DB adapters skip the INSERT/UPDATE and only open a connection).
+   *
+   * Safe: no writes, 5s timeout, one attempt only.
+   */
+  async dryRun(input: {
+    type?: string;
+    config?: Record<string, unknown>;
+    tenantId?: string;
+  }): Promise<{
+    ok: boolean;
+    statusCode: number;
+    latencyMs: number;
+    error: string | null;
+    adapterType: string;
+  }> {
+    const started = Date.now();
+
+    if (!input.type || typeof input.type !== 'string') {
+      return {
+        ok: false,
+        statusCode: 0,
+        latencyMs: 0,
+        error: 'type is required',
+        adapterType: '',
+      };
+    }
+    if (!input.config || typeof input.config !== 'object') {
+      return {
+        ok: false,
+        statusCode: 0,
+        latencyMs: 0,
+        error: 'config is required',
+        adapterType: input.type,
+      };
+    }
+
+    const registered = this.adapters.get(input.type);
+    if (!registered) {
+      return {
+        ok: false,
+        statusCode: 0,
+        latencyMs: Date.now() - started,
+        error: `No adapter for type '${input.type}'`,
+        adapterType: input.type,
+      };
+    }
+
+    const configWithDryRun: Record<string, unknown> = {
+      ...input.config,
+      __dryRun: true,
+    };
+
+    const ctx: DeliveryContext = {
+      destinationId: 'dry-run',
+      destinationType: input.type,
+      config: configWithDryRun,
+      payload: {
+        type: 'relayon.dry_run',
+        message: 'Validation payload — no data will be written',
+        timestamp: new Date().toISOString(),
+      },
+      correlationId: 'dry-run',
+      eventId: 'dry-run',
+      attemptNumber: 1,
+    };
+
+    try {
+      const result = await this.withTimeout(
+        registered.instance.send(ctx),
+        5_000,
+      );
+
+      return {
+        ok: result.success,
+        statusCode: result.statusCode,
+        latencyMs: result.latencyMs,
+        error: result.error,
+        adapterType: input.type,
+      };
+    } catch (err) {
+      return {
+        ok: false,
+        statusCode: 0,
+        latencyMs: Date.now() - started,
+        error: err instanceof Error ? err.message : String(err),
+        adapterType: input.type,
+      };
+    }
+  }
+
   // ─────────────────────────────────────────────────────────────
   // PRIVATE
   // ─────────────────────────────────────────────────────────────

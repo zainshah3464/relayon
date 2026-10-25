@@ -27,6 +27,17 @@ export class DiscordAdapter implements DeliveryAdapter {
       return this.error("missing or invalid 'webhookUrl'", started);
     }
 
+    if (ctx.config['__dryRun'] === true) {
+      return {
+        success: true,
+        statusCode: 200,
+        latencyMs: Date.now() - started,
+        responseBody: 'config valid — Discord webhooks cannot be tested without sending a message',
+        error: null,
+        retryable: false,
+      };
+    }
+
     const content = this.formatContent(ctx);
     const username =
       typeof ctx.config['username'] === 'string'

@@ -1,12 +1,34 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
+// `diff` is CommonJS — require it to stay compatible with both CJS and ESM builds
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { createTwoFilesPatch } = require('diff') as {
+  createTwoFilesPatch: (
+    oldFile: string,
+    newFile: string,
+    oldStr: string,
+    newStr: string,
+    oldHeader?: string,
+    newHeader?: string,
+    options?: { context?: number },
+  ) => string;
+};
+
 export interface VersionSummary {
   id: string;
   version: number;
   message: string | null;
   createdBy: string | null;
   createdAt: Date;
+}
+
+export interface VersionDiffResult {
+  fromVersion: number;
+  toVersion: number;
+  identical: boolean;
+  stats: { added: number; removed: number };
+  unified: string;
 }
 
 const MAX_VERSIONS_PER_WORKFLOW = 50;
@@ -165,6 +187,70 @@ export class WorkflowVersionsService {
       where: { id: workflowId },
       include: { destinations: true },
     });
+  }
+
+  /**
+   * Line-level unified diff between two version snapshots.
+   * Returns a patch string that can be rendered in a <pre> or sent
+   * to a diff viewer. Identical versions return identical:true + empty patch.
+   */
+  async diff(
+    tenantId: string,
+    workflowId: string,
+    fromVersion: number,
+    toVersion: number,
+  ): Promise<VersionDiffResult> {
+    await this.assertOwnership(tenantId, workflowId);
+
+    const [fromRow, toRow] = await Promise.all([
+      this.prisma.workflowVersion.findFirst({
+        where: { workflowId, tenantId, version: fromVersion },
+      }),
+      this.prisma.workflowVersion.findFirst({
+        where: { workflowId, tenantId, version: toVersion },
+      }),
+    ]);
+
+    if (!fromRow) throw new NotFoundException(`Version ${fromVersion} not found`);
+    if (!toRow) throw new NotFoundException(`Version ${toVersion} not found`);
+
+    const fromText = JSON.stringify(fromRow.snapshot, null, 2);
+    const toText = JSON.stringify(toRow.snapshot, null, 2);
+
+    if (fromText === toText) {
+      return {
+        fromVersion,
+        toVersion,
+        identical: true,
+        stats: { added: 0, removed: 0 },
+        unified: '',
+      };
+    }
+
+    const unified = createTwoFilesPatch(
+      `v${fromVersion}`,
+      `v${toVersion}`,
+      fromText,
+      toText,
+      `Version ${fromVersion}`,
+      `Version ${toVersion}`,
+      { context: 3 },
+    );
+
+    let added = 0;
+    let removed = 0;
+    for (const line of unified.split('\n')) {
+      if (line.startsWith('+') && !line.startsWith('+++')) added++;
+      else if (line.startsWith('-') && !line.startsWith('---')) removed++;
+    }
+
+    return {
+      fromVersion,
+      toVersion,
+      identical: false,
+      stats: { added, removed },
+      unified,
+    };
   }
 
   private async assertOwnership(tenantId: string, workflowId: string) {

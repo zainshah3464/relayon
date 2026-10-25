@@ -5,6 +5,7 @@ import { CreateApiKeyDto } from './dto/create-api-key.dto';
 
 const PEPPER = process.env['API_KEY_PEPPER'] ?? 'relayon-dev-pepper-change-in-prod';
 const KEY_TTL_DAYS = 90;
+const ROTATION_GRACE_HOURS = 24; // old key keeps working for 24h after rotate
 
 export interface IssuedApiKey {
   id: string;
@@ -89,6 +90,81 @@ export class ApiKeysService {
     });
 
     return { revoked: true, id };
+  }
+
+  /**
+   * Rotates an API key: issues a new raw key (same scopes, env, expiry),
+   * and schedules the old key for revocation after ROTATION_GRACE_HOURS.
+   *
+   * During grace window BOTH keys work — gives clients time to deploy.
+   * The `rotatedFromId` tracks lineage for audit.
+   */
+  async rotate(
+    tenantId: string,
+    id: string,
+  ): Promise<{
+    oldKeyId: string;
+    newKey: IssuedApiKey;
+    oldKeyRevokeAt: string;
+  }> {
+    const old = await this.prisma.apiKey.findFirst({
+      where: { id, tenantId },
+    });
+    if (!old) throw new NotFoundException('API key not found');
+    if (old.revokedAt) throw new NotFoundException('API key already revoked');
+
+    const envTag = old.environment === 'live' ? 'live' : 'test';
+    const randomPart = randomBytes(24).toString('hex');
+    const prefix = `rlk_${envTag}_${randomBytes(4).toString('hex')}`;
+    const rawKey = `${prefix}_${randomPart}`;
+    const keyHash = this.hashKey(rawKey);
+
+    const graceUntil = new Date(
+      Date.now() + ROTATION_GRACE_HOURS * 3600_000,
+    );
+
+    const created = await this.prisma.$transaction(async (tx) => {
+      // Schedule old key for revocation at graceUntil, but keep
+      // `revokedAt` null so verify() continues to accept it.
+      await tx.apiKey.update({
+        where: { id: old.id },
+        data: {
+          // `expiresAt` is honoured by verify(), so we cap it at graceUntil
+          // if the original expiry was further out.
+          expiresAt:
+            old.expiresAt && old.expiresAt < graceUntil
+              ? old.expiresAt
+              : graceUntil,
+        },
+      });
+
+      return tx.apiKey.create({
+        data: {
+          tenantId,
+          name: `${old.name} (rotated)`,
+          prefix,
+          keyHash,
+          scopes: old.scopes,
+          environment: old.environment,
+          expiresAt: old.expiresAt,
+        },
+      });
+    });
+
+    return {
+      oldKeyId: old.id,
+      newKey: {
+        id: created.id,
+        name: created.name,
+        prefix: created.prefix,
+        scopes: created.scopes,
+        environment: created.environment,
+        expiresAt: created.expiresAt ? created.expiresAt.toISOString() : null,
+        createdAt: created.createdAt.toISOString(),
+        rawKey,
+      },
+      oldKeyRevokeAt: graceUntil.toISOString(),
+    };
   }
 
   /**

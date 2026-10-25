@@ -170,6 +170,36 @@ export class WorkflowsService {
     );
   }
 
+  validateDestination(payload: {
+    type: DestinationType;
+    config: Record<string, unknown>;
+    dryRun?: boolean;
+  }): Observable<{
+    ok: boolean;
+    layer: 'schema' | 'connectivity' | 'both';
+    errors: Array<{ field: string; message: string }>;
+    warnings: string[];
+    dryRun: {
+      attempted: boolean;
+      success: boolean;
+      latencyMs: number;
+      detail: string;
+    } | null;
+  }> {
+    return this.http.post<{
+      ok: boolean;
+      layer: 'schema' | 'connectivity' | 'both';
+      errors: Array<{ field: string; message: string }>;
+      warnings: string[];
+      dryRun: {
+        attempted: boolean;
+        success: boolean;
+        latencyMs: number;
+        detail: string;
+      } | null;
+    }>(`${this.base}/api/destinations/validate`, payload);
+  }
+
   // ── Versions ─────────────────────────────────────────────────
 
   listVersions(workflowId: string): Observable<WorkflowVersionSummary[]> {
@@ -188,6 +218,28 @@ export class WorkflowsService {
     return this.http.post<Workflow>(
       `${this.base}/api/workflows/${workflowId}/versions/${version}/restore`,
       {},
+    );
+  }
+
+  diffVersions(
+    workflowId: string,
+    fromVersion: number,
+    toVersion: number,
+  ): Observable<{
+    fromVersion: number;
+    toVersion: number;
+    identical: boolean;
+    stats: { added: number; removed: number };
+    unified: string;
+  }> {
+    return this.http.get<{
+      fromVersion: number;
+      toVersion: number;
+      identical: boolean;
+      stats: { added: number; removed: number };
+      unified: string;
+    }>(
+      `${this.base}/api/workflows/${workflowId}/versions/${fromVersion}/diff/${toVersion}`,
     );
   }
 
@@ -227,5 +279,21 @@ export class WorkflowsService {
       correlationId: string | null;
       timestamp: string;
     }>(`${this.base}/api/workflows/${workflowId}/schedule/run-now`, {});
+  }
+
+  // ── Bulk schedule operations ─────────────────────────────────
+
+  bulkPauseSchedules(): Observable<{ updated: number }> {
+    return this.http.post<{ updated: number }>(
+      `${this.base}/api/schedules/bulk/pause-all`,
+      {},
+    );
+  }
+
+  bulkResumeSchedules(): Observable<{ updated: number }> {
+    return this.http.post<{ updated: number }>(
+      `${this.base}/api/schedules/bulk/resume-all`,
+      {},
+    );
   }
 }

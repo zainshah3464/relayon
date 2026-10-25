@@ -41,6 +41,37 @@ export class NotionAdapter implements DeliveryAdapter {
         ? ctx.config['notionVersion']
         : DEFAULT_NOTION_VERSION;
 
+    if (ctx.config['__dryRun'] === true) {
+      try {
+        const res = await fetch(
+          `https://api.notion.com/v1/data_sources/${encodeURIComponent(dataSourceId)}`,
+          {
+            headers: {
+              Authorization: `Bearer ${apiKey}`,
+              'Notion-Version': notionVersion,
+            },
+          },
+        );
+        return {
+          success: res.ok,
+          statusCode: res.status,
+          latencyMs: Date.now() - started,
+          responseBody: res.ok ? 'Notion data source accessible' : 'Access denied',
+          error: res.ok ? null : `Notion: ${res.status}`,
+          retryable: false,
+        };
+      } catch (err) {
+        return {
+          success: false,
+          statusCode: 0,
+          latencyMs: Date.now() - started,
+          responseBody: '',
+          error: err instanceof Error ? err.message : String(err),
+          retryable: false,
+        };
+      }
+    }
+
     const properties: Record<string, unknown> = {
       [titleProperty]: {
         title: [{ text: { content: this.titleFor(ctx.payload, ctx.eventId) } }],

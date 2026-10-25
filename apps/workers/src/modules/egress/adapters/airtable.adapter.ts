@@ -34,6 +34,32 @@ export class AirtableAdapter implements DeliveryAdapter {
       return this.error("missing 'tableName'", started);
     }
 
+    if (ctx.config['__dryRun'] === true) {
+      try {
+        const res = await fetch(
+          `https://api.airtable.com/v0/meta/bases/${encodeURIComponent(baseId)}/tables`,
+          { headers: { Authorization: `Bearer ${apiKey}` } },
+        );
+        return {
+          success: res.ok,
+          statusCode: res.status,
+          latencyMs: Date.now() - started,
+          responseBody: res.ok ? 'Airtable base accessible' : 'Access denied',
+          error: res.ok ? null : `Airtable: ${res.status}`,
+          retryable: false,
+        };
+      } catch (err) {
+        return {
+          success: false,
+          statusCode: 0,
+          latencyMs: Date.now() - started,
+          responseBody: '',
+          error: err instanceof Error ? err.message : String(err),
+          retryable: false,
+        };
+      }
+    }
+
     const typecast = ctx.config['typecast'] === true;
     const fields = this.toFields(ctx.payload);
 

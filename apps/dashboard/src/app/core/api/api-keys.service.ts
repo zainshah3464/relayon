@@ -54,4 +54,16 @@ export class ApiKeysService {
       `${this.base}/api/api-keys/${id}`,
     );
   }
+
+  rotate(id: string): Observable<{
+    oldKeyId: string;
+    newKey: IssuedApiKey;
+    oldKeyRevokeAt: string;
+  }> {
+    return this.http.post<{
+      oldKeyId: string;
+      newKey: IssuedApiKey;
+      oldKeyRevokeAt: string;
+    }>(`${this.base}/api/api-keys/${id}/rotate`, {});
+  }
 }
