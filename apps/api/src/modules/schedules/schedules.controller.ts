@@ -6,6 +6,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  Post,
   Put,
   UseGuards,
 } from '@nestjs/common';
@@ -44,5 +45,15 @@ export class SchedulesController {
   @HttpCode(HttpStatus.OK)
   remove(@CurrentUser() user: JwtUser, @Param('workflowId') workflowId: string) {
     return this.schedules.remove(user.tenantId, workflowId);
+  }
+
+  @Post('run-now')
+  @RequireScopes('workflows:write')
+  @HttpCode(HttpStatus.OK)
+  runNow(
+    @CurrentUser() user: JwtUser,
+    @Param('workflowId') workflowId: string,
+  ) {
+    return this.schedules.runNow(user.tenantId, workflowId);
   }
 }

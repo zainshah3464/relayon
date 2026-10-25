@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import parser from 'cron-parser';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpsertScheduleDto } from './dto/upsert-schedule.dto';
@@ -55,6 +59,55 @@ export class SchedulesService {
     if (!existing) throw new NotFoundException('Schedule not found');
     await this.prisma.workflowSchedule.delete({ where: { workflowId } });
     return { deleted: true, workflowId };
+  }
+
+  async runNow(tenantId: string, workflowId: string) {
+    await this.assertWorkflow(tenantId, workflowId);
+
+    const schedule = await this.prisma.workflowSchedule.findUnique({
+      where: { workflowId },
+    });
+    if (!schedule) {
+      throw new NotFoundException('No schedule configured for this workflow');
+    }
+
+    const workersUrl = process.env['WORKERS_URL'];
+    const cronSecret = process.env['CRON_SECRET'];
+    if (!workersUrl || !cronSecret) {
+      throw new BadRequestException(
+        'WORKERS_URL and CRON_SECRET must be configured for run-now',
+      );
+    }
+
+    const res = await fetch(`${workersUrl}/internal/schedule/run-now`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Cron-Secret': cronSecret,
+      },
+      body: JSON.stringify({ workflowId }),
+    });
+
+    if (!res.ok) {
+      const detail = await res.text().catch(() => '');
+      throw new BadRequestException(
+        `Workers returned ${res.status}: ${detail.slice(0, 200)}`,
+      );
+    }
+
+    const body = (await res.json()) as Record<string, unknown>;
+
+    await this.prisma.workflowSchedule.update({
+      where: { workflowId },
+      data: { lastRunAt: new Date() },
+    });
+
+    return {
+      triggered: true,
+      workflowId,
+      correlationId: body['correlationId'] ?? null,
+      timestamp: new Date().toISOString(),
+    };
   }
 
   /** Validates a cron expression and returns the next fire time. */

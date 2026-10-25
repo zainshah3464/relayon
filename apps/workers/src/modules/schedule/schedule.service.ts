@@ -130,6 +130,56 @@ export class ScheduleService {
     return result;
   }
 
+  async runNow(workflowId: string): Promise<{
+    correlationId: string;
+    workflowId: string;
+    enqueuedAt: string;
+  }> {
+    const schedule = await this.prisma.workflowSchedule.findUnique({
+      where: { workflowId },
+      include: {
+        workflow: {
+          select: { id: true, tenantId: true, sourceType: true, isActive: true },
+        },
+      },
+    });
+
+    if (!schedule) {
+      throw new Error(`No schedule for workflow ${workflowId}`);
+    }
+    if (!schedule.workflow.isActive) {
+      throw new Error(`Workflow ${workflowId} is inactive`);
+    }
+
+    const correlationId = randomUUID();
+    const now = new Date();
+
+    const event: QueuedEvent = {
+      correlationId,
+      tenantId: schedule.workflow.tenantId,
+      workflowId: schedule.workflow.id,
+      sourceType: schedule.workflow.sourceType,
+      receivedAt: now.toISOString(),
+      rawPayload: {
+        type: 'relayon.schedule.manual',
+        scheduledAt: now.toISOString(),
+        cronExpression: schedule.cronExpression,
+        timezone: schedule.timezone,
+        data: (schedule.payloadTemplate ?? {}) as Record<string, unknown>,
+      },
+      headers: { 'x-relayon-trigger': 'schedule-manual' },
+      ipHash: null,
+      userAgent: 'relayon-scheduler-manual',
+      idempotencyKey: `schedule-manual:${schedule.id}:${correlationId}`,
+    };
+
+    await this.redis.raw.lpush(INCOMING_QUEUE, JSON.stringify(event));
+
+    logger.info('schedule.manual_enqueued', { workflowId, correlationId });
+
+    return { correlationId, workflowId, enqueuedAt: now.toISOString() };
+  }
+
   async status() {
     const now = new Date();
     const [active, dueNow, nextUp] = await Promise.all([

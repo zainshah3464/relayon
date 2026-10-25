@@ -67,11 +67,27 @@ const PRESETS: Preset[] = [
           </div>
           <div class="flex gap-2">
             <button (click)="startEdit(s)" class="btn-secondary text-xs">Edit</button>
+            <button (click)="runNow(s)" [disabled]="running()" class="btn-primary text-xs">
+              {{ running() ? 'Running...' : 'Run now' }}
+            </button>
             <button (click)="toggleActive(s)" class="btn-secondary text-xs">
               {{ s.isActive ? 'Pause' : 'Resume' }}
             </button>
             <button (click)="remove()" class="btn-secondary text-xs text-signal-rose">Delete</button>
           </div>
+          @if (runResult(); as r) {
+            <p
+              class="text-xs mt-2"
+              [class.text-signal-green]="r.triggered"
+              [class.text-signal-rose]="!r.triggered"
+            >
+              @if (r.triggered) {
+                ✓ Triggered — correlation {{ r.correlationId?.slice(0, 8) }}…
+              } @else {
+                ✗ {{ r.error }}
+              }
+            </p>
+          }
         } @else {
           <button (click)="startCreate()" class="btn-primary text-xs">+ Add schedule</button>
         }
@@ -124,6 +140,13 @@ export class WorkflowScheduleCardComponent implements OnInit {
   editing = signal(false);
   saving = signal(false);
   error = signal<string | null>(null);
+
+  running = signal(false);
+  runResult = signal<{
+    triggered: boolean;
+    correlationId?: string | null;
+    error?: string;
+  } | null>(null);
 
   cronExpression = '';
   timezone = 'UTC';
@@ -219,6 +242,28 @@ export class WorkflowScheduleCardComponent implements OnInit {
     if (!confirm('Delete this schedule? Events will stop being generated.')) return;
     this.svc.deleteSchedule(this.workflowId()).subscribe({
       next: () => this.schedule.set(null),
+    });
+  }
+
+  runNow(s: WorkflowSchedule): void {
+    if (this.running()) return;
+    this.running.set(true);
+    this.runResult.set(null);
+
+    this.svc.runScheduleNow(this.workflowId()).subscribe({
+      next: (r) => {
+        this.running.set(false);
+        this.runResult.set({ triggered: true, correlationId: r.correlationId });
+        void s;
+        this.load();
+      },
+      error: (err) => {
+        this.running.set(false);
+        this.runResult.set({
+          triggered: false,
+          error: err?.error?.message ?? 'Run-now failed',
+        });
+      },
     });
   }
 }

@@ -14,6 +14,7 @@ import { DlqModule } from './modules/dlq/dlq.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { ApiKeysModule } from './modules/api-keys/api-keys.module';
 import { JwtOrApiKeyGuard } from './common/guards/jwt-or-api-key.guard';
+import { SchedulesModule } from './modules/schedules/schedules.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { JwtOrApiKeyGuard } from './common/guards/jwt-or-api-key.guard';
     DlqModule,
     AnalyticsModule,
     ApiKeysModule,
+    SchedulesModule,
   ],
   providers: [
     // Globally provide so it's injectable across modules

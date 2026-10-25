@@ -11,6 +11,8 @@ import { SheetsAdapter } from './adapters/sheets.adapter';
 import { DiscordAdapter } from './adapters/discord.adapter';
 import { AirtableAdapter } from './adapters/airtable.adapter';
 import { NotionAdapter } from './adapters/notion.adapter';
+import { PostgresAdapter } from './adapters/postgres.adapter';
+import { MongoDbAdapter } from './adapters/mongodb.adapter';
 
 @Module({
   imports: [DiscoveryModule],
@@ -26,6 +28,8 @@ import { NotionAdapter } from './adapters/notion.adapter';
     DiscordAdapter,
     AirtableAdapter,
     NotionAdapter,
+    PostgresAdapter,
+    MongoDbAdapter,
   ],
   exports: [EgressService, AdapterRegistry],
 })

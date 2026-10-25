@@ -214,4 +214,18 @@ export class WorkflowsService {
       `${this.base}/api/workflows/${workflowId}/schedule`,
     );
   }
+
+  runScheduleNow(workflowId: string): Observable<{
+    triggered: boolean;
+    workflowId: string;
+    correlationId: string | null;
+    timestamp: string;
+  }> {
+    return this.http.post<{
+      triggered: boolean;
+      workflowId: string;
+      correlationId: string | null;
+      timestamp: string;
+    }>(`${this.base}/api/workflows/${workflowId}/schedule/run-now`, {});
+  }
 }

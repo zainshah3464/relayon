@@ -1,4 +1,5 @@
 import {
+  Body,
   Controller,
   Get,
   HttpCode,
@@ -18,6 +19,15 @@ export class ScheduleController {
   @HttpCode(HttpStatus.OK)
   tick() {
     return this.schedule.tick();
+  }
+
+  @Post('run-now')
+  @HttpCode(HttpStatus.OK)
+  runNow(@Body() body: { workflowId?: string }) {
+    if (!body?.workflowId) {
+      throw new Error('workflowId is required');
+    }
+    return this.schedule.runNow(body.workflowId);
   }
 
   @Get('status')
