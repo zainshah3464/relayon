@@ -1,6 +1,8 @@
 # Relayon — Database Design
 
 > **Complete reference for Relayon's data layer — PostgreSQL + MongoDB + Redis.**
+>
+> **Current version:** v1.5.0
 
 Relayon uses **three data stores**, each chosen for a specific workload characteristic:
 
@@ -20,6 +22,7 @@ Relayon uses **three data stores**, each chosen for a specific workload characte
   - [Tables](#tables)
   - [Indexes](#postgresql-indexes)
   - [Migrations](#migrations)
+  - [Prisma Configuration](#prisma-configuration)
 - [MongoDB Collections](#mongodb-collections)
   - [events](#events)
   - [deliveries](#deliveries)
@@ -33,7 +36,7 @@ Relayon uses **three data stores**, each chosen for a specific workload characte
 
 ## Design Principles
 
-1. **PostgreSQL is the source of truth for "who/what"** — tenants, users, workflows, destinations. If PostgreSQL loses a row, money and trust are lost.
+1. **PostgreSQL is the source of truth for "who/what"** — tenants, users, workflows, destinations, schedules, versions, API keys. If PostgreSQL loses a row, money and trust are lost.
 
 2. **MongoDB is the source of truth for "when/did"** — events, deliveries. If MongoDB loses a row, a dashboard is slightly wrong. Never money.
 
@@ -81,9 +84,10 @@ Relayon uses **three data stores**, each chosen for a specific workload characte
 │ tenant_id (FK) │  ◄─── belongs to Tenant
 │ name           │
 │ source_type    │  (enum: stripe | github | shopify | slack | generic)
-│ source_config  │  (JSON: { secret: "whsec_..." })
+│ source_config  │  (JSON: { secret: "enc:v2:..." })
 │ enrichment_*   │
 │ transform_*    │
+│ routing_rules  │  (JSON array — v1.1+)
 │ is_active      │
 └───────┬────────┘
         │ 1
@@ -94,23 +98,53 @@ Relayon uses **three data stores**, each chosen for a specific workload characte
 │────────────────│
 │ id (PK)        │
 │ workflow_id(FK)│
-│ type           │  (enum: http | slack | email | sheets | postgres | mongodb)
+│ type (String)  │  (http | slack | email | sheets | discord |
+│                │   airtable | notion | postgres | mongodb)
 │ name           │
-│ config         │  (JSON: type-specific)
+│ config         │  (JSON: type-specific, secrets enc:v2:)
 │ enabled        │
 │ retry_policy   │  (JSON: { max_attempts, backoff_ms[] })
 └────────────────┘
 
 ┌────────────────┐
-│   ApiKey       │  (schema exists, UI not yet built)
+│   ApiKey       │  (v1.2+ — full schema with scopes/rotation)
 │────────────────│
 │ id (PK)        │
 │ tenant_id (FK) │
 │ name           │
+│ prefix (UQ)    │
 │ key_hash (UQ)  │
+│ scopes[]       │
+│ environment    │
 │ last_used_at   │
 │ expires_at     │
+│ revoked_at     │
 └────────────────┘
+
+┌────────────────────┐
+│ WorkflowSchedule   │  (v1.3+ — 1:1 with Workflow)
+│────────────────────│
+│ id (PK)            │
+│ workflow_id (FK,UQ)│
+│ cron_expression    │
+│ timezone           │
+│ payload_template   │
+│ is_active          │
+│ last_run_at        │
+│ next_run_at        │
+└────────────────────┘
+
+┌────────────────────┐
+│ WorkflowVersion    │  (v1.3+ — 1:N with Workflow, cap 50)
+│────────────────────│
+│ id (PK)            │
+│ workflow_id (FK)   │
+│ tenant_id (FK)     │
+│ version (int)      │
+│ snapshot (JSON)    │
+│ message            │
+│ created_by         │
+└────────────────────┘
 ```
 
 ---
@@ -123,15 +157,15 @@ Relayon uses **three data stores**, each chosen for a specific workload characte
 |---|---|---|---|
 | `id` | `uuid` | PK | `gen_random_uuid()` |
 | `name` | `text` | NOT NULL | Display name |
-| `slug` | `text` | UNIQUE | URL-safe; auto-generated from `name` at signup |
-| `plan` | `enum` | NOT NULL | `free` \| `pro` \| `enterprise` |
+| `slug` | `text` | UNIQUE | URL-safe; auto-generated from `name` at signup; conflicts get random suffix |
+| `plan` | `text` | NOT NULL | `free` (default) — `pro`/`enterprise` reserved for future |
 | `quota_events_per_month` | `int4` | NOT NULL | Default 10000 (free tier) |
 | `quota_ai_tokens_per_month` | `int4` | NOT NULL | Default 100000 |
 | `current_period_start` | `timestamptz` | NOT NULL | Billing period start |
 | `created_at` | `timestamptz` | NOT NULL | `now()` |
 | `updated_at` | `timestamptz` | NOT NULL | Auto-managed |
 
-**Why `slug`:** Used in URLs (`/webhook/:tenantId/:workflowId` actually uses UUID, but slug is exposed in dashboard for human identification).
+**Why `slug`:** Exposed in dashboard for human identification. The webhook URL uses UUID, but slug is friendlier in logs.
 
 ---
 
@@ -144,11 +178,11 @@ Relayon uses **three data stores**, each chosen for a specific workload characte
 | `email` | `text` | UNIQUE, NOT NULL | |
 | `password_hash` | `text` | NOT NULL | bcrypt cost 12 |
 | `name` | `text` | NOT NULL | |
-| `role` | `enum` | NOT NULL | `owner` \| `admin` \| `viewer` |
+| `role` | `text` | NOT NULL | `owner` (default) — `admin`/`viewer` reserved |
 | `last_login_at` | `timestamptz` | NULL | Updated on login |
 | `created_at`, `updated_at` | `timestamptz` | NOT NULL | |
 
-**Why `email` is globally unique:** Not per-tenant. One email = one account. Simpler login flow (no tenant selection at login). If a user needs access to multiple tenants, add them to a `tenant_members` table later.
+**Why `email` is globally unique:** Not per-tenant. One email = one account. Simpler login flow (no tenant selection at login). Multi-tenant-per-user is deferred to v2.0 (`tenant_members` table).
 
 ---
 
@@ -158,7 +192,7 @@ Relayon uses **three data stores**, each chosen for a specific workload characte
 |---|---|---|---|
 | `id` | `uuid` | PK | |
 | `user_id` | `uuid` | FK → users CASCADE | |
-| `tenant_id` | `uuid` | FK → tenants CASCADE | |
+| `tenant_id` | `uuid` | FK → tenants CASCADE | Denormalized for tenant-scoped revocation queries |
 | `token_hash` | `text` | UNIQUE | SHA-256 of raw token (raw never stored) |
 | `expires_at` | `timestamptz` | NOT NULL | 7 days after creation |
 | `revoked_at` | `timestamptz` | NULL | Set on rotation or logout |
@@ -178,21 +212,31 @@ Relayon uses **three data stores**, each chosen for a specific workload characte
 | `tenant_id` | `uuid` | FK → tenants CASCADE | |
 | `name` | `text` | NOT NULL | |
 | `source_type` | `enum` | NOT NULL | `stripe` \| `github` \| `shopify` \| `slack` \| `generic` |
-| `source_config` | `jsonb` | NOT NULL, default `{}` | Type-specific config |
+| `source_config` | `jsonb` | NOT NULL, default `{}` | Type-specific config; `secret` encrypted as `enc:v2:...` |
 | `enrichment_enabled` | `bool` | NOT NULL | Default `false` |
 | `enrichment_prompt` | `text` | NULL | Custom LLM prompt |
-| `transform_expression` | `text` | NULL | JSONata expression |
+| `transform_expression` | `text` | NULL | JSONata expression (2s timeout at runtime) |
+| `routing_rules` | `jsonb` | NOT NULL, default `[]` | **v1.1+** — array of `{ when: string, destinationIds: string[] }` |
 | `is_active` | `bool` | NOT NULL | Default `true` |
 | `created_at`, `updated_at` | `timestamptz` | NOT NULL | |
 
 **`source_config` shape per type:**
 ```json
 // stripe, github, shopify, slack
-{ "secret": "whsec_..." }
+{ "secret": "enc:v2:key-2026-10:..." }
 
 // generic
-{ "secret": "...", "header": "x-webhook-signature", "encoding": "hex" | "base64" }
+{ "secret": "enc:v2:...", "header": "x-webhook-signature", "encoding": "hex" | "base64" }
 ```
+
+**`routing_rules` shape (v1.1+):**
+```json
+[
+  { "when": "$exists(data.amount) and data.amount > 100", "destinationIds": ["dest-uuid-1"] },
+  { "when": "type = 'payment_intent.succeeded'", "destinationIds": ["dest-uuid-2"] }
+]
+```
+Empty array = route to all destinations. First matching rule wins.
 
 ---
 
@@ -202,12 +246,17 @@ Relayon uses **three data stores**, each chosen for a specific workload characte
 |---|---|---|---|
 | `id` | `uuid` | PK | |
 | `workflow_id` | `uuid` | FK → workflows CASCADE | |
-| `type` | `enum` | NOT NULL | `http` \| `slack` \| `email` \| `sheets` \| `postgres` \| `mongodb` |
+| `type` | `text` | NOT NULL | **Not enum** — see note below |
 | `name` | `text` | NOT NULL | |
-| `config` | `jsonb` | NOT NULL, default `{}` | Type-specific |
+| `config` | `jsonb` | NOT NULL, default `{}` | Type-specific; secret fields `enc:v2:...` |
 | `enabled` | `bool` | NOT NULL | Default `true` |
 | `retry_policy` | `jsonb` | NOT NULL | `{ max_attempts, backoff_ms[] }` |
 | `created_at`, `updated_at` | `timestamptz` | NOT NULL | |
+
+**Why `type` is `text` not `enum` (v1.5 reality):** Each version added new adapters — Discord (v1.2), Airtable/Notion (v1.3), Postgres/MongoDB (v1.4). An enum would mean a migration per adapter. As `String`, new adapters register via `@DestinationAdapter` decorator with zero DB change. API DTO enforces `@IsIn(DESTINATION_TYPES)` at the boundary.
+
+**Valid `type` values (v1.5):**
+`http` · `slack` · `email` · `sheets` · `discord` · `airtable` · `notion` · `postgres` · `mongodb`
 
 **Default `retry_policy`:**
 ```json
@@ -217,41 +266,134 @@ Relayon uses **three data stores**, each chosen for a specific workload characte
 }
 ```
 
-**`config` shape per type:**
+**`config` shape per type (v1.5 — 9 adapters):**
 ```json
 // http
 { "url": "https://...", "method": "POST", "headers": {...} }
 
-// slack
-{ "webhookUrl": "https://hooks.slack.com/services/..." }
+// slack / discord
+{ "webhookUrl": "enc:v2:key-2026-10:..." }
 
 // email (Resend)
-{ "apiKey": "re_...", "to": ["a@x.com"], "from": "Relayon <noreply@y.com>" }
+{ "apiKey": "enc:v2:...", "to": ["a@x.com"], "from": "Relayon <noreply@y.com>" }
 
 // sheets (service account)
 {
   "spreadsheetId": "1abc...",
   "range": "Sheet1!A:Z",
   "serviceAccountEmail": "xxx@xxx.iam.gserviceaccount.com",
-  "privateKey": "-----BEGIN PRIVATE KEY-----\n..."
+  "privateKey": "enc:v2:..."
+}
+
+// airtable (v1.3+)
+{
+  "apiKey": "enc:v2:...",
+  "baseId": "appXXXXXXXXXXXXXX",
+  "tableName": "Leads",
+  "typecast": true
+}
+
+// notion (v1.3+)
+{
+  "apiKey": "enc:v2:...",
+  "dataSourceId": "uuid",
+  "titleProperty": "Name"
+}
+
+// postgres (v1.4+)
+{
+  "connectionString": "enc:v2:...",
+  "table": "events",
+  "columns": { "type": "event_type", "data.amount": "amount_cents" },
+  "onConflict": "id",
+  "ssl": true
+}
+
+// mongodb (v1.4+)
+{
+  "connectionString": "enc:v2:...",
+  "database": "mydb",
+  "collection": "events",
+  "upsertKey": "orderId"
 }
 ```
 
+**Encryption scope:** Only keys in `SECRET_CONFIG_KEYS` (`secret`, `apiKey`, `privateKey`, `webhookUrl`, `connectionString`, etc.) are encrypted by default. Setting `FULL_CONFIG_ENCRYPTION=true` on the API switches to `encryptConfigAll` — every non-metadata field encrypted. See [SECURITY.md](./SECURITY.md).
+
 ---
 
-#### `api_keys` (schema ready, UI planned)
+#### `api_keys` (v1.2 — full schema with scopes + rotation)
 
 | Column | Type | Constraints | Notes |
 |---|---|---|---|
 | `id` | `uuid` | PK | |
 | `tenant_id` | `uuid` | FK → tenants CASCADE | |
-| `name` | `text` | NOT NULL | e.g., "Production Ingress" |
-| `key_hash` | `text` | UNIQUE | SHA-256 of raw key |
-| `last_used_at` | `timestamptz` | NULL | |
-| `expires_at` | `timestamptz` | NULL | NULL = no expiry |
+| `name` | `text` | NOT NULL | e.g., "CI pipeline" |
+| `prefix` | `text` | UNIQUE, NOT NULL | e.g., `rlk_live_ab12cd34` — O(1) lookup at verify time |
+| `key_hash` | `text` | UNIQUE, NOT NULL | SHA-256 of `{PEPPER}:{rawKey}` |
+| `scopes` | `text[]` | NOT NULL, default `[]` | Postgres array — e.g., `["events:read","workflows:read"]` |
+| `environment` | `text` | NOT NULL, default `'live'` | `live` \| `test` |
+| `last_used_at` | `timestamptz` | NULL | Updated on every successful verify (fire-and-forget) |
+| `expires_at` | `timestamptz` | NULL | NULL = no expiry (`neverExpires: true`) |
+| `revoked_at` | `timestamptz` | NULL | Set on revoke; verify rejects revoked keys |
 | `created_at` | `timestamptz` | NOT NULL | |
 
-**Status:** Table exists; API endpoints not yet exposed. Planned for v1.1.
+**Valid scopes (v1.5):**
+`events:read` · `workflows:read` · `workflows:write` · `destinations:read` · `destinations:write` · `dlq:read` · `dlq:write` · `analytics:read`
+
+**Key format:** `rlk_<live|test>_<8-hex-prefix>_<48-hex-secret>` — Stripe-style. Raw key returned **once** at creation. Never retrievable again.
+
+**Rotation (v1.5):** `POST /api/api-keys/:id/rotate` creates a new key and caps the old key's `expiresAt` at `now + 24h`. Both keys work during the grace window.
+
+**Why pepper + SHA-256, not bcrypt:** bcrypt is ~100ms — too slow for API auth on every request. SHA-256 of a high-entropy key (~1μs) is secure because the key itself has 384 bits of entropy. Pepper defends against rainbow tables if the DB leaks. See [SECURITY.md](./SECURITY.md) for details.
+
+---
+
+#### `workflow_schedules` (v1.3)
+
+| Column | Type | Constraints | Notes |
+|---|---|---|---|
+| `id` | `uuid` | PK | |
+| `workflow_id` | `uuid` | FK → workflows CASCADE, UNIQUE | 1:1 with workflow |
+| `cron_expression` | `text` | NOT NULL | 5-field; digits + `*`,`,`,`-`,`/`, space only |
+| `timezone` | `text` | NOT NULL, default `'UTC'` | IANA tz name |
+| `payload_template` | `jsonb` | NOT NULL, default `{}` | Injected as `rawPayload.data` in synthetic event |
+| `is_active` | `bool` | NOT NULL, default `true` | Pausable without deleting |
+| `last_run_at` | `timestamptz` | NULL | Updated on each tick enqueue |
+| `next_run_at` | `timestamptz` | NOT NULL | Indexed with `is_active` — the atomic claim predicate |
+| `created_at`, `updated_at` | `timestamptz` | NOT NULL | |
+
+**Atomic claim query (serverless-safe):**
+```typescript
+await prisma.workflowSchedule.updateMany({
+  where: { id: schedule.id, nextRunAt: { lte: now } },
+  data: { lastRunAt: now, nextRunAt: computedFuture },
+});
+```
+If `count !== 1`, another worker already advanced this row → skip.
+
+**Why DB-backed, not in-memory:** Vercel functions are stateless — `@nestjs/schedule` loses its registry on every cold start. See [ARCHITECTURE.md § Scheduled Workflows](./ARCHITECTURE.md#scheduled-workflows).
+
+---
+
+#### `workflow_versions` (v1.3)
+
+| Column | Type | Constraints | Notes |
+|---|---|---|---|
+| `id` | `uuid` | PK | |
+| `workflow_id` | `uuid` | FK → workflows CASCADE | |
+| `tenant_id` | `uuid` | FK → tenants CASCADE | Denormalized for tenant-scoped queries |
+| `version` | `int4` | NOT NULL | Sequential, starts at 1 |
+| `snapshot` | `jsonb` | NOT NULL | Full workflow + destinations snapshot (encrypted configs inside) |
+| `message` | `text` | NULL | Human label — `"Initial version"`, `"Configuration updated"`, `"Restored from vN"`, `"Imported from YAML"` |
+| `created_by` | `uuid` | NULL | Actor user ID |
+| `created_at` | `timestamptz` | NOT NULL | |
+
+**Unique constraint:** `@@unique([workflowId, version])` — protects against duplicate version numbers under concurrent writes.
+
+**Cap:** 50 versions per workflow. Older versions trimmed after each capture (query: `findMany({ orderBy: { version: 'desc' }, skip: 50 }).deleteMany()`).
+
+**Restore semantics:** Destinations are deleted and recreated — their UUIDs are **not** stable across versions. The restore itself produces a new version (`"Restored from vN"`), so history stays linear — never branches.
 
 ---
 
@@ -265,6 +407,12 @@ Relayon uses **three data stores**, each chosen for a specific workload characte
 | `workflows` | `workflows_tenant_id_idx` | `tenant_id` | List tenant's workflows |
 | `destinations` | `destinations_workflow_id_idx` | `workflow_id` | List workflow's destinations |
 | `api_keys` | `api_keys_tenant_id_idx` | `tenant_id` | List tenant's keys |
+| `api_keys` | `api_keys_prefix_key` | `prefix` (UNIQUE) | Fast lookup at verify — this is the hot path |
+| `api_keys` | `api_keys_key_hash_key` | `key_hash` (UNIQUE) | Defense-in-depth (timing-safe compare after prefix lookup) |
+| `workflow_schedules` | `workflow_schedules_is_active_next_run_at_idx` | `(is_active, next_run_at)` | **Hot path** — atomic claim query |
+| `workflow_schedules` | `workflow_schedules_workflow_id_key` | `workflow_id` (UNIQUE) | 1:1 enforcement |
+| `workflow_versions` | `workflow_versions_workflow_id_version_key` | `(workflow_id, version)` (UNIQUE) | Duplicate version guard + ordered listing |
+| `workflow_versions` | `workflow_versions_tenant_id_workflow_id_version_idx` | `(tenant_id, workflow_id, version)` | Tenant-scoped version list |
 
 ---
 
@@ -272,8 +420,16 @@ Relayon uses **three data stores**, each chosen for a specific workload characte
 
 Relayon uses **Prisma Migrate** — versioned SQL migrations stored in `packages/db/prisma/migrations/`.
 
-**Current migrations:**
-- `20261018152226_init` — Initial schema (all tables above)
+**Current migrations (v1.5):**
+
+| Migration | Version | Change |
+|---|---|---|
+| `20261018152226_init` | v1.0 | Initial schema — `Tenant`, `User`, `Workflow`, `Destination`, `RefreshToken`, `ApiKey` (basic), all enums |
+| `add_routing_rules` | v1.1 | Adds `workflows.routing_rules` JSONB column (default `[]`) |
+| `api_keys_scopes` | v1.2 | Rebuilds `api_keys`: adds `prefix`, `scopes[]`, `environment`, `revoked_at`; renames `key` → `key_hash` |
+| `v13_schedules_and_versions` | v1.3 | Adds `workflow_schedules` + `workflow_versions` tables |
+| *(none)* | v1.4 | No migration — PG/MongoDB adapters + `enc:v2:` envelope are data-layer changes only |
+| *(none)* | v1.5 | No migration — validation, dry-run, `encryptConfigAll`, api-key rotate, bulk schedules are code-only |
 
 **Commands:**
 
@@ -282,9 +438,10 @@ Relayon uses **Prisma Migrate** — versioned SQL migrations stored in `packages
 cd packages/db
 npx prisma migrate dev --name add_xyz
 
-# Apply pending migrations (production)
+# Apply pending migrations (production — safe, idempotent)
 cd packages/db
-DATABASE_URL="..." npx prisma migrate deploy
+DATABASE_URL="postgresql://...neon...?sslmode=require" npx prisma migrate deploy
+cd ../..
 
 # Reset database (dev only — DESTRUCTIVE)
 cd packages/db
@@ -298,9 +455,41 @@ npx prisma studio
 1. Edit `packages/db/prisma/schema.prisma`
 2. Run `npm run db:migrate` (creates + applies migration in dev)
 3. Commit the new migration file to Git
-4. `npm run db:deploy` runs on next production deploy (via Vercel build)
+4. `npm run db:deploy` runs on next production deploy (via Vercel build, before API starts)
 
 **Idempotency:** All migrations are wrapped in transactions. `prisma migrate deploy` is safe to run multiple times.
+
+**⚠️ Rule:** Never run `prisma migrate dev` (generates files) on production. Always `prisma migrate deploy` (applies only). Always `pg_dump` before `db:deploy` on production.
+
+---
+
+### Prisma Configuration
+
+**Generator block (v1.5 — critical for Vercel):**
+
+```prisma
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+```
+
+**Why `rhel-openssl-3.0.x`:** Vercel's Node runtime is Amazon Linux 2023. Without this target, the Prisma query engine binary is missing at runtime → every request fails with `PrismaClientInitializationError: Query engine library not found`.
+
+**Why `native`:** Local dev (Windows/Mac/Linux) needs its own target to run migrations and queries without a Docker container.
+
+**Version pinning (v1.5 — exact, not caret):**
+
+- Root `dependencies.prisma`: **`6.19.3`** (exact)
+- `@prisma/client`: `^6.2.0` in api/workers/ingress workspaces
+
+**Generate command (CI and Vercel build):**
+
+```bash
+node ./node_modules/prisma/build/index.js generate --schema=./packages/db/prisma/schema.prisma
+```
+
+**Never use `npx prisma generate`.** During early v1.0 deployment, `npx` couldn't find the local binary (workspace `.bin` not in PATH), so it fetched `prisma@latest` — which was `8.0.0-rc.x`, a new CLI that removed the `generate` command. Build failed with `CLI.UNKNOWN_COMMAND`. The absolute-path invocation is the fix.
 
 ---
 
@@ -343,6 +532,12 @@ One document per received webhook, capturing the full processing lifecycle.
 **Write path:** Only Workers writes. API reads.
 **Retention:** 30 days via `ttlExpiresAt` TTL index.
 
+**`rawPayload.type` markers:**
+- `'relayon.schedule.trigger'` — fired by cron tick (v1.3)
+- `'relayon.schedule.manual'` — fired by Run-now button (v1.4)
+- `'relayon.dry_run'` — sent during `/internal/egress/dry-run` (never persisted) (v1.5)
+- Anything else — real webhook from source
+
 ---
 
 ### `deliveries`
@@ -382,7 +577,8 @@ One document per (event, destination) pair. Tracks attempt history and current s
 }
 ```
 
-**Write path:** Workers writes. API reads + updates (replay).
+**Write path:** Workers writes. API reads + updates (replay, bulk replay, bulk discard — the only API-writes-to-MongoDB exception, documented in [ARCHITECTURE.md](./ARCHITECTURE.md)).
+
 **Retention:** 30 days via TTL.
 
 ---
@@ -403,6 +599,7 @@ One document per (event, destination) pair. Tracks attempt history and current s
 { tenantId: 1, status: 1 }        // DLQ listing
 { destinationId: 1, status: 1 }   // destination health
 { status: 1, lastAttemptAt: 1 }   // stuck recovery scan
+{ status: 1, nextAttemptAt: 1 }   // delayed queue recovery scan
 { ttlExpiresAt: 1 }               // TTL: expire after 0s
 ```
 
@@ -416,7 +613,7 @@ All keys are prefixed by purpose. Namespacing prevents collisions.
 
 | Pattern | Type | TTL | Written By | Read By |
 |---|---|---|---|---|
-| `queue:events:incoming` | List | None | Ingress | Workers |
+| `queue:events:incoming` | List | None | Ingress, Workers (schedule) | Workers |
 | `queue:events:processing` | List | None | Workers | Workers |
 | `queue:egress:pending` | List | None | Workers | Workers |
 | `queue:egress:delayed` | ZSet | None | Workers | Workers |
@@ -425,16 +622,24 @@ All keys are prefixed by purpose. Namespacing prevents collisions.
 | `circuit:dest:{destinationId}` | String | 300s | Workers | Workers |
 | `groq:enrich:{hash}` | String | 3600s | Workers | Workers |
 
+**`{key}` in idempotency:** Either `X-Event-Id` header or `sha256(body)`. `SET NX EX 86400` — if key exists, webhook is a duplicate.
+
+**`{bucket}` in ratelimit:** `Math.floor(Date.now() / 60000)` — auto-rolls every minute. `INCR` per request, reject at 300.
+
+**`{hash}` in groq:enrich:** `sha256(payload + prompt)` — prompt change naturally invalidates cache.
+
 **Memory footprint estimate:**
 - 1000 events in-flight × 2 KB avg = 2 MB
 - 100 cached enrichments × 500 bytes = 50 KB
 - Rate limit + idempotency keys: 1 KB × active workflows
 
-Upstash M0 free tier (256 MB) is enough for **~50K daily events** with conservative headroom.
+Upstash free tier (256 MB, 10K commands/day) is enough for **~50K daily events** with conservative headroom.
 
 ---
 
 ## Data Flow Between Stores
+
+### Webhook path (v1.0)
 
 ```
 ┌──────────┐
@@ -461,20 +666,77 @@ Upstash M0 free tier (256 MB) is enough for **~50K daily events** with conservat
      │11. Pop from queue (Redis RPOP)
      │12. Atomic claim Delivery (Mongoose findOneAndUpdate)
      │13. Read destination config (Prisma → PostgreSQL)
-     │14. Call adapter (HTTP/Slack/Email/Sheets)
-     │15. Update Delivery status (Mongoose)
-     │16. ZADD to delayed queue on retry (Redis)
+     │14. Decrypt credentials (crypto-box → decryptConfig)
+     │15. Call adapter (HTTP/Slack/Email/Sheets/Discord/Airtable/Notion/PG/Mongo)
+     │16. Update Delivery status (Mongoose)
+     │17. ZADD to delayed queue on retry (Redis)
      ▼
 ┌──────────┐
 │Dashboard │
 └──────────┘
-     │17. Read events (API → MongoDB)
-     │18. Read deliveries (API → MongoDB)
-     │19. Replay DLQ (API → MongoDB update)
-     │20. Read workflows (API → PostgreSQL)
+     │18. Read events (API → MongoDB)
+     │19. Read deliveries (API → MongoDB)
+     │20. Replay DLQ (API → MongoDB update)
+     │21. Read workflows (API → PostgreSQL)
 ```
 
-**Key insight:** Every read for a write happens via the **owning service's database**. The API never writes events (only Workers does). The API **does** write to MongoDB for DLQ replay — the only exception, documented.
+### Scheduled workflow path (v1.3+)
+
+```
+┌──────────────┐
+│ External Cron│ (cron-job.org, every 5 min)
+└──────┬───────┘
+       │ POST /internal/schedule/tick
+       ▼
+┌──────────┐
+│ Workers  │
+└────┬─────┘
+     │ 1. SELECT due schedules (Prisma → PostgreSQL)
+     │ 2. Atomic claim via updateMany (nextRunAt guard)
+     │ 3. Compute nextRunAt (cron-parser)
+     │ 4. LPUSH synthetic event → queue:events:incoming
+     ▼
+   (same pipeline as webhook — enrichment, transform, routing, delivery)
+```
+
+### Manual run-now path (v1.4+)
+
+```
+┌──────────┐
+│Dashboard │ → click "Run now" → POST /api/workflows/:id/schedule/run-now
+└────┬─────┘
+     │
+     ▼
+┌──────────┐
+│   API    │ → forward to workers POST /internal/schedule/run-now
+└────┬─────┘
+     │
+     ▼
+┌──────────┐
+│ Workers  │ → LPUSH synthetic event (type: 'relayon.schedule.manual')
+└──────────┘ → API updates lastRunAt (nextRunAt untouched)
+```
+
+### Destination dry-run path (v1.5+)
+
+```
+┌──────────┐
+│Dashboard │ → click "Test connection" → POST /api/destinations/validate { dryRun: true }
+└────┬─────┘
+     │
+     ▼
+┌──────────┐
+│   API    │ → schema check → forward to workers POST /internal/egress/dry-run
+└────┬─────┘
+     │
+     ▼
+┌──────────┐
+│ Workers  │ → load adapter → add __dryRun: true → adapter.send()
+└──────────┘    → safe probe per adapter (HEAD / auth check / SELECT 1 / ping)
+                → NO writes to the destination
+```
+
+**Key insight:** Every read for a write happens via the **owning service's database**. The API never writes events (only Workers does). The API **does** write to MongoDB for DLQ replay/bulk-discard and schedule run-now signals — the only exceptions, documented.
 
 ---
 
@@ -562,6 +824,27 @@ db.deliveries.aggregate([
   }},
   { $sort: { successRate: -1 } }
 ]);
+```
+
+### Find due schedules (v1.3+ — the atomic claim query)
+
+```sql
+SELECT id, workflow_id, cron_expression, timezone, next_run_at
+FROM workflow_schedules
+WHERE is_active = true
+  AND next_run_at <= NOW()
+ORDER BY next_run_at
+LIMIT 25;
+```
+
+### Version history for a workflow (v1.3+)
+
+```sql
+SELECT version, message, created_by, created_at
+FROM workflow_versions
+WHERE tenant_id = $1 AND workflow_id = $2
+ORDER BY version DESC
+LIMIT 50;
 ```
 
 ---
