@@ -1,8 +1,13 @@
+
 # Relayon — FAQ
 
 > **Frequently asked questions — honestly answered.**
+>
+> **Current version:** v1.5.0
 
-Every answer here reflects the **actual v1.0.0 production state** as of 2026-10-22. No marketing speak. No promises about features that don't exist.
+Every answer here reflects the **actual v1.5.0 production state** as of 2026-10-26. No marketing speak. No promises about features that don't exist.
+
+**Note on this update:** The original v1.0 FAQ said credentials were stored as plaintext and that Relayon only had 4 destination adapters. Both are now outdated — credentials have been **encrypted at rest since v1.3**, and Relayon now supports **9 adapters** (v1.5). See the "Security" section for the current reality.
 
 ---
 
@@ -14,6 +19,7 @@ Every answer here reflects the **actual v1.0.0 production state** as of 2026-10-
 - [Pricing & Limits](#pricing--limits)
 - [Technical](#technical)
 - [Security](#security)
+- [New in v1.1-v1.5](#new-in-v11-v15)
 - [Troubleshooting](#troubleshooting)
 - [Product & Roadmap](#product--roadmap)
 - [Contributing](#contributing)
@@ -38,12 +44,22 @@ This is repetitive, error-prone, and expensive. Relayon turns it into **configur
 
 ### Is Relayon production-ready?
 
-**Yes, but with caveats.** v1.0.0 is deployed and functional at `https://relayon.vercel.app`. It handles real webhooks, real AI enrichment, real deliveries, real retries, real DLQs. **However:**
+**Yes, but with honest caveats.** v1.5.0 is deployed and functional at `https://relayon.vercel.app`. It handles real webhooks, real AI enrichment, real deliveries, real retries, real DLQs, **encrypted credentials at rest**, and **scheduled workflows**. **However:**
+
 - No SOC 2 / HIPAA / GDPR certification yet
 - No SLA guarantee
 - No automated backups on free tier
-- No unit tests yet (smoke test only)
+- **No unit tests yet** — 5 versions shipped without any (v2.0 is where this stops)
+- No MFA/TOTP for dashboard login
 - Solo-maintained (24-72h response time)
+
+**What got better since v1.0:**
+- ✅ Credentials now encrypted at rest (v1.3)
+- ✅ 9 adapters instead of 4 (v1.5)
+- ✅ Scheduled workflows (v1.3)
+- ✅ Workflow versioning + diff (v1.3-v1.5)
+- ✅ API keys with scopes (v1.2)
+- ✅ Destination validation with dry-run (v1.5)
 
 If you need enterprise compliance today, use Zapier/Make. If you want a working free-tier platform you can inspect, fork, and extend — Relayon works.
 
@@ -72,7 +88,9 @@ If you need enterprise compliance today, use Zapier/Make. If you want a working 
 | **Self-hosted** | No | Fork and deploy anywhere |
 | **Data ownership** | Your data on Zapier servers | Your data on your Neon/Atlas |
 | **Vendor lock-in** | Workflows can't be exported | Full source code, MIT license |
-| **App count** | 6000+ integrations | 4 destinations (HTTP, Slack, Email, Sheets) |
+| **App count** | 6000+ integrations | **9 destinations** (HTTP, Slack, Email, Sheets, Discord, Airtable, Notion, PostgreSQL, MongoDB) |
+| **Scheduling** | Yes, built-in | Yes (v1.3+) — DB-backed cron, run-now |
+| **Versioning** | No | Yes (v1.3+) — snapshot, restore, diff |
 | **Reliability** | Enterprise SLA | Best-effort, DLQ-based |
 
 **When to use Zapier:** You need 6000+ app integrations, OAuth, and enterprise SLAs.
@@ -86,13 +104,33 @@ Same answer as Zapier. Make is more visual, more app integrations, more expensiv
 ### How is Relayon different from n8n?
 
 **n8n** is closer to Relayon than Zapier — both are self-hostable, both are open-source-ish. Differences:
+
 - **n8n** requires a **persistent server** (Node process running 24/7). Relayon is **serverless** (Vercel functions).
 - **n8n** is visual workflow builder. Relayon is config-based (no visual builder).
 - **n8n** costs $0 self-hosted but needs $5-20/month server. Relayon is $0 on Vercel Hobby.
+- **n8n** has 400+ integration nodes. Relayon has **9 adapters** (v1.5). Different scope — Relayon bets on 9 well-tested adapters instead of 400 shallow ones.
 
-**When to use n8n:** You want visual workflows and don't mind paying for a server.
+**When to use n8n:** You want visual workflows, 400+ app integrations, and don't mind paying for a server.
 
-**When to use Relayon:** You want serverless, config-based, Vercel-native.
+**When to use Relayon:** You want serverless, config-based, Vercel-native with AI enrichment built in.
+
+### How is Relayon different from Hookdeck, Svix, or Convoy?
+
+These are **webhook infrastructure** platforms (receive, queue, retry, forward). Relayon overlaps:
+
+| Feature | Hookdeck/Svix/Convoy | Relayon |
+|---|---|---|
+| **Webhook reception** | ✅ | ✅ |
+| **Retry + DLQ** | ✅ | ✅ |
+| **AI enrichment** | ❌ | ✅ (Groq) |
+| **Transform (JSONata)** | ❌ | ✅ |
+| **Conditional routing** | ⚠️ Limited | ✅ (JSONata rules) |
+| **Scheduling (cron trigger)** | ⚠️ Some | ✅ (DB-backed) |
+| **Workflow versioning** | ❌ | ✅ |
+| **Self-hostable on free tier** | ❌ | ✅ (Vercel Hobby) |
+| **Pricing** | $20-500/month | $0 |
+
+**The differentiator:** Relayon combines webhook relay **with** AI enrichment **with** scheduling **with** versioning — all on free tier. Nobody else in this space has all four.
 
 ### How is Relayon different from webhook.site?
 
@@ -110,8 +148,9 @@ Same answer as Zapier. Make is more visual, more app integrations, more expensiv
 2. Sign up (email + password)
 3. Create a workflow (name + source type + signing secret)
 4. Add a destination (e.g., `https://httpbin.org/post`)
-5. Copy the webhook URL
-6. Send a webhook → check the Events page
+5. **Click "Test connection"** — v1.5 verifies it works without sending real data
+6. Copy the webhook URL
+7. Send a webhook → check the Events page
 
 **Time to first delivery:** ~3 minutes.
 
@@ -149,7 +188,7 @@ curl -X POST https://relayon-workers.vercel.app/internal/process \
 Stripe gives you a **webhook signing secret** (starts with `whsec_`). It's different from your API key. Find it at:
 - Stripe Dashboard → Developers → Webhooks → your endpoint → **Signing secret**
 
-Paste that into Relayon's workflow creation form.
+Paste that into Relayon's workflow creation form. **It gets encrypted at rest (v1.3+)** — you won't see it as plaintext in the DB or API responses.
 
 ### Can I use Relayon without a signing secret?
 
@@ -162,6 +201,7 @@ Paste that into Relayon's workflow creation form.
 ### Is Relayon really free?
 
 **Yes, for the free tier.** The full stack runs on:
+
 - **Vercel Hobby** — $0 (100GB bandwidth)
 - **Neon** — $0 (0.5GB storage)
 - **MongoDB Atlas M0** — $0 (512MB)
@@ -178,17 +218,17 @@ Paste that into Relayon's workflow creation form.
 | **Vercel** | 100GB bandwidth, 100GB-hours | ~50K monthly visitors |
 | **Neon** | 0.5GB storage, 191 compute hrs | ~50K events, 10K tenants |
 | **MongoDB M0** | 512MB storage | ~500K events (30-day TTL) |
-| **Upstash Redis** | 10K commands/day | ~3K events/day |
+| **Upstash Redis** | 10K commands/day | ~3K events/day (v1.0-v1.2), ~2K events/day (v1.3+ — schedules + versioning add commands) |
 | **Groq** | 14,400 requests/day | ~10K enriched events/day |
 | **Sentry** | 5K errors/month | Small team usage |
 
-**Rule of thumb:** Relayon is free for **up to ~3K events/day**. Above that, you'll need to upgrade one or more services.
+**Rule of thumb:** Relayon is free for **up to ~2-3K events/day** (v1.5 — v1.3+ added scheduled workflow overhead on Redis).
 
 ### When should I upgrade?
 
 | Trigger | Upgrade | Cost |
 |---|---|---|
-| **>3K events/day** | Upstash Pro | $5/mo |
+| **>2K events/day** (v1.5) | Upstash Pro | $5/mo |
 | **>10K enriched events/day** | Groq paid tier | ~$0.05/1K requests |
 | **>500K events stored** | MongoDB M2 | $9/mo |
 | **>50K monthly visitors** | Vercel Pro | $20/mo |
@@ -217,7 +257,7 @@ A monolith would need to:
 Splitting into 4 apps:
 - **Ingress** has only Express + ioredis → fast cold start (~500ms)
 - **API** has NestJS + Prisma → medium cold start (~800ms)
-- **Workers** has full AI stack → slow cold start (~1200ms), but batching amortizes it
+- **Workers** has full AI stack + 9 adapters → slow cold start (~1200ms), but batching amortizes it
 
 **Result:** Each app is optimized for its workload.
 
@@ -226,7 +266,7 @@ Splitting into 4 apps:
 **Different workloads, different databases.**
 
 **PostgreSQL (ACID-critical):**
-- Tenants, users, workflows, destinations
+- Tenants, users, workflows, destinations, schedules, versions, API keys
 - Foreign keys, transactions, `FOR UPDATE` locks
 - **Rule:** If losing a row breaks money or trust, it goes here.
 
@@ -294,7 +334,7 @@ Vercel's serverless functions are **not** always running. After ~15 minutes of i
 - **Dashboard** — Static Angular build → any CDN
 - **API / Ingress / Workers** — NestJS/Express → any Node.js host (Fly.io, Railway, Render, self-hosted VPS)
 
-See `DEPLOYMENT.md` for the VPS deployment section.
+See `DEPLOYMENT.md` for the VPS deployment section. Self-hosted Docker option is planned for v3.0 (conditional on enterprise demand).
 
 ### Can I use a different AI provider instead of Groq?
 
@@ -314,33 +354,45 @@ See `DEPLOYMENT.md` for the VPS deployment section.
 
 **Mostly, with honest caveats.**
 
-**What's covered:**
+**What's covered (v1.5):**
 - ✅ Multi-tenant isolation (application + database layer)
 - ✅ JWT auth with refresh rotation
+- ✅ **API key auth with scopes** (v1.2+)
 - ✅ HMAC signature verification (timing-safe)
 - ✅ Encrypted connections (HTTPS, `rediss://`, `sslmode=require`)
 - ✅ Rate limiting on all endpoints
 - ✅ Secrets in Vercel environment variables (encrypted at rest)
 - ✅ IP hashing (raw IPs never stored)
+- ✅ **Credential encryption at rest** — AES-256-GCM + HKDF per-tenant keys (v1.3+)
+- ✅ **Zero-downtime key rotation** — multi-key keyring, `enc:v2:<kid>` (v1.4+)
+- ✅ **Optional full-config encryption** — `FULL_CONFIG_ENCRYPTION=true` (v1.5+)
+- ✅ **Dry-run safety** — validation never writes to destination (v1.5+)
 
-**What's NOT covered:**
-- ❌ **`sourceConfig.secret` and `destination.config` are plaintext in PostgreSQL** — anyone with DB access sees them
-- ❌ **Webhook payloads stored plaintext in MongoDB** — anyone with DB access sees them
-- ❌ **No MFA/TOTP** for dashboard login
-- ❌ **No SOC 2 / HIPAA / GDPR certification**
-- ❌ **No automated backups** on free tier
+**What's NOT covered (v1.5):**
+- ❌ **Webhook payloads stored plaintext in MongoDB** — anyone with DB access sees raw payloads. Encryption covers *credentials*, not payloads. This is by design — the server needs to read payloads to transform and deliver them.
+- ❌ **No MFA/TOTP** for dashboard login. Password-only.
+- ❌ **No SOC 2 / HIPAA / GDPR certification.**
+- ❌ **No automated backups** on free tier.
+- ❌ **No persistent audit log table** — console logs only (v2.0 planned).
+- ❌ **`API_KEY_PEPPER` rotation is breaking** — no migration path yet (v2.0 planned).
 
 See `docs/SECURITY.md` for the full threat model.
 
 ### Where are my secrets stored?
 
-**Three places:**
+**Three places, all with different protections:**
 
-1. **Infrastructure secrets** (JWT_SECRET, DATABASE_URL, GROQ_API_KEY) → Vercel environment variables (encrypted at rest, AES-256)
-2. **Per-workflow secrets** (Stripe/GitHub HMAC secret) → PostgreSQL `workflows.source_config` **plaintext JSON**
-3. **Per-destination secrets** (Slack webhook URL, Resend API key, Sheets private key) → PostgreSQL `destinations.config` **plaintext JSON**
+1. **Infrastructure secrets** (JWT_SECRET, DATABASE_URL, GROQ_API_KEY, CONNECTOR_ENCRYPTION_KEYS) → Vercel environment variables (encrypted at rest, AES-256)
 
-**For production use with sensitive data:** encrypt `sourceConfig` and `destination.config` at the application layer before storing. This is **not implemented in v1.0** but planned for v2.0.
+2. **Per-workflow secrets** (Stripe/GitHub HMAC secret) → PostgreSQL `workflows.source_config`. **Encrypted as `enc:v2:<kid>:...` (v1.3+).** Not plaintext, not ciphertext-visible via API — only `••••••••` returned to client.
+
+3. **Per-destination secrets** (Slack webhook URL, Resend API key, Sheets private key, PG/Mongo connection string) → PostgreSQL `destinations.config`. **Encrypted as `enc:v2:<kid>:...` (v1.3+).** Same client-side redaction.
+
+**What this means for a DB dump:** An attacker with only a DB dump gets ciphertext. They need the master keyring (in Vercel env vars) to decrypt. **Compromise of both = full credential exposure.**
+
+**What it does NOT cover:** Webhook payloads (stored plaintext in MongoDB). The server has to read them to deliver them. This is documented in `SECURITY.md`.
+
+**v1.0 → v1.5 upgrade:** The plaintext gap in v1.0's FAQ is **closed**. See `CHANGELOG.md` v1.3 section.
 
 ### Can someone replay my webhooks?
 
@@ -349,7 +401,7 @@ See `docs/SECURITY.md` for the full threat model.
 - **Stripe, Slack** — No, they include timestamps. Requests outside 300s window are rejected.
 - **GitHub, Shopify, Generic** — Yes, if attacker captures a valid request. No timestamp in signature. **Mitigation:** Provide `X-Event-Id` header for idempotency. Duplicates are deduped but the first one still processes.
 
-**Fix (planned v1.1):** Add optional timestamp header for all sources.
+**Fix (planned v2.0):** Optional timestamp header for all sources.
 
 ### What happens if my JWT_SECRET leaks?
 
@@ -363,6 +415,22 @@ See `docs/SECURITY.md` for the full threat model.
 
 **Time to remediate:** ~5 minutes (rotate both secrets, redeploy).
 
+### What happens if my CONNECTOR_ENCRYPTION_KEYS leak?
+
+**Worse than a JWT_SECRET leak.** Attacker can decrypt all credentials in the DB.
+
+**If leak is passive (attacker has read access to env):**
+1. Rotate keys (add new key, run rotation script, remove old key) — see `TROUBLESHOOTING.md` "Key Rotation"
+2. Then **regenerate every credential at the destination** — Slack webhooks, Resend keys, PG/Mongo connection strings, Sheets service account keys
+3. Old credentials are compromised even if ciphertext was protected
+
+**If leak is active (attacker is using keys to decrypt in real-time):**
+1. Rotate immediately
+2. Regenerate every credential
+3. Audit `audit_logs` (v2.0) or Vercel logs for suspicious access
+
+**This is why the encryption master key is treated as the highest-severity secret in the system.**
+
 ### Is the AI prompt injection vulnerable?
 
 **Partially mitigated.**
@@ -373,6 +441,122 @@ See `docs/SECURITY.md` for the full threat model.
 - **Not a multi-tenant risk:** Each tenant's enrichment is scoped to their own workflows.
 
 **For external-facing LLM endpoints:** add prompt injection guard. Relayon doesn't have one because it's not a user-facing AI chat — it's a batch enrichment pipeline.
+
+---
+
+## New in v1.1-v1.5
+
+### Can I schedule workflows instead of waiting for webhooks?
+
+**Yes — since v1.3.** Scheduled workflows fire on a cron expression, generating synthetic events that flow through the same pipeline (AI → transform → routing → delivery).
+
+**How:**
+1. Workflow detail → Scheduled trigger card → + Add schedule
+2. Choose a preset (every 15 min, hourly, daily at 9 AM) or write a custom cron
+3. Set timezone
+4. Save
+
+**v1.4 added:** "Run now" button — trigger immediately without waiting for the next cron tick.
+
+**v1.5 added:** Bulk pause-all / resume-all for all tenant schedules.
+
+**Limitations:**
+- External cron required (Vercel Hobby allows 1 cron/day) — see "Why do webhooks take 2 hours" above
+- Cron expression format: 5-field only, no named days (`MON`, `JAN` not supported) — reduces parser surface
+- Timezone must be a valid IANA name (`Asia/Karachi`, `America/New_York`)
+
+### Can I see what changed between two workflow versions?
+
+**Yes — since v1.5 (diff) and v1.3 (versioning).**
+
+**How:**
+1. Workflow detail → Version history button (top right)
+2. Version drawer shows all snapshots (v1, v2, v3, ...)
+3. Select 2 versions → "Compute diff"
+4. See line-level colored diff (green `+`, red `-`, cyan `@@`)
+
+**What it captures:** Every workflow create, update, import, and restore produces a new immutable version. Capped at 50 per workflow.
+
+**Restore:** Click "Restore" on any version — destinations are recreated from snapshot, a new version is captured (history stays linear, never branches).
+
+### What are API keys for and how do I use them?
+
+**API keys let external programs call your Relayon API without needing a JWT** (which expires in 15 minutes). Useful for:
+- CI/CD pipelines that manage workflows
+- Scripts that query events
+- Third-party tools that sync data
+
+**Format:** `rlk_<live|test>_<8hex-prefix>_<48hex-secret>` — Stripe-style.
+
+**How to create:**
+1. Settings → API Keys tab → + New key
+2. Select scopes (e.g., `events:read`, `workflows:read`)
+3. **Copy the raw key immediately** — it's shown only once
+4. Use it: `X-API-Key: rlk_live_...` header
+
+**v1.5 added rotation:** Click "Rotate" on an existing key → new key created, old key keeps working for 24 hours (grace window) → old key auto-expires.
+
+**Security:** Raw key is never stored. Only `SHA-256(PEPPER:rawKey)` is stored. If lost, revoke and create a new one.
+
+### What is "Test connection" on destinations?
+
+**It's a validation endpoint (v1.5) that lets you verify a destination works without sending real data.**
+
+**How:**
+1. Open destination modal → "Test connection" button
+2. Relayon runs a **safe probe** on the destination:
+   - HTTP → `HEAD` request (no body)
+   - Slack/Discord → URL format check only (cannot test without sending)
+   - Email → `GET /api-keys` (auth check, no email)
+   - Sheets → `GET spreadsheet metadata` (no row append)
+   - Airtable → `GET base tables` (no record)
+   - Notion → `GET data source` (no page)
+   - PostgreSQL → `SELECT 1` (no INSERT)
+   - MongoDB → `ping` (no insert)
+3. Green ✓ if valid, red ✗ with error if not
+
+**Critical safety:** `__dryRun` flag is honored by **all 9 adapters**. Testing a destination **never sends a real message, email, or DB insert** — only safe probes.
+
+**What it doesn't test:** Whether the actual delivery payload will succeed. Only that the config is valid and (for most adapters) reachable.
+
+### What does "encrypted at rest" mean?
+
+**It means credentials are stored as ciphertext in the database, not plaintext.**
+
+**Before v1.3:** DB dump = all credentials in plaintext. Anyone with DB access had everything.
+
+**Since v1.3:** Credentials are stored as `enc:v2:<kid>:<iv>:<tag>:<ciphertext>` — AES-256-GCM encrypted with a per-tenant key derived via HKDF from a master keyring.
+
+**What it means practically:**
+- DB dump without the master keyring = useless ciphertext
+- Attacker needs both DB access AND `CONNECTOR_ENCRYPTION_KEYS` from Vercel env
+- Deleting one row doesn't leak that row's secret to neighboring rows (each has its own IV)
+
+**What it does NOT mean:**
+- Not E2E encryption — server sees plaintext during delivery
+- Not per-tenant DB partitions — all ciphertext is in the same tables, but derived keys are cryptographically separated per tenant
+- Not payload encryption — webhook payloads in MongoDB are still plaintext (by design)
+
+### Why are there still no unit tests after 5 versions?
+
+**Honest answer: every version prioritized shipping the next feature over building test infrastructure.**
+
+**What actually happened:**
+- v1.0 shipped with smoke test only (10 checks)
+- v1.1 added bulk DLQ, YAML, cost analytics, routing — no unit tests
+- v1.2 added adapter SDK, charts, API keys — no unit tests
+- v1.3 added schedules, versioning, encryption — no unit tests
+- v1.4 added PG/Mongo adapters, key rotation — no unit tests
+- v1.5 added validation, dry-run, diff, key rotation — no unit tests
+
+**What was tested instead:**
+- Smoke test (10 checks against production) — still only covers v1.0 features
+- Manual feature checklists per release (~25 checks across v1.1-v1.5) — documented in `TESTING.md`
+- CI typecheck + builds (catches compile errors, not runtime bugs)
+
+**The tradeoff:** Adding 50 unit tests to a 20,000-line codebase would take 2 weeks and catch maybe 5 bugs. Adding the smoke test took 2 hours and catches every production regression. **The smoke test won.**
+
+**v2.0 is where this stops.** Testing is the **non-negotiable P0 blocker** for v2.0. No v2.0 feature ships before unit tests are complete. See `ROADMAP.md`.
 
 ---
 
@@ -446,7 +630,35 @@ curl -X POST https://relayon-workers.vercel.app/internal/deliver \
 - Reduce `GROQ_MAX_TOKENS` (1024 → 512)
 - Upgrade to Groq paid tier ($0.05/1K requests)
 
-**See:** `docs/TROUBLESHOOTING.md` for 20+ more issues.
+### Scheduled workflow never fires
+
+**Common causes:**
+1. Schedule `isActive: false` — check dashboard
+2. Workflow `isActive: false` — check dashboard
+3. External cron not hitting `/internal/schedule/tick` — check cron-job.org
+4. `nextRunAt` is in the future — normal, wait for it
+
+**Force a test:**
+```sql
+-- In Prisma Studio
+UPDATE workflow_schedules
+SET next_run_at = NOW() - INTERVAL '1 minute'
+WHERE workflow_id = 'YOUR_WORKFLOW_ID';
+```
+Then hit `/internal/schedule/tick`. Should return `{enqueued: 1}`.
+
+### "Test connection" shows green but delivery fails
+
+**Test connection only validates config shape and (for most adapters) reachability.** It does NOT test whether the actual delivery payload will succeed.
+
+**Common causes of post-green failure:**
+- Destination requires authentication not tested by dry-run (e.g., Slack webhook doesn't exist, only URL format was valid)
+- Payload shape mismatch (Airtable columns, Notion properties)
+- Rate limit hit on the destination during real delivery
+
+**Always do a real end-to-end test with a real webhook after validating.**
+
+**See:** `docs/TROUBLESHOOTING.md` for 40+ more issues including encryption, key rotation, and adapter-specific cases.
 
 ---
 
@@ -456,9 +668,11 @@ curl -X POST https://relayon-workers.vercel.app/internal/deliver \
 
 See `docs/ROADMAP.md` for the full list. Summary:
 
-**v1.1 (Q1 2027):** Unit tests, API keys UI, destination test button, audit logs
-**v1.2 (Q2 2027):** Charts, bulk DLQ actions, conditional routing, 6 more adapters, i18n
-**v2.0 (Q3-Q4 2027):** SAML SSO, Row-level security, SOC 2, multi-region, self-hosted
+**v1.0-v1.5 (shipped):** MVP + reliability + extensibility + scheduling/versioning/encryption + DB adapters + validation/diff
+
+**v2.0 (planned):** Unit tests (blocking P0), persistent audit log, MFA/TOTP, `API_KEY_PEPPER` rotation, smoke test expansion, 3 more adapters (Linear, PagerDuty, Opsgenie)
+
+**v3.0 (conditional):** SAML SSO, row-level security, SOC 2, multi-region, self-hosted Docker — only if v2.0 succeeds and enterprise demand exists
 
 ### What's NOT on the roadmap?
 
@@ -467,8 +681,10 @@ See `docs/ROADMAP.md` for the full list. Summary:
 - Blockchain / NFT features
 - Custom LLM fine-tuning
 - Real-time WebSocket updates
+- Custom domain / white-label
+- E2E encrypted payloads (breaks core functionality by design)
 
-See `docs/ROADMAP.md` for reasoning.
+See `docs/ROADMAP.md` for reasoning on each.
 
 ### Can I suggest a feature?
 
@@ -484,6 +700,8 @@ Vague proposals get closed. Specific proposals get prioritized.
 
 **Honest answer:** When either (a) I have time, or (b) someone sponsors it, or (c) enough users request it.
 
+**v2.0 is different:** Testing is a hard commitment, not a "when I have time." Everything else stays in the "when requested" bucket.
+
 This is a solo-maintained project. No roadmap commitment beyond what's documented in `docs/ROADMAP.md`.
 
 ---
@@ -494,10 +712,10 @@ This is a solo-maintained project. No roadmap commitment beyond what's documente
 
 **Yes.** See `docs/CONTRIBUTING.md` for the full guide. Summary:
 
-**High-value contributions:**
-- New destination adapters (Discord, Airtable, Notion)
+**High-value contributions (v1.5 → v2.0):**
+- **Unit tests — any test, any file.** Top priority until v2.0 testing goal is met.
+- New destination adapters (Linear, PagerDuty, Opsgenie)
 - New signature verifiers (Twilio, SendGrid)
-- Unit tests (currently 0)
 - Documentation improvements
 - Bug reports with reproduction steps
 
@@ -506,6 +724,8 @@ This is a solo-maintained project. No roadmap commitment beyond what's documente
 ### Do you accept AI-generated PRs?
 
 **Yes, but you own them.** If you submit it, you must understand every line. AI-generated PRs that break things or introduce subtle bugs will be rejected, same as any other bad PR.
+
+**Special note:** AI-generated PRs that don't honor `__dryRun` in new adapters are rejected regardless of quality — the safety rule is not negotiable.
 
 ### How fast do PRs get reviewed?
 
@@ -536,7 +756,10 @@ This is a solo-maintained project. No roadmap commitment beyond what's documente
 
 ---
 
-**Last updated:** 2026-10-22 (v1.0.0)
+**Last updated:** 2026-10-26 (v1.5.0)
+
+**Changelog of this FAQ:**
+- v1.0 → v1.5: Rewrote security section (encryption closed the plaintext gap). Added "New in v1.1-v1.5" section. Updated comparison tables (9 adapters, scheduling, versioning). Added Q&As for schedules, versioning, API keys, dry-run, encryption. Updated roadmap summary to v2.0 test-first reality. Corrected free-tier limits (Redis command usage went up in v1.3+ due to schedules).
 ```
 
 ---
