@@ -1,4 +1,6 @@
 import {
+  BadRequestException,
+  Body,
   Controller,
   Get,
   HttpCode,
@@ -23,5 +25,25 @@ export class ProcessingController {
   @Get('status')
   async status() {
     return this.processing.getQueueStatus();
+  }
+
+  @Post('process/test')
+  @HttpCode(HttpStatus.OK)
+  async test(
+    @Body()
+    body: {
+      tenantId?: string;
+      workflowId?: string;
+      payload?: unknown;
+    },
+  ) {
+    if (!body.tenantId || !body.workflowId) {
+      throw new BadRequestException('tenantId and workflowId are required');
+    }
+    return this.processing.testRun({
+      tenantId: body.tenantId,
+      workflowId: body.workflowId,
+      payload: body.payload ?? {},
+    });
   }
 }

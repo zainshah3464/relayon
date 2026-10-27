@@ -34,18 +34,24 @@ export class EmailAdapter implements DeliveryAdapter {
       return this.error("missing 'from' field", started);
     }
 
-    if (ctx.config['__dryRun'] === true) {
+    const isDryRun = ctx.config['__dryRun'] === true;
+
+    if (isDryRun) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
       try {
-        const res = await fetch('https://api.resend.com/api-keys', {
+        const res = await fetch('https://api.resend.com/domains', {
           method: 'GET',
           headers: { Authorization: `Bearer ${apiKey}` },
+          signal: controller.signal,
         });
+        const bodyText = await res.text();
         return {
           success: res.ok,
           statusCode: res.status,
           latencyMs: Date.now() - started,
-          responseBody: res.ok ? 'Resend key valid' : 'Invalid Resend key',
-          error: res.ok ? null : `Resend: ${res.status}`,
+          responseBody: bodyText.slice(0, 500),
+          error: res.ok ? null : `Resend auth: ${res.status}`,
           retryable: false,
         };
       } catch (err) {
@@ -57,6 +63,8 @@ export class EmailAdapter implements DeliveryAdapter {
           error: err instanceof Error ? err.message : String(err),
           retryable: false,
         };
+      } finally {
+        clearTimeout(timer);
       }
     }
 

@@ -82,6 +82,25 @@ const ALL_SCOPES: ApiKeyScope[] = [
         </div>
       }
 
+      <!-- Rotation history -->
+      @if (rotations().length > 0) {
+        <div class="card mt-6">
+          <h2 class="text-sm font-medium text-white mb-3">Rotation history</h2>
+          <div class="space-y-2">
+            @for (r of rotations(); track r.id) {
+              <div class="flex justify-between text-xs bg-surface-2 p-2 rounded">
+                <div class="text-muted font-mono">
+                  {{ r.oldKeyId.slice(0, 8) }}… → {{ r.newKeyId.slice(0, 8) }}…
+                </div>
+                <div class="text-muted">
+                  {{ r.createdAt | date: 'short' }} · grace until {{ r.graceUntil | date: 'short' }}
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+      }
+
       @if (showCreate()) {
         <div class="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" (click)="closeCreate()">
           <div class="card w-full max-w-lg" (click)="$event.stopPropagation()">
@@ -146,6 +165,15 @@ export class ApiKeysComponent implements OnInit {
   saving = signal(false);
   createError = signal<string | null>(null);
 
+  rotations = signal<Array<{
+    id: string;
+    oldKeyId: string;
+    newKeyId: string;
+    rotatedBy: string | null;
+    graceUntil: string;
+    createdAt: string;
+  }>>([]);
+
   form = {
     name: '',
     environment: 'live' as 'live' | 'test',
@@ -155,6 +183,10 @@ export class ApiKeysComponent implements OnInit {
 
   ngOnInit(): void {
     this.load();
+    this.svc.rotationHistory().subscribe({
+      next: (r) => this.rotations.set(r),
+      error: () => this.rotations.set([]),
+    });
   }
 
   load(): void {

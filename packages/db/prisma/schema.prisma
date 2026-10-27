@@ -2,6 +2,7 @@ generator client {
   provider      = "prisma-client-js"
   binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
@@ -36,6 +37,9 @@ enum DestinationType {
   slack
   sheets
   email
+  discord
+  airtable
+  notion
   postgres
   mongodb
 }
@@ -55,10 +59,11 @@ model Tenant {
   createdAt             DateTime @default(now()) @map("created_at")
   updatedAt             DateTime @updatedAt @map("updated_at")
 
-  users         User[]
-  workflows     Workflow[]
-  refreshTokens RefreshToken[]
-  apiKeys       ApiKey[]
+  users           User[]
+  workflows       Workflow[]
+  refreshTokens   RefreshToken[]
+  apiKeys         ApiKey[]
+  apiKeyRotations ApiKeyRotation[]
 
   @@map("tenants")
 }
@@ -133,6 +138,11 @@ model Destination {
   config      Json            @default("{}")
   enabled     Boolean         @default(true)
   retryPolicy Json            @default("{\"max_attempts\":5,\"backoff_ms\":[10000,30000,60000,300000,900000]}") @map("retry_policy")
+
+  lastValidatedAt     DateTime? @map("last_validated_at")
+  lastValidationOk    Boolean?  @map("last_validation_ok")
+  lastValidationError String?   @map("last_validation_error")
+
   createdAt   DateTime        @default(now()) @map("created_at")
   updatedAt   DateTime        @updatedAt @map("updated_at")
 
@@ -202,4 +212,23 @@ model WorkflowVersion {
   @@unique([workflowId, version])
   @@index([tenantId, workflowId, version])
   @@map("workflow_versions")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// API KEY ROTATION AUDIT
+// ═══════════════════════════════════════════════════════════════
+
+model ApiKeyRotation {
+  id         String   @id @default(uuid())
+  tenantId   String   @map("tenant_id")
+  oldKeyId   String   @map("old_key_id")
+  newKeyId   String   @map("new_key_id")
+  rotatedBy  String?  @map("rotated_by")
+  graceUntil DateTime @map("grace_until")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@map("api_key_rotations")
 }

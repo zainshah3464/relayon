@@ -147,6 +147,12 @@ export class DestinationsService {
     if (shapeError) errors.push(shapeError);
 
     if (errors.length > 0) {
+      await this.persistValidation(
+        dto.destinationId,
+        tenantId,
+        false,
+        errors.map((e) => e.message).join('; '),
+      );
       return {
         ok: false,
         layer: 'schema',
@@ -204,6 +210,13 @@ export class DestinationsService {
         });
       }
 
+      await this.persistValidation(
+        dto.destinationId,
+        tenantId,
+        success,
+        success ? null : body.error ?? `Dry-run returned ${res.status}`,
+      );
+
       return {
         ok: success,
         layer: 'both',
@@ -222,6 +235,28 @@ export class DestinationsService {
       );
       return { ok: true, layer: 'schema', errors: [], warnings, dryRun: null };
     }
+  }
+
+  private async persistValidation(
+    destinationId: string | undefined,
+    tenantId: string,
+    ok: boolean,
+    error: string | null,
+  ): Promise<void> {
+    if (!destinationId) return;
+    const owned = await this.prisma.destination.findFirst({
+      where: { id: destinationId, workflow: { tenantId } },
+      select: { id: true },
+    });
+    if (!owned) return;
+    await this.prisma.destination.update({
+      where: { id: destinationId },
+      data: {
+        lastValidatedAt: new Date(),
+        lastValidationOk: ok,
+        lastValidationError: error ? error.slice(0, 500) : null,
+      },
+    });
   }
 
   private requiredKeys(type: string): string[] {

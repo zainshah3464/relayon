@@ -27,6 +27,11 @@ export class ApiKeysController {
     return this.keys.list(user.tenantId);
   }
 
+  @Get('rotations/history')
+  rotationHistory(@CurrentUser() user: JwtUser) {
+    return this.keys.rotationHistory(user.tenantId);
+  }
+
   @Post()
   create(@CurrentUser() user: JwtUser, @Body() dto: CreateApiKeyDto) {
     return this.keys.create(user.tenantId, dto);
@@ -41,6 +46,6 @@ export class ApiKeysController {
   @Post(':id/rotate')
   @HttpCode(HttpStatus.OK)
   rotate(@CurrentUser() user: JwtUser, @Param('id') id: string) {
-    return this.keys.rotate(user.tenantId, id);
+    return this.keys.rotate(user.tenantId, id, user.sub);
   }
 }

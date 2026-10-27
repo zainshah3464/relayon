@@ -139,6 +139,125 @@ export class ProcessingService {
     return result;
   }
 
+  /**
+   * Pipeline dry-run: runs enrichment → transform → routing on a sample
+   * payload WITHOUT touching MongoDB or the egress queue.
+   */
+  async testRun(input: {
+    tenantId: string;
+    workflowId: string;
+    payload: unknown;
+  }): Promise<{
+    enrichment: {
+      enabled: boolean;
+      result: unknown;
+      cached: boolean;
+      error: string | null;
+      durationMs: number;
+    };
+    transform: {
+      applied: boolean;
+      result: unknown;
+      error: string | null;
+      durationMs: number;
+    };
+    routing: {
+      destinationIds: string[];
+      matchedRule: number | null;
+      reason: string;
+    };
+    destinations: Array<{ id: string; name: string; type: string }>;
+  }> {
+    const workflow = await this.prisma.workflow.findFirst({
+      where: { id: input.workflowId, tenantId: input.tenantId },
+      include: { destinations: { where: { enabled: true } } },
+    });
+
+    if (!workflow) {
+      throw new Error('Workflow not found');
+    }
+
+    // ── 1. Enrichment ─────────────────────────────────────────
+    let enrichedPayload: unknown = null;
+    const enrichment: {
+      enabled: boolean;
+      result: unknown;
+      cached: boolean;
+      error: string | null;
+      durationMs: number;
+    } = {
+      enabled: workflow.enrichmentEnabled,
+      result: null,
+      cached: false,
+      error: null,
+      durationMs: 0,
+    };
+
+    if (workflow.enrichmentEnabled) {
+      try {
+        const r = await this.groq.enrich({
+          workflowId: workflow.id,
+          prompt: workflow.enrichmentPrompt,
+          payload: input.payload,
+        });
+        enrichedPayload = r.enrichedPayload;
+        enrichment.result = r.enrichedPayload;
+        enrichment.cached = r.cached;
+        enrichment.durationMs = r.durationMs;
+      } catch (err) {
+        enrichment.error = err instanceof Error ? err.message : String(err);
+      }
+    }
+
+    // ── 2. Transform ──────────────────────────────────────────
+    const transformInput =
+      enrichedPayload !== null ? enrichedPayload : input.payload;
+
+    const transform: {
+      applied: boolean;
+      result: unknown;
+      error: string | null;
+      durationMs: number;
+    } = {
+      applied: false,
+      result: transformInput,
+      error: null,
+      durationMs: 0,
+    };
+
+    if (workflow.transformExpression && workflow.transformExpression.trim()) {
+      const started = Date.now();
+      try {
+        transform.result = await this.transform.apply(
+          workflow.transformExpression,
+          transformInput,
+        );
+        transform.applied = true;
+      } catch (err) {
+        transform.error = err instanceof Error ? err.message : String(err);
+      }
+      transform.durationMs = Date.now() - started;
+    }
+
+    // ── 3. Routing ────────────────────────────────────────────
+    const routing = await this.routing.decide(
+      (workflow as { routingRules?: unknown }).routingRules,
+      workflow.destinations,
+      transform.result,
+    );
+
+    return {
+      enrichment,
+      transform,
+      routing,
+      destinations: workflow.destinations.map((d) => ({
+        id: d.id,
+        name: d.name,
+        type: d.type,
+      })),
+    };
+  }
+
   async getQueueStatus() {
     const r = this.redis.raw;
     const [incoming, processing, egress] = await Promise.all([

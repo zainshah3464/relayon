@@ -240,7 +240,7 @@ export class WorkflowVersionsDrawerComponent implements OnInit {
   exitCompare(): void {
     this.compareMode.set(false);
     this.compareA.set(null);
-    this.compareB.set(null);
+    this.compareB.set(null);  
     this.diffResult.set(null);
   }
 }

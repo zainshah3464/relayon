@@ -28,4 +28,10 @@ export class SchedulesBulkController {
   resumeAll(@CurrentUser() user: JwtUser) {
     return this.schedules.bulkSetActive(user.tenantId, true);
   }
+
+  @Post('bulk/delete')
+  @HttpCode(HttpStatus.OK)
+  bulkDelete(@CurrentUser() user: JwtUser) {
+    return this.schedules.bulkDelete(user.tenantId);
+  }
 }

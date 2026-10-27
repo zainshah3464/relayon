@@ -153,6 +153,22 @@ export class SchedulesService {
     return { updated };
   }
 
+  /**
+   * Deletes ALL schedules for the tenant. Workflows are untouched.
+   */
+  async bulkDelete(tenantId: string): Promise<{ deleted: number }> {
+    const workflows = await this.prisma.workflow.findMany({
+      where: { tenantId },
+      select: { id: true },
+    });
+    if (workflows.length === 0) return { deleted: 0 };
+
+    const result = await this.prisma.workflowSchedule.deleteMany({
+      where: { workflowId: { in: workflows.map((w) => w.id) } },
+    });
+    return { deleted: result.count };
+  }
+
   /** Validates a cron expression and returns the next fire time. */
   nextRun(cronExpression: string, timezone = 'UTC'): Date {
     try {

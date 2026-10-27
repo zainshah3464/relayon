@@ -42,29 +42,31 @@ export class SheetsAdapter implements DeliveryAdapter {
     try {
       const token = await this.getAccessToken(saEmail, privateKey);
 
-      if (ctx.config['__dryRun'] === true) {
+      const isDryRun = ctx.config['__dryRun'] === true;
+
+      if (isDryRun) {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
         try {
           const res = await fetch(
-            `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}?fields=properties.title`,
-            { headers: { Authorization: `Bearer ${token}` } },
+            `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}`,
+            {
+              method: 'GET',
+              headers: { Authorization: `Bearer ${token}` },
+              signal: controller.signal,
+            },
           );
+          const bodyText = await res.text();
           return {
             success: res.ok,
             statusCode: res.status,
             latencyMs: Date.now() - started,
-            responseBody: res.ok ? 'Spreadsheet accessible' : 'Access denied',
-            error: res.ok ? null : `Sheets: ${res.status}`,
+            responseBody: bodyText.slice(0, 500),
+            error: res.ok ? null : `Sheets access: ${res.status}`,
             retryable: false,
           };
-        } catch (err) {
-          return {
-            success: false,
-            statusCode: 0,
-            latencyMs: Date.now() - started,
-            responseBody: '',
-            error: err instanceof Error ? err.message : String(err),
-            retryable: false,
-          };
+        } finally {
+          clearTimeout(timer);
         }
       }
 

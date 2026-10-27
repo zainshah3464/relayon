@@ -44,9 +44,8 @@ import { WorkflowVersionsDrawerComponent } from './workflow-versions-drawer.comp
           <button (click)="exportYaml()" [disabled]="exporting()" class="btn-secondary">
             {{ exporting() ? 'Exporting...' : 'Export YAML' }}
           </button>
-          <button (click)="showVersions.set(true)" class="btn-secondary">
-            Version history
-          </button>
+          <button (click)="openTestRun()" class="btn-primary text-xs">▶ Test run</button>
+          <button (click)="showVersions.set(true)" class="btn-secondary text-xs">Version history</button>
         </div>
       </div>
 
@@ -141,6 +140,15 @@ import { WorkflowVersionsDrawerComponent } from './workflow-versions-drawer.comp
                     <div class="flex items-center gap-2">
                       <span class="text-white font-medium">{{ d.name }}</span>
                       <span class="text-xs px-2 py-0.5 rounded bg-surface-2 text-relay-cyan font-mono">{{ d.type }}</span>
+                      @if (d.lastValidationOk === true) {
+                        <span class="text-xs px-2 py-0.5 rounded bg-signal-green/20 text-signal-green" [title]="'Last validated: ' + (d.lastValidatedAt | date: 'short')">
+                          ✓ verified
+                        </span>
+                      } @else if (d.lastValidationOk === false) {
+                        <span class="text-xs px-2 py-0.5 rounded bg-signal-rose/20 text-signal-rose" [title]="d.lastValidationError || 'Validation failed'">
+                          ✗ failed
+                        </span>
+                      }
                       @if (!d.enabled) {
                         <span class="text-xs px-2 py-0.5 rounded bg-signal-rose/20 text-signal-rose">Disabled</span>
                       }
@@ -320,6 +328,104 @@ import { WorkflowVersionsDrawerComponent } from './workflow-versions-drawer.comp
           </div>
         </div>
       }
+
+      <!-- Test-run modal -->
+      @if (showTestRun()) {
+        <div class="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" (click)="closeTestRun()">
+          <div class="card w-full max-w-3xl max-h-[90vh] overflow-y-auto" (click)="$event.stopPropagation()">
+            <div class="flex justify-between items-center mb-4">
+              <div>
+                <h2 class="text-lg font-semibold text-white">Test run pipeline</h2>
+                <p class="text-xs text-muted mt-1">Runs enrich → transform → routing. No delivery, no DB writes.</p>
+              </div>
+              <button (click)="closeTestRun()" class="text-muted hover:text-white">✕</button>
+            </div>
+
+            <label class="label">Sample payload (JSON)</label>
+            <textarea
+              [value]="testRunPayload()"
+              (input)="testRunPayload.set($any($event.target).value)"
+              rows="8"
+              class="input font-mono text-xs"
+            ></textarea>
+
+            <div class="flex justify-end gap-2 mt-3">
+              <button (click)="closeTestRun()" class="btn-secondary">Close</button>
+              <button (click)="runTestRun()" [disabled]="testRunLoading()" class="btn-primary">
+                {{ testRunLoading() ? 'Running...' : 'Run pipeline' }}
+              </button>
+            </div>
+
+            @if (testRunError()) {
+              <div class="text-sm text-signal-rose mt-3">{{ testRunError() }}</div>
+            }
+
+            @if (testRunResult(); as r) {
+              <div class="mt-6 space-y-4">
+                <div class="card bg-surface-2">
+                  <div class="flex justify-between items-center mb-2">
+                    <h3 class="text-sm font-medium text-white">1. Enrichment</h3>
+                    <span class="text-xs"
+                      [class.text-signal-green]="r.enrichment.enabled && !r.enrichment.error"
+                      [class.text-muted]="!r.enrichment.enabled"
+                      [class.text-signal-rose]="r.enrichment.error">
+                      @if (!r.enrichment.enabled) { Disabled }
+                      @else if (r.enrichment.error) { Error · {{ r.enrichment.durationMs }}ms }
+                      @else { OK · {{ r.enrichment.durationMs }}ms @if (r.enrichment.cached) { · cached } }
+                    </span>
+                  </div>
+                  @if (r.enrichment.error) {
+                    <p class="text-xs text-signal-rose">{{ r.enrichment.error }}</p>
+                  } @else if (r.enrichment.result) {
+                    <pre class="text-xs bg-midnight p-2 rounded overflow-x-auto text-relay-cyan">{{ r.enrichment.result | json }}</pre>
+                  }
+                </div>
+
+                <div class="card bg-surface-2">
+                  <div class="flex justify-between items-center mb-2">
+                    <h3 class="text-sm font-medium text-white">2. Transform</h3>
+                    <span class="text-xs"
+                      [class.text-signal-green]="r.transform.applied && !r.transform.error"
+                      [class.text-muted]="!r.transform.applied"
+                      [class.text-signal-rose]="r.transform.error">
+                      @if (!r.transform.applied) { No transform }
+                      @else if (r.transform.error) { Error · {{ r.transform.durationMs }}ms }
+                      @else { Applied · {{ r.transform.durationMs }}ms }
+                    </span>
+                  </div>
+                  @if (r.transform.error) {
+                    <p class="text-xs text-signal-rose">{{ r.transform.error }}</p>
+                  }
+                  <pre class="text-xs bg-midnight p-2 rounded overflow-x-auto text-relay-cyan">{{ r.transform.result | json }}</pre>
+                </div>
+
+                <div class="card bg-surface-2">
+                  <div class="flex justify-between items-center mb-2">
+                    <h3 class="text-sm font-medium text-white">3. Routing</h3>
+                    <span class="text-xs text-muted">{{ r.routing.reason }}</span>
+                  </div>
+                  @if (r.routing.destinationIds.length === 0) {
+                    <p class="text-xs text-signal-amber">No destination would receive this event.</p>
+                  } @else {
+                    <p class="text-xs text-white mb-2">
+                      {{ r.routing.destinationIds.length }} destination(s) would receive:
+                    </p>
+                    <div class="flex gap-1 flex-wrap">
+                      @for (d of r.destinations; track d.id) {
+                        @if (r.routing.destinationIds.includes(d.id)) {
+                          <span class="text-xs px-2 py-0.5 rounded bg-signal-green/20 text-signal-green font-mono">
+                            {{ d.name }} ({{ d.type }})
+                          </span>
+                        }
+                      }
+                    </div>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+      }
     </div>
   `,
 })
@@ -362,6 +468,27 @@ export class WorkflowDetailComponent implements OnInit {
     warnings: string[];
     dryRun: { attempted: boolean; success: boolean; latencyMs: number; detail: string } | null;
   } | null>(null);
+
+  // ── Test-run state ───────────────────────────────────────────
+  showTestRun = signal(false);
+  testRunLoading = signal(false);
+  testRunResult = signal<{
+    enrichment: { enabled: boolean; result: unknown; cached: boolean; error: string | null; durationMs: number };
+    transform: { applied: boolean; result: unknown; error: string | null; durationMs: number };
+    routing: { destinationIds: string[]; matchedRule: number | null; reason: string };
+    destinations: Array<{ id: string; name: string; type: string }>;
+  } | null>(null);
+  testRunPayload = signal<string>(
+    JSON.stringify(
+      {
+        type: 'checkout.session.completed',
+        data: { amount: 5000, currency: 'usd', customer: { email: 'test@example.com' } },
+      },
+      null,
+      2,
+    ),
+  );
+  testRunError = signal<string | null>(null);
 
   private readonly samplePayload = {
     type: 'checkout.session.completed',
@@ -500,6 +627,46 @@ export class WorkflowDetailComponent implements OnInit {
     });
   }
 
+  // ── Test-run methods ─────────────────────────────────────────
+
+  openTestRun(): void {
+    this.testRunResult.set(null);
+    this.testRunError.set(null);
+    this.showTestRun.set(true);
+  }
+
+  closeTestRun(): void {
+    if (!this.testRunLoading()) this.showTestRun.set(false);
+  }
+
+  runTestRun(): void {
+    const wf = this.workflow();
+    if (!wf || this.testRunLoading()) return;
+
+    let payload: Record<string, unknown>;
+    try {
+      payload = JSON.parse(this.testRunPayload()) as Record<string, unknown>;
+    } catch {
+      this.testRunError.set('Payload is not valid JSON');
+      return;
+    }
+
+    this.testRunLoading.set(true);
+    this.testRunError.set(null);
+    this.testRunResult.set(null);
+
+    this.svc.testRun(wf.id, payload).subscribe({
+      next: (r) => {
+        this.testRunResult.set(r);
+        this.testRunLoading.set(false);
+      },
+      error: (err) => {
+        this.testRunError.set(err?.error?.message ?? 'Test run failed');
+        this.testRunLoading.set(false);
+      },
+    });
+  }
+
   destinationSummary(d: Destination): string {
     const cfg = d.config as Record<string, unknown>;
     if (typeof cfg['url'] === 'string') return cfg['url'] as string;
@@ -534,7 +701,12 @@ export class WorkflowDetailComponent implements OnInit {
     this.validating.set(true);
     this.validationResult.set(null);
 
-    this.svc.validateDestination({ type: v.type, config, dryRun: true }).subscribe({
+    this.svc.validateDestination({
+      type: v.type,
+      config,
+      dryRun: true,
+      destinationId: undefined, // naye destination ke liye undefined
+    }).subscribe({
       next: (r) => {
         this.validationResult.set(r);
         this.validating.set(false);

@@ -24,6 +24,7 @@ import {
 } from '../../common/decorators/current-user.decorator';
 import { CreateWorkflowDto } from './dto/create-workflow.dto';
 import { UpdateWorkflowDto } from './dto/update-workflow.dto';
+import { TestRunDto } from './dto/test-run.dto';
 
 @Controller('workflows')
 @UseGuards(JwtOrApiKeyGuard)
@@ -103,6 +104,17 @@ export class WorkflowsController {
       body.expression ?? '',
       body.samplePayload ?? {},
     );
+  }
+
+  @Post(':id/test')
+  @RequireScopes('workflows:read')
+  @HttpCode(HttpStatus.OK)
+  testRun(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() dto: TestRunDto,
+  ) {
+    return this.workflows.testRun(user.tenantId, id, dto.payload ?? {});
   }
 
   // ── Versioning ───────────────────────────────────────────────

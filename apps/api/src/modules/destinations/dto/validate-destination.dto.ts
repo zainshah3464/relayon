@@ -18,4 +18,8 @@ export class ValidateDestinationDto {
   @IsOptional()
   @IsBoolean()
   dryRun?: boolean;
+
+  @IsOptional()
+  @IsString()
+  destinationId?: string;
 }

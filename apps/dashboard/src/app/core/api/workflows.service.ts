@@ -53,6 +53,9 @@ export interface Destination {
   config: Record<string, unknown>;
   enabled: boolean;
   retryPolicy: Record<string, unknown>;
+  lastValidatedAt: string | null;
+  lastValidationOk: boolean | null;
+  lastValidationError: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -174,6 +177,7 @@ export class WorkflowsService {
     type: DestinationType;
     config: Record<string, unknown>;
     dryRun?: boolean;
+    destinationId?: string;   // ✅ ADDED — TS2353 error fix
   }): Observable<{
     ok: boolean;
     layer: 'schema' | 'connectivity' | 'both';
@@ -198,6 +202,75 @@ export class WorkflowsService {
         detail: string;
       } | null;
     }>(`${this.base}/api/destinations/validate`, payload);
+  }
+
+  // ── Pipeline test-run ────────────────────────────────────────
+
+  testRun(
+    workflowId: string,
+    payload: Record<string, unknown>,
+  ): Observable<{
+    enrichment: {
+      enabled: boolean;
+      result: unknown;
+      cached: boolean;
+      error: string | null;
+      durationMs: number;
+    };
+    transform: {
+      applied: boolean;
+      result: unknown;
+      error: string | null;
+      durationMs: number;
+    };
+    routing: {
+      destinationIds: string[];
+      matchedRule: number | null;
+      reason: string;
+    };
+    destinations: Array<{ id: string; name: string; type: string }>;
+  }> {
+    return this.http.post<{
+      enrichment: {
+        enabled: boolean;
+        result: unknown;
+        cached: boolean;
+        error: string | null;
+        durationMs: number;
+      };
+      transform: {
+        applied: boolean;
+        result: unknown;
+        error: string | null;
+        durationMs: number;
+      };
+      routing: {
+        destinationIds: string[];
+        matchedRule: number | null;
+        reason: string;
+      };
+      destinations: Array<{ id: string; name: string; type: string }>;
+    }>(`${this.base}/api/workflows/${workflowId}/test`, { payload });
+  }
+
+  // ── Adapters catalog ─────────────────────────────────────────
+
+  listAdapters(): Observable<{
+    adapters: Array<{
+      type: string;
+      displayName: string;
+      configSchema: { required: string[]; optional?: string[] };
+    }>;
+    warning?: string;
+  }> {
+    return this.http.get<{
+      adapters: Array<{
+        type: string;
+        displayName: string;
+        configSchema: { required: string[]; optional?: string[] };
+      }>;
+      warning?: string;
+    }>(`${this.base}/api/destinations/adapters`);
   }
 
   // ── Versions ─────────────────────────────────────────────────
@@ -293,6 +366,13 @@ export class WorkflowsService {
   bulkResumeSchedules(): Observable<{ updated: number }> {
     return this.http.post<{ updated: number }>(
       `${this.base}/api/schedules/bulk/resume-all`,
+      {},
+    );
+  }
+
+  bulkDeleteSchedules(): Observable<{ deleted: number }> {
+    return this.http.post<{ deleted: number }>(
+      `${this.base}/api/schedules/bulk/delete`,
       {},
     );
   }

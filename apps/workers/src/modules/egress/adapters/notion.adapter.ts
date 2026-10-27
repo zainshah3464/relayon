@@ -41,23 +41,27 @@ export class NotionAdapter implements DeliveryAdapter {
         ? ctx.config['notionVersion']
         : DEFAULT_NOTION_VERSION;
 
-    if (ctx.config['__dryRun'] === true) {
+    const isDryRun = ctx.config['__dryRun'] === true;
+
+    if (isDryRun) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
       try {
-        const res = await fetch(
-          `https://api.notion.com/v1/data_sources/${encodeURIComponent(dataSourceId)}`,
-          {
-            headers: {
-              Authorization: `Bearer ${apiKey}`,
-              'Notion-Version': notionVersion,
-            },
+        const res = await fetch('https://api.notion.com/v1/users/me', {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            'Notion-Version': notionVersion,
           },
-        );
+          signal: controller.signal,
+        });
+        const bodyText = await res.text();
         return {
           success: res.ok,
           statusCode: res.status,
           latencyMs: Date.now() - started,
-          responseBody: res.ok ? 'Notion data source accessible' : 'Access denied',
-          error: res.ok ? null : `Notion: ${res.status}`,
+          responseBody: bodyText.slice(0, 500),
+          error: res.ok ? null : `Notion auth: ${res.status}`,
           retryable: false,
         };
       } catch (err) {
@@ -69,6 +73,8 @@ export class NotionAdapter implements DeliveryAdapter {
           error: err instanceof Error ? err.message : String(err),
           retryable: false,
         };
+      } finally {
+        clearTimeout(timer);
       }
     }
 

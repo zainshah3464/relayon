@@ -34,18 +34,24 @@ export class AirtableAdapter implements DeliveryAdapter {
       return this.error("missing 'tableName'", started);
     }
 
-    if (ctx.config['__dryRun'] === true) {
+    const isDryRun = ctx.config['__dryRun'] === true;
+
+    if (isDryRun) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
       try {
-        const res = await fetch(
-          `https://api.airtable.com/v0/meta/bases/${encodeURIComponent(baseId)}/tables`,
-          { headers: { Authorization: `Bearer ${apiKey}` } },
-        );
+        const res = await fetch('https://api.airtable.com/v0/meta/whoami', {
+          method: 'GET',
+          headers: { Authorization: `Bearer ${apiKey}` },
+          signal: controller.signal,
+        });
+        const bodyText = await res.text();
         return {
           success: res.ok,
           statusCode: res.status,
           latencyMs: Date.now() - started,
-          responseBody: res.ok ? 'Airtable base accessible' : 'Access denied',
-          error: res.ok ? null : `Airtable: ${res.status}`,
+          responseBody: bodyText.slice(0, 500),
+          error: res.ok ? null : `Airtable auth: ${res.status}`,
           retryable: false,
         };
       } catch (err) {
@@ -57,6 +63,8 @@ export class AirtableAdapter implements DeliveryAdapter {
           error: err instanceof Error ? err.message : String(err),
           retryable: false,
         };
+      } finally {
+        clearTimeout(timer);
       }
     }
 

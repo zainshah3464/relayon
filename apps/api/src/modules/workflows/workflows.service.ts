@@ -306,6 +306,40 @@ export class WorkflowsService {
     }
   }
 
+  async testRun(
+    tenantId: string,
+    workflowId: string,
+    payload: unknown,
+  ) {
+    await this.get(tenantId, workflowId);
+
+    const workersUrl = process.env['WORKERS_URL'];
+    const cronSecret = process.env['CRON_SECRET'];
+    if (!workersUrl || !cronSecret) {
+      throw new BadRequestException(
+        'WORKERS_URL and CRON_SECRET must be configured to use test-run',
+      );
+    }
+
+    const res = await fetch(`${workersUrl}/internal/process/test`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Cron-Secret': cronSecret,
+      },
+      body: JSON.stringify({ tenantId, workflowId, payload }),
+    });
+
+    if (!res.ok) {
+      const detail = await res.text().catch(() => '');
+      throw new BadRequestException(
+        `Workers returned ${res.status}: ${detail.slice(0, 200)}`,
+      );
+    }
+
+    return res.json();
+  }
+
   private redactYamlConfig(
     config: Record<string, unknown>,
     namespace: string,

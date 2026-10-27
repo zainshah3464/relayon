@@ -27,6 +27,31 @@ import { ValidateDestinationDto } from './dto/validate-destination.dto';
 export class DestinationsController {
   constructor(private readonly destinations: DestinationsService) {}
 
+  @Get('destinations/adapters')
+  async listAdapters() {
+    const workersUrl = process.env['WORKERS_URL'];
+    const cronSecret = process.env['CRON_SECRET'];
+    if (!workersUrl || !cronSecret) {
+      return { adapters: [], warning: 'WORKERS_URL not configured' };
+    }
+
+    try {
+      const res = await fetch(`${workersUrl}/internal/adapters`, {
+        headers: { 'X-Cron-Secret': cronSecret },
+      });
+      if (!res.ok) {
+        return { adapters: [], warning: `Workers returned ${res.status}` };
+      }
+      const body = (await res.json()) as { adapters?: unknown[] };
+      return body;
+    } catch (err) {
+      return {
+        adapters: [],
+        warning: err instanceof Error ? err.message : String(err),
+      };
+    }
+  }
+
   @Get('workflows/:workflowId/destinations')
   list(
     @CurrentUser() user: JwtUser,

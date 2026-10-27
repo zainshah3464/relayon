@@ -102,6 +102,7 @@ export class ApiKeysService {
   async rotate(
     tenantId: string,
     id: string,
+    actorId: string | null,
   ): Promise<{
     oldKeyId: string;
     newKey: IssuedApiKey;
@@ -151,6 +152,16 @@ export class ApiKeysService {
       });
     });
 
+    await this.prisma.apiKeyRotation.create({
+      data: {
+        tenantId,
+        oldKeyId: old.id,
+        newKeyId: created.id,
+        rotatedBy: actorId,
+        graceUntil,
+      },
+    });
+
     return {
       oldKeyId: old.id,
       newKey: {
@@ -165,6 +176,34 @@ export class ApiKeysService {
       },
       oldKeyRevokeAt: graceUntil.toISOString(),
     };
+  }
+
+  async rotationHistory(
+    tenantId: string,
+  ): Promise<
+    Array<{
+      id: string;
+      oldKeyId: string;
+      newKeyId: string;
+      rotatedBy: string | null;
+      graceUntil: string;
+      createdAt: string;
+    }>
+  > {
+    const rows = await this.prisma.apiKeyRotation.findMany({
+      where: { tenantId },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
+
+    return rows.map((r) => ({
+      id: r.id,
+      oldKeyId: r.oldKeyId,
+      newKeyId: r.newKeyId,
+      rotatedBy: r.rotatedBy,
+      graceUntil: r.graceUntil.toISOString(),
+      createdAt: r.createdAt.toISOString(),
+    }));
   }
 
   /**

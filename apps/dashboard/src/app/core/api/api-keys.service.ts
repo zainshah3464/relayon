@@ -66,4 +66,26 @@ export class ApiKeysService {
       oldKeyRevokeAt: string;
     }>(`${this.base}/api/api-keys/${id}/rotate`, {});
   }
+
+  rotationHistory(): Observable<
+    Array<{
+      id: string;
+      oldKeyId: string;
+      newKeyId: string;
+      rotatedBy: string | null;
+      graceUntil: string;
+      createdAt: string;
+    }>
+  > {
+    return this.http.get<
+      Array<{
+        id: string;
+        oldKeyId: string;
+        newKeyId: string;
+        rotatedBy: string | null;
+        graceUntil: string;
+        createdAt: string;
+      }>
+    >(`${this.base}/api/api-keys/rotations/history`);
+  }
 }
