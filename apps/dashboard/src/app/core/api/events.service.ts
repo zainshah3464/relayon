@@ -101,6 +101,20 @@ export class EventsService {
     return this.http.get<EventDetail>(`${this.base}/api/events/${id}`);
   }
 
+  replayEvent(eventId: string): Observable<{
+    replayed: boolean;
+    originalCorrelationId: string;
+    newCorrelationId: string;
+    workflowId: string;
+  }> {
+    return this.http.post<{
+      replayed: boolean;
+      originalCorrelationId: string;
+      newCorrelationId: string;
+      workflowId: string;
+    }>(`${this.base}/api/events/${eventId}/replay`, {});
+  }
+
   listDlq(opts: { limit?: number; cursor?: string } = {}): Observable<ListResponse<Delivery>> {
     let params = new HttpParams();
     if (opts.limit) params = params.set('limit', String(opts.limit));

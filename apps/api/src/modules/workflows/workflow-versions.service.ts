@@ -1,9 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
-// `diff` is CommonJS — require it to stay compatible with both CJS and ESM builds
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { createTwoFilesPatch } = require('diff') as {
+const { createTwoFilesPatch, structuredPatch } = require('diff') as {
   createTwoFilesPatch: (
     oldFile: string,
     newFile: string,
@@ -13,6 +12,23 @@ const { createTwoFilesPatch } = require('diff') as {
     newHeader?: string,
     options?: { context?: number },
   ) => string;
+  structuredPatch: (
+    oldFileName: string,
+    newFileName: string,
+    oldStr: string,
+    newStr: string,
+    oldHeader?: string,
+    newHeader?: string,
+    options?: { context?: number },
+  ) => {
+    hunks: Array<{
+      oldStart: number;
+      oldLines: number;
+      newStart: number;
+      newLines: number;
+      lines: string[];
+    }>;
+  };
 };
 
 export interface VersionSummary {
@@ -23,12 +39,26 @@ export interface VersionSummary {
   createdAt: Date;
 }
 
+export interface SplitDiffRow {
+  left: { lineNo: number | null; text: string; type: 'ctx' | 'del' | 'blank' };
+  right: { lineNo: number | null; text: string; type: 'ctx' | 'add' | 'blank' };
+}
+
 export interface VersionDiffResult {
   fromVersion: number;
   toVersion: number;
   identical: boolean;
   stats: { added: number; removed: number };
   unified: string;
+  structured: {
+    hunks: Array<{
+      oldStart: number;
+      oldLines: number;
+      newStart: number;
+      newLines: number;
+    }>;
+    split: SplitDiffRow[];
+  };
 }
 
 const MAX_VERSIONS_PER_WORKFLOW = 50;
@@ -37,10 +67,6 @@ const MAX_VERSIONS_PER_WORKFLOW = 50;
 export class WorkflowVersionsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /**
-   * Snapshots the CURRENT state of a workflow (including destinations)
-   * as a new immutable version. Called after every create/update.
-   */
   async capture(
     workflowId: string,
     tenantId: string,
@@ -90,7 +116,6 @@ export class WorkflowVersionsService {
       },
     });
 
-    // Trim old versions beyond the retention cap
     const excess = await this.prisma.workflowVersion.findMany({
       where: { workflowId },
       orderBy: { version: 'desc' },
@@ -129,11 +154,6 @@ export class WorkflowVersionsService {
     return row;
   }
 
-  /**
-   * Restores a workflow to a previous snapshot. Destinations are replaced
-   * wholesale (deleted + recreated) because their IDs are not stable across
-   * versions. A new version is captured afterwards so history stays linear.
-   */
   async restore(
     tenantId: string,
     workflowId: string,
@@ -189,11 +209,6 @@ export class WorkflowVersionsService {
     });
   }
 
-  /**
-   * Line-level unified diff between two version snapshots.
-   * Returns a patch string that can be rendered in a <pre> or sent
-   * to a diff viewer. Identical versions return identical:true + empty patch.
-   */
   async diff(
     tenantId: string,
     workflowId: string,
@@ -224,6 +239,7 @@ export class WorkflowVersionsService {
         identical: true,
         stats: { added: 0, removed: 0 },
         unified: '',
+        structured: { hunks: [], split: [] },
       };
     }
 
@@ -236,6 +252,18 @@ export class WorkflowVersionsService {
       `Version ${toVersion}`,
       { context: 3 },
     );
+
+    const patch = structuredPatch(
+      `v${fromVersion}`,
+      `v${toVersion}`,
+      fromText,
+      toText,
+      '',
+      '',
+      { context: 3 },
+    );
+
+    const split = this.buildSplitRows(patch.hunks);
 
     let added = 0;
     let removed = 0;
@@ -250,7 +278,71 @@ export class WorkflowVersionsService {
       identical: false,
       stats: { added, removed },
       unified,
+      structured: {
+        hunks: patch.hunks.map((h) => ({
+          oldStart: h.oldStart,
+          oldLines: h.oldLines,
+          newStart: h.newStart,
+          newLines: h.newLines,
+        })),
+        split,
+      },
     };
+  }
+
+  private buildSplitRows(
+    hunks: Array<{ oldStart: number; newStart: number; lines: string[] }>,
+  ): SplitDiffRow[] {
+    const rows: SplitDiffRow[] = [];
+
+    for (const hunk of hunks) {
+      let oldNo = hunk.oldStart;
+      let newNo = hunk.newStart;
+
+      let i = 0;
+      while (i < hunk.lines.length) {
+        const line = hunk.lines[i]!;
+        const marker = line[0];
+        const text = line.slice(1);
+
+        if (marker === ' ') {
+          rows.push({
+            left: { lineNo: oldNo++, text, type: 'ctx' },
+            right: { lineNo: newNo++, text, type: 'ctx' },
+          });
+          i++;
+          continue;
+        }
+
+        const deletions: Array<{ lineNo: number; text: string }> = [];
+        while (i < hunk.lines.length && hunk.lines[i]![0] === '-') {
+          deletions.push({ lineNo: oldNo++, text: hunk.lines[i]!.slice(1) });
+          i++;
+        }
+
+        const additions: Array<{ lineNo: number; text: string }> = [];
+        while (i < hunk.lines.length && hunk.lines[i]![0] === '+') {
+          additions.push({ lineNo: newNo++, text: hunk.lines[i]!.slice(1) });
+          i++;
+        }
+
+        const max = Math.max(deletions.length, additions.length);
+        for (let k = 0; k < max; k++) {
+          const del = deletions[k];
+          const add = additions[k];
+          rows.push({
+            left: del
+              ? { lineNo: del.lineNo, text: del.text, type: 'del' }
+              : { lineNo: null, text: '', type: 'blank' },
+            right: add
+              ? { lineNo: add.lineNo, text: add.text, type: 'add' }
+              : { lineNo: null, text: '', type: 'blank' },
+          });
+        }
+      }
+    }
+
+    return rows;
   }
 
   private async assertOwnership(tenantId: string, workflowId: string) {

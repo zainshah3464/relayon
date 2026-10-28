@@ -97,6 +97,66 @@ export interface UpsertSchedulePayload {
   isActive?: boolean;
 }
 
+// ✅ NEW — Adapter SDK types
+export interface AdapterField {
+  key: string;
+  label: string;
+  type:
+    | 'text'
+    | 'url'
+    | 'password'
+    | 'email'
+    | 'textarea'
+    | 'number'
+    | 'boolean'
+    | 'select'
+    | 'json'
+    | 'string-array';
+  required: boolean;
+  placeholder?: string;
+  help?: string;
+  sensitive?: boolean;
+  defaultValue?: string | number | boolean;
+  options?: Array<{ value: string; label: string }>;
+}
+
+export interface AdapterCatalogEntry {
+  type: string;
+  displayName: string;
+  fields: AdapterField[];
+  testPayload: unknown;
+}
+
+export interface TestRunResult {
+  enrichment: {
+    enabled: boolean;
+    result: unknown;
+    cached: boolean;
+    error: string | null;
+    durationMs: number;
+  };
+  transform: {
+    applied: boolean;
+    result: unknown;
+    error: string | null;
+    durationMs: number;
+  };
+  routing: {
+    destinationIds: string[];
+    matchedRule: number | null;
+    reason: string;
+  };
+  destinations: Array<{ id: string; name: string; type: string }>;
+  dryRuns: Array<{
+    destinationId: string;
+    destinationType: string;
+    ok: boolean;
+    statusCode: number;
+    latencyMs: number;
+    error: string | null;
+  }>;
+}
+
 @Injectable({ providedIn: 'root' })
 export class WorkflowsService {
   private http = inject(HttpClient);
@@ -177,7 +237,7 @@ export class WorkflowsService {
     type: DestinationType;
     config: Record<string, unknown>;
     dryRun?: boolean;
-    destinationId?: string;   // ✅ ADDED — TS2353 error fix
+    destinationId?: string;
   }): Observable<{
     ok: boolean;
     layer: 'schema' | 'connectivity' | 'both';
@@ -209,68 +269,20 @@ export class WorkflowsService {
   testRun(
     workflowId: string,
     payload: Record<string, unknown>,
-  ): Observable<{
-    enrichment: {
-      enabled: boolean;
-      result: unknown;
-      cached: boolean;
-      error: string | null;
-      durationMs: number;
-    };
-    transform: {
-      applied: boolean;
-      result: unknown;
-      error: string | null;
-      durationMs: number;
-    };
-    routing: {
-      destinationIds: string[];
-      matchedRule: number | null;
-      reason: string;
-    };
-    destinations: Array<{ id: string; name: string; type: string }>;
-  }> {
-    return this.http.post<{
-      enrichment: {
-        enabled: boolean;
-        result: unknown;
-        cached: boolean;
-        error: string | null;
-        durationMs: number;
-      };
-      transform: {
-        applied: boolean;
-        result: unknown;
-        error: string | null;
-        durationMs: number;
-      };
-      routing: {
-        destinationIds: string[];
-        matchedRule: number | null;
-        reason: string;
-      };
-      destinations: Array<{ id: string; name: string; type: string }>;
-    }>(`${this.base}/api/workflows/${workflowId}/test`, { payload });
+    dryRunDestinations = false,
+  ): Observable<TestRunResult> {
+    return this.http.post<TestRunResult>(
+      `${this.base}/api/workflows/${workflowId}/test`,
+      { payload, dryRunDestinations },
+    );
   }
 
   // ── Adapters catalog ─────────────────────────────────────────
 
-  listAdapters(): Observable<{
-    adapters: Array<{
-      type: string;
-      displayName: string;
-      configSchema: { required: string[]; optional?: string[] };
-    }>;
-    warning?: string;
-  }> {
-    return this.http.get<{
-      adapters: Array<{
-        type: string;
-        displayName: string;
-        configSchema: { required: string[]; optional?: string[] };
-      }>;
-      warning?: string;
-    }>(`${this.base}/api/destinations/adapters`);
+  listAdapters(): Observable<{ adapters: AdapterCatalogEntry[]; warning?: string }> {
+    return this.http.get<{ adapters: AdapterCatalogEntry[]; warning?: string }>(
+      `${this.base}/api/destinations/adapters`,
+    );
   }
 
   // ── Versions ─────────────────────────────────────────────────
@@ -304,6 +316,18 @@ export class WorkflowsService {
     identical: boolean;
     stats: { added: number; removed: number };
     unified: string;
+    structured: {
+      hunks: Array<{
+        oldStart: number;
+        oldLines: number;
+        newStart: number;
+        newLines: number;
+      }>;
+      split: Array<{
+        left: { lineNo: number | null; text: string; type: 'ctx' | 'del' | 'blank' };
+        right: { lineNo: number | null; text: string; type: 'ctx' | 'add' | 'blank' };
+      }>;
+    };
   }> {
     return this.http.get<{
       fromVersion: number;
@@ -311,6 +335,18 @@ export class WorkflowsService {
       identical: boolean;
       stats: { added: number; removed: number };
       unified: string;
+      structured: {
+        hunks: Array<{
+          oldStart: number;
+          oldLines: number;
+          newStart: number;
+          newLines: number;
+        }>;
+        split: Array<{
+          left: { lineNo: number | null; text: string; type: 'ctx' | 'del' | 'blank' };
+          right: { lineNo: number | null; text: string; type: 'ctx' | 'add' | 'blank' };
+        }>;
+      };
     }>(
       `${this.base}/api/workflows/${workflowId}/versions/${fromVersion}/diff/${toVersion}`,
     );

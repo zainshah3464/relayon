@@ -87,8 +87,23 @@ import {
           <div class="bg-surface w-full max-w-2xl h-full overflow-y-auto p-6" (click)="$event.stopPropagation()">
             <div class="flex justify-between items-center mb-4">
               <h2 class="text-lg font-semibold text-white">Event detail</h2>
-              <button (click)="closeDetail()" class="text-muted hover:text-white">✕</button>
+              <div class="flex gap-2 items-center">
+                <button
+                  (click)="replayCurrent()"
+                  [disabled]="replaying()"
+                  class="btn-primary text-xs"
+                >
+                  {{ replaying() ? 'Replaying...' : '↻ Replay event' }}
+                </button>
+                <button (click)="closeDetail()" class="text-muted hover:text-white">✕</button>
+              </div>
             </div>
+            @if (replayResult()) {
+              <div class="rounded-lg border border-signal-green/30 bg-signal-green/5 p-2 text-xs mb-3">
+                <p class="text-signal-green">✓ Replay queued</p>
+                <p class="text-muted mt-1 font-mono">new correlation: {{ replayResult()!.newCorrelationId.slice(0, 12) }}…</p>
+              </div>
+            }
             @if (detail(); as d) {
               <div class="space-y-4">
                 <div class="grid grid-cols-2 gap-2 text-sm">
@@ -156,6 +171,9 @@ export class EventsListComponent implements OnInit {
   detail = signal<EventDetail | null>(null);
   filterStatus = '';
 
+  replaying = signal(false);
+  replayResult = signal<{ newCorrelationId: string } | null>(null);
+
   ngOnInit(): void {
     this.load();
   }
@@ -189,6 +207,7 @@ export class EventsListComponent implements OnInit {
   }
 
   openDetail(id: string): void {
+    this.replayResult.set(null);
     this.svc.get(id).subscribe({
       next: (d) => this.detail.set(d),
     });
@@ -196,5 +215,29 @@ export class EventsListComponent implements OnInit {
 
   closeDetail(): void {
     this.detail.set(null);
+    this.replayResult.set(null);
+  }
+
+  replayCurrent(): void {
+    const d = this.detail();
+    if (!d || this.replaying()) return;
+
+    if (!confirm('Replay this event from scratch? A new correlation ID will be created.')) {
+      return;
+    }
+
+    this.replaying.set(true);
+    this.replayResult.set(null);
+
+    this.svc.replayEvent(d._id).subscribe({
+      next: (r) => {
+        this.replaying.set(false);
+        this.replayResult.set({ newCorrelationId: r.newCorrelationId });
+      },
+      error: (err) => {
+        this.replaying.set(false);
+        this.error.set(err?.error?.message ?? 'Replay failed');
+      },
+    });
   }
 }

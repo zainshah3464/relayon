@@ -6,6 +6,8 @@ import { RedisService } from '../redis/redis.service';
 import { GroqService, EnrichmentResult } from './groq.service';
 import { TransformService } from './transform.service';
 import { RoutingService } from './routing.service';
+import { AdapterRegistry } from '../egress/adapters/registry';
+import { decryptConfig } from '../../lib/crypto-box';
 import { logger } from '../../lib/logger';
 import {
   INCOMING_QUEUE,
@@ -50,6 +52,7 @@ export class ProcessingService {
     private readonly groq: GroqService,
     private readonly transform: TransformService,
     private readonly routing: RoutingService,
+    private readonly adapters: AdapterRegistry,
   ) {}
 
   async processBatch(): Promise<BatchResult> {
@@ -79,7 +82,6 @@ export class ProcessingService {
       return result;
     }
 
-    // Batch-load workflows for the whole batch (one DB query)
     const workflowIds = Array.from(
       new Set(items.map((i) => i.event.workflowId)),
     );
@@ -91,7 +93,6 @@ export class ProcessingService {
 
     for (const item of items) {
       if (Date.now() - startedAt > budget) {
-        // Out of time — put remaining items back on incoming queue for next run
         this.logger.warn(
           `Time budget exceeded, requeueing ${items.length - result.processed} event(s)`,
         );
@@ -139,14 +140,31 @@ export class ProcessingService {
     return result;
   }
 
+  async getQueueStatus() {
+    const r = this.redis.raw;
+    const [incoming, processing, egress] = await Promise.all([
+      r.llen(INCOMING_QUEUE),
+      r.llen(PROCESSING_QUEUE),
+      r.llen(EGRESS_QUEUE),
+    ]);
+    return {
+      incoming,
+      processing,
+      egress,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
   /**
-   * Pipeline dry-run: runs enrichment → transform → routing on a sample
-   * payload WITHOUT touching MongoDB or the egress queue.
+   * Pipeline dry-run: runs enrichment → transform → routing, and
+   * OPTIONALLY dry-runs matched destinations. Zero DB writes, zero
+   * deliveries. Used by the workflow editor "Test run" button.
    */
   async testRun(input: {
     tenantId: string;
     workflowId: string;
     payload: unknown;
+    dryRunDestinations: boolean;
   }): Promise<{
     enrichment: {
       enabled: boolean;
@@ -167,6 +185,14 @@ export class ProcessingService {
       reason: string;
     };
     destinations: Array<{ id: string; name: string; type: string }>;
+    dryRuns: Array<{
+      destinationId: string;
+      destinationType: string;
+      ok: boolean;
+      statusCode: number;
+      latencyMs: number;
+      error: string | null;
+    }>;
   }> {
     const workflow = await this.prisma.workflow.findFirst({
       where: { id: input.workflowId, tenantId: input.tenantId },
@@ -177,19 +203,13 @@ export class ProcessingService {
       throw new Error('Workflow not found');
     }
 
-    // ── 1. Enrichment ─────────────────────────────────────────
+    // ── 1. Enrichment
     let enrichedPayload: unknown = null;
-    const enrichment: {
-      enabled: boolean;
-      result: unknown;
-      cached: boolean;
-      error: string | null;
-      durationMs: number;
-    } = {
+    const enrichment = {
       enabled: workflow.enrichmentEnabled,
-      result: null,
+      result: null as unknown,
       cached: false,
-      error: null,
+      error: null as string | null,
       durationMs: 0,
     };
 
@@ -209,19 +229,14 @@ export class ProcessingService {
       }
     }
 
-    // ── 2. Transform ──────────────────────────────────────────
+    // ── 2. Transform
     const transformInput =
       enrichedPayload !== null ? enrichedPayload : input.payload;
 
-    const transform: {
-      applied: boolean;
-      result: unknown;
-      error: string | null;
-      durationMs: number;
-    } = {
+    const transform = {
       applied: false,
-      result: transformInput,
-      error: null,
+      result: transformInput as unknown,
+      error: null as string | null,
       durationMs: 0,
     };
 
@@ -239,12 +254,78 @@ export class ProcessingService {
       transform.durationMs = Date.now() - started;
     }
 
-    // ── 3. Routing ────────────────────────────────────────────
+    // ── 3. Routing
     const routing = await this.routing.decide(
       (workflow as { routingRules?: unknown }).routingRules,
       workflow.destinations,
       transform.result,
     );
+
+    // ── 4. Optional destination dry-runs
+    const dryRuns: Array<{
+      destinationId: string;
+      destinationType: string;
+      ok: boolean;
+      statusCode: number;
+      latencyMs: number;
+      error: string | null;
+    }> = [];
+
+    if (input.dryRunDestinations && routing.destinationIds.length > 0) {
+      const matched = workflow.destinations.filter((d) =>
+        routing.destinationIds.includes(d.id),
+      );
+
+      for (const dest of matched) {
+        const registered = this.adapters.get(dest.type);
+        if (!registered) {
+          dryRuns.push({
+            destinationId: dest.id,
+            destinationType: dest.type,
+            ok: false,
+            statusCode: 0,
+            latencyMs: 0,
+            error: `No adapter for type '${dest.type}'`,
+          });
+          continue;
+        }
+
+        try {
+          const config = decryptConfig(
+            (dest.config ?? {}) as Record<string, unknown>,
+            input.tenantId,
+          );
+
+          const result = await registered.instance.send({
+            destinationId: dest.id,
+            destinationType: dest.type,
+            config: { ...config, __dryRun: true },
+            payload: transform.result,
+            correlationId: 'test-run',
+            eventId: 'test-run',
+            attemptNumber: 1,
+          });
+
+          dryRuns.push({
+            destinationId: dest.id,
+            destinationType: dest.type,
+            ok: result.success,
+            statusCode: result.statusCode,
+            latencyMs: result.latencyMs,
+            error: result.error,
+          });
+        } catch (err) {
+          dryRuns.push({
+            destinationId: dest.id,
+            destinationType: dest.type,
+            ok: false,
+            statusCode: 0,
+            latencyMs: 0,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
+    }
 
     return {
       enrichment,
@@ -255,21 +336,7 @@ export class ProcessingService {
         name: d.name,
         type: d.type,
       })),
-    };
-  }
-
-  async getQueueStatus() {
-    const r = this.redis.raw;
-    const [incoming, processing, egress] = await Promise.all([
-      r.llen(INCOMING_QUEUE),
-      r.llen(PROCESSING_QUEUE),
-      r.llen(EGRESS_QUEUE),
-    ]);
-    return {
-      incoming,
-      processing,
-      egress,
-      timestamp: new Date().toISOString(),
+      dryRuns,
     };
   }
 
@@ -289,7 +356,6 @@ export class ProcessingService {
         const event = JSON.parse(raw) as QueuedEvent;
         items.push({ raw, event });
       } catch {
-        // Corrupt entry — remove it so it doesn't block the queue
         await r.lrem(PROCESSING_QUEUE, 1, raw);
         this.logger.warn('queue.corrupt_entry_removed');
       }
@@ -330,7 +396,6 @@ export class ProcessingService {
     },
     result: BatchResult,
   ): Promise<'ok' | 'failed'> {
-    // ── 1. Idempotency guard: skip if event already logged as processed
     const existing = await this.mongo.eventModel
       .findOne({ correlationId: event.correlationId, status: 'processed' })
       .lean()
@@ -340,7 +405,6 @@ export class ProcessingService {
       return 'ok';
     }
 
-    // ── 2. AI enrichment (graceful degradation on failure)
     let enrichedPayload: unknown = null;
     let enrichmentMeta: {
       enabled: boolean;
@@ -369,9 +433,7 @@ export class ProcessingService {
         else result.breakdown.enriched++;
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        this.logger.warn(
-          `enrichment.failed ${event.correlationId}: ${msg}`,
-        );
+        this.logger.warn(`enrichment.failed ${event.correlationId}: ${msg}`);
         result.breakdown.enrichmentFailures++;
         enrichmentMeta = {
           enabled: true,
@@ -380,11 +442,9 @@ export class ProcessingService {
           durationMs: 0,
           error: msg,
         };
-        // Continue — event still routes without enrichment
       }
     }
 
-    // ── 3. Transform (JSONata)
     const inputForTransform =
       enrichedPayload !== null ? enrichedPayload : event.rawPayload;
 
@@ -403,7 +463,6 @@ export class ProcessingService {
       }
     }
 
-    // ── 4. Persist event in MongoDB
     const ttlExpiresAt = new Date(
       Date.now() + EVENT_TTL_DAYS * 24 * 60 * 60 * 1000,
     );
@@ -428,12 +487,10 @@ export class ProcessingService {
       ttlExpiresAt,
     });
 
-    // ── 5. Fan-out: create delivery docs + enqueue egress jobs
     if (workflow.destinations.length === 0) {
       return 'ok';
     }
 
-    // ── 5a. Conditional routing — decide which destinations receive this event
     const decision = await this.routing.decide(
       (workflow as { routingRules?: unknown }).routingRules,
       workflow.destinations,
@@ -451,7 +508,6 @@ export class ProcessingService {
       decision.destinationIds.includes(d.id),
     );
 
-    // ── 5b. Persist delivery docs for the selected destinations only
     const deliveryTtl = new Date(
       Date.now() + DELIVERY_TTL_DAYS * 24 * 60 * 60 * 1000,
     );
@@ -475,7 +531,6 @@ export class ProcessingService {
       })),
     );
 
-    // ── 5c. Enqueue egress jobs
     const r = this.redis.raw;
     for (let i = 0; i < selectedDestinations.length; i++) {
       const dest = selectedDestinations[i];
@@ -494,7 +549,6 @@ export class ProcessingService {
       await r.lpush(EGRESS_QUEUE, JSON.stringify(job));
       result.breakdown.egressJobsQueued++;
 
-      // Silence unused-var warning for delivery ref
       void delivery;
     }
 

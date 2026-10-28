@@ -9,10 +9,39 @@ const API_ROOT = 'https://api.airtable.com/v0';
 @DestinationAdapter({
   type: 'airtable',
   displayName: 'Airtable',
-  configSchema: {
-    required: ['apiKey', 'baseId', 'tableName'],
-    optional: ['typecast'],
-  },
+  fields: [
+    {
+      key: 'apiKey',
+      label: 'Personal access token',
+      type: 'password',
+      required: true,
+      sensitive: true,
+      placeholder: 'pat...',
+    },
+    {
+      key: 'baseId',
+      label: 'Base ID',
+      type: 'text',
+      required: true,
+      placeholder: 'appXXXXXXXXXXXXXX',
+      help: 'Found in the base URL',
+    },
+    {
+      key: 'tableName',
+      label: 'Table name',
+      type: 'text',
+      required: true,
+      placeholder: 'Leads',
+    },
+    {
+      key: 'typecast',
+      label: 'Typecast fields',
+      type: 'boolean',
+      required: false,
+      defaultValue: false,
+    },
+  ],
+  testPayload: { type: 'relayon.test', summary: 'Dry-run record' },
 })
 export class AirtableAdapter implements DeliveryAdapter {
   readonly type = 'airtable';

@@ -12,10 +12,46 @@ const MAX_POOL_PER_DEST = 3;
 @DestinationAdapter({
   type: 'postgres',
   displayName: 'PostgreSQL',
-  configSchema: {
-    required: ['connectionString', 'table'],
-    optional: ['columns', 'onConflict', 'ssl'],
-  },
+  fields: [
+    {
+      key: 'connectionString',
+      label: 'Connection string',
+      type: 'password',
+      required: true,
+      sensitive: true,
+      placeholder: 'postgresql://user:pass@host/db?sslmode=require',
+    },
+    {
+      key: 'table',
+      label: 'Table',
+      type: 'text',
+      required: true,
+      placeholder: 'events',
+      help: 'Use schema.table for non-public schemas',
+    },
+    {
+      key: 'onConflict',
+      label: 'Upsert column',
+      type: 'text',
+      required: false,
+      placeholder: 'id',
+    },
+    {
+      key: 'columns',
+      label: 'Column map (JSON)',
+      type: 'json',
+      required: false,
+      placeholder: '{"data.amount":"amount_cents"}',
+    },
+    {
+      key: 'ssl',
+      label: 'Require SSL',
+      type: 'boolean',
+      required: false,
+      defaultValue: true,
+    },
+  ],
+  testPayload: { type: 'relayon.test', data: { amount: 100 } },
 })
 export class PostgresAdapter implements DeliveryAdapter, OnModuleDestroy {
   readonly type = 'postgres';

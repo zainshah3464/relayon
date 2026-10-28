@@ -35,6 +35,7 @@ export class ProcessingController {
       tenantId?: string;
       workflowId?: string;
       payload?: unknown;
+      dryRunDestinations?: boolean;
     },
   ) {
     if (!body.tenantId || !body.workflowId) {
@@ -44,6 +45,7 @@ export class ProcessingController {
       tenantId: body.tenantId,
       workflowId: body.workflowId,
       payload: body.payload ?? {},
+      dryRunDestinations: body.dryRunDestinations === true,
     });
   }
 }

@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -53,5 +54,16 @@ export class EgressController {
     },
   ) {
     return this.egress.dryRun(body);
+  }
+
+  @Post('egress/replay-event')
+  @HttpCode(HttpStatus.OK)
+  replayEvent(
+    @Body() body: { tenantId?: string; eventId?: string },
+  ) {
+    if (!body.tenantId || !body.eventId) {
+      throw new BadRequestException('tenantId and eventId are required');
+    }
+    return this.egress.replayEvent(body.tenantId, body.eventId);
   }
 }

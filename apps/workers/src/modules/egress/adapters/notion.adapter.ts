@@ -11,10 +11,38 @@ const RICH_TEXT_LIMIT = 2000;
 @DestinationAdapter({
   type: 'notion',
   displayName: 'Notion',
-  configSchema: {
-    required: ['apiKey', 'dataSourceId', 'titleProperty'],
-    optional: ['payloadProperty', 'notionVersion'],
-  },
+  fields: [
+    {
+      key: 'apiKey',
+      label: 'Integration token',
+      type: 'password',
+      required: true,
+      sensitive: true,
+      placeholder: 'secret_...',
+    },
+    {
+      key: 'dataSourceId',
+      label: 'Data source ID',
+      type: 'text',
+      required: true,
+      help: 'Database → ••• → Copy link → extract the ID',
+    },
+    {
+      key: 'titleProperty',
+      label: 'Title property name',
+      type: 'text',
+      required: true,
+      placeholder: 'Name',
+    },
+    {
+      key: 'payloadProperty',
+      label: 'Payload property (optional)',
+      type: 'text',
+      required: false,
+      placeholder: 'Payload',
+    },
+  ],
+  testPayload: { type: 'relayon.test', summary: 'Dry-run page' },
 })
 export class NotionAdapter implements DeliveryAdapter {
   readonly type = 'notion';

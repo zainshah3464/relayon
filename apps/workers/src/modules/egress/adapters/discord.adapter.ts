@@ -9,9 +9,26 @@ const DISCORD_MAX_CONTENT = 2000;
 @DestinationAdapter({
   type: 'discord',
   displayName: 'Discord',
-  configSchema: {
-    required: ['webhookUrl'],
-    optional: ['username'],
+  fields: [
+    {
+      key: 'webhookUrl',
+      label: 'Discord webhook URL',
+      type: 'password',
+      required: true,
+      sensitive: true,
+      placeholder: 'https://discord.com/api/webhooks/...',
+    },
+    {
+      key: 'username',
+      label: 'Username override',
+      type: 'text',
+      required: false,
+      placeholder: 'Relayon',
+    },
+  ],
+  testPayload: {
+    summary: 'Relayon dry-run — Discord connectivity verified',
+    type: 'relayon.test',
   },
 })
 export class DiscordAdapter implements DeliveryAdapter {

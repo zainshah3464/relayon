@@ -114,7 +114,12 @@ export class WorkflowsController {
     @Param('id') id: string,
     @Body() dto: TestRunDto,
   ) {
-    return this.workflows.testRun(user.tenantId, id, dto.payload ?? {});
+    return this.workflows.testRun(
+      user.tenantId,
+      id,
+      dto.payload ?? {},
+      dto.dryRunDestinations === true,
+    );
   }
 
   // ── Versioning ───────────────────────────────────────────────

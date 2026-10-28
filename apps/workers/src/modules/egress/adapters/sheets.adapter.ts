@@ -12,9 +12,39 @@ const TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token';
 @DestinationAdapter({
   type: 'sheets',
   displayName: 'Google Sheets',
-  configSchema: {
-    required: ['spreadsheetId', 'range', 'serviceAccountEmail', 'privateKey'],
-  },
+  fields: [
+    {
+      key: 'spreadsheetId',
+      label: 'Spreadsheet ID',
+      type: 'text',
+      required: true,
+      placeholder: '1AbC...',
+    },
+    {
+      key: 'range',
+      label: 'Range',
+      type: 'text',
+      required: true,
+      placeholder: 'Sheet1!A:Z',
+    },
+    {
+      key: 'serviceAccountEmail',
+      label: 'Service account email',
+      type: 'email',
+      required: true,
+      placeholder: 'xxx@xxx.iam.gserviceaccount.com',
+    },
+    {
+      key: 'privateKey',
+      label: 'Private key (PEM)',
+      type: 'textarea',
+      required: true,
+      sensitive: true,
+      placeholder: '-----BEGIN PRIVATE KEY-----...',
+      help: 'Share the sheet with the service account (Editor)',
+    },
+  ],
+  testPayload: { type: 'relayon.test', summary: 'Dry-run row' },
 })
 export class SheetsAdapter implements DeliveryAdapter {
   readonly type = 'sheets';

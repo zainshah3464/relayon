@@ -8,8 +8,20 @@ const TIMEOUT_MS = 10_000;
 @DestinationAdapter({
   type: 'slack',
   displayName: 'Slack',
-  configSchema: {
-    required: ['webhookUrl'],
+  fields: [
+    {
+      key: 'webhookUrl',
+      label: 'Slack webhook URL',
+      type: 'password',
+      required: true,
+      sensitive: true,
+      placeholder: 'https://hooks.slack.com/services/...',
+      help: 'Create at api.slack.com → Incoming Webhooks',
+    },
+  ],
+  testPayload: {
+    summary: 'Relayon dry-run — Slack connectivity verified',
+    type: 'relayon.test',
   },
 })
 export class SlackAdapter implements DeliveryAdapter {
@@ -30,7 +42,8 @@ export class SlackAdapter implements DeliveryAdapter {
         success: true,
         statusCode: 200,
         latencyMs: Date.now() - started,
-        responseBody: 'config valid — Slack webhooks cannot be tested without sending a message',
+        responseBody:
+          'config valid — Slack webhooks cannot be tested without sending a message',
         error: null,
         retryable: false,
       };

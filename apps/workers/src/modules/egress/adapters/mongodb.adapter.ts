@@ -17,10 +17,39 @@ interface ClientEntry {
 @DestinationAdapter({
   type: 'mongodb',
   displayName: 'MongoDB',
-  configSchema: {
-    required: ['connectionString', 'database', 'collection'],
-    optional: ['upsertKey'],
-  },
+  fields: [
+    {
+      key: 'connectionString',
+      label: 'Connection string',
+      type: 'password',
+      required: true,
+      sensitive: true,
+      placeholder: 'mongodb+srv://user:pass@cluster/...',
+    },
+    {
+      key: 'database',
+      label: 'Database',
+      type: 'text',
+      required: true,
+      placeholder: 'relayon_target',
+    },
+    {
+      key: 'collection',
+      label: 'Collection',
+      type: 'text',
+      required: true,
+      placeholder: 'events',
+    },
+    {
+      key: 'upsertKey',
+      label: 'Upsert key path',
+      type: 'text',
+      required: false,
+      placeholder: 'orderId',
+      help: 'Comma-separated dot paths',
+    },
+  ],
+  testPayload: { type: 'relayon.test', data: { orderId: 'test-123' } },
 })
 export class MongoDbAdapter implements DeliveryAdapter, OnModuleDestroy {
   readonly type = 'mongodb';

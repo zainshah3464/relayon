@@ -8,9 +8,39 @@ const TIMEOUT_MS = 10_000;
 @DestinationAdapter({
   type: 'http',
   displayName: 'HTTP Webhook',
-  configSchema: {
-    required: ['url'],
-    optional: ['method', 'headers'],
+  fields: [
+    {
+      key: 'url',
+      label: 'URL',
+      type: 'url',
+      required: true,
+      placeholder: 'https://api.example.com/webhook',
+    },
+    {
+      key: 'method',
+      label: 'Method',
+      type: 'select',
+      required: false,
+      defaultValue: 'POST',
+      options: [
+        { value: 'POST', label: 'POST' },
+        { value: 'PUT', label: 'PUT' },
+        { value: 'PATCH', label: 'PATCH' },
+        { value: 'GET', label: 'GET' },
+        { value: 'DELETE', label: 'DELETE' },
+      ],
+    },
+    {
+      key: 'headers',
+      label: 'Custom headers (JSON)',
+      type: 'json',
+      required: false,
+      placeholder: '{"X-Api-Version":"2026-01"}',
+    },
+  ],
+  testPayload: {
+    type: 'checkout.session.completed',
+    data: { amount: 5000, currency: 'usd', customer: { email: 'test@example.com' } },
   },
   supportsIdempotency: true,
 })

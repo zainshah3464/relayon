@@ -1,4 +1,13 @@
-import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { EventsService } from './events.service';
 import { JwtOrApiKeyGuard } from '../../common/guards/jwt-or-api-key.guard';
 import { RequireScopes } from '../../common/guards/api-key.guard';
@@ -33,5 +42,12 @@ export class EventsController {
   @RequireScopes('events:read')
   get(@CurrentUser() user: JwtUser, @Param('id') id: string) {
     return this.events.get(user.tenantId, id);
+  }
+
+  @Post(':id/replay')
+  @RequireScopes('events:read')
+  @HttpCode(HttpStatus.OK)
+  replay(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.events.replay(user.tenantId, id);
   }
 }

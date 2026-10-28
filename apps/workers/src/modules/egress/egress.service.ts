@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { randomUUID } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { MongoService } from '../mongo/mongo.service';
 import { RedisService } from '../redis/redis.service';
@@ -10,7 +11,9 @@ import type { AdapterResult, DeliveryContext } from './adapters/types';
 import {
   EGRESS_PENDING_QUEUE,
   EGRESS_DELAYED_QUEUE,
+  INCOMING_QUEUE,
   type EgressJob,
+  type QueuedEvent,
 } from '../../lib/queues';
 import { logger } from '../../lib/logger';
 
@@ -180,6 +183,55 @@ export class EgressService {
     await this.redis.raw.lpush(EGRESS_PENDING_QUEUE, JSON.stringify(job));
 
     return { replayed: true, message: 'Delivery re-queued' };
+  }
+
+  async replayEvent(
+    tenantId: string,
+    eventId: string,
+  ): Promise<{
+    replayed: boolean;
+    originalCorrelationId: string;
+    newCorrelationId: string;
+    workflowId: string;
+  }> {
+    const event = await this.mongo.eventModel
+      .findOne({ _id: eventId, tenantId })
+      .lean()
+      .exec();
+
+    if (!event) {
+      throw new Error('Event not found');
+    }
+
+    const newCorrelationId = randomUUID();
+
+    const queued: QueuedEvent = {
+      correlationId: newCorrelationId,
+      tenantId,
+      workflowId: event.workflowId,
+      sourceType: event.sourceType as never,
+      receivedAt: new Date().toISOString(),
+      rawPayload: (event.rawPayload ?? {}) as Record<string, unknown>,
+      headers: (event.headers ?? {}) as Record<string, string>,
+      ipHash: event.ipHash ?? null,
+      userAgent: event.userAgent ?? null,
+      idempotencyKey: `replay:${event.correlationId}:${newCorrelationId}`,
+    };
+
+    await this.redis.raw.lpush(INCOMING_QUEUE, JSON.stringify(queued));
+
+    logger.info('event.replayed', {
+      originalCorrelationId: event.correlationId,
+      newCorrelationId,
+      workflowId: event.workflowId,
+    });
+
+    return {
+      replayed: true,
+      originalCorrelationId: event.correlationId,
+      newCorrelationId,
+      workflowId: event.workflowId,
+    };
   }
 
   /**

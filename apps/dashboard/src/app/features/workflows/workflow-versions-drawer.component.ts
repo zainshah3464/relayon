@@ -13,7 +13,7 @@ import {
   template: `
     <div class="fixed inset-0 z-50 bg-black/60 flex justify-end" (click)="close.emit()">
       <div
-        class="bg-surface w-full max-w-xl h-full overflow-y-auto p-6"
+        class="bg-surface w-full max-w-4xl h-full overflow-y-auto p-6"
         (click)="$event.stopPropagation()"
       >
         <div class="flex justify-between items-center mb-4">
@@ -81,17 +81,65 @@ import {
               @if (d.identical) {
                 <p class="text-sm text-muted">Versions are identical.</p>
               } @else {
-                <div class="flex gap-3 text-xs">
+                <div class="flex items-center gap-3 text-xs">
                   <span class="text-signal-green">+{{ d.stats.added }}</span>
                   <span class="text-signal-rose">-{{ d.stats.removed }}</span>
+                  <div class="ml-auto flex gap-1">
+                    <button
+                      (click)="diffMode.set('split')"
+                      class="px-2 py-0.5 rounded text-[10px]"
+                      [ngClass]="{
+                        'bg-relay-violet text-white': diffMode() === 'split',
+                        'text-muted': diffMode() !== 'split'
+                      }"
+                    >Split</button>
+                    <button
+                      (click)="diffMode.set('unified')"
+                      class="px-2 py-0.5 rounded text-[10px]"
+                      [ngClass]="{
+                        'bg-relay-violet text-white': diffMode() === 'unified',
+                        'text-muted': diffMode() !== 'unified'
+                      }"
+                    >Unified</button>
+                  </div>
                 </div>
-                <pre class="bg-surface-2 p-3 rounded text-[10px] overflow-auto max-h-[500px] font-mono">@for (line of diffLines(); track $index) {<span
-                  [class.text-signal-green]="line.startsWith('+') && !line.startsWith('+++')"
-                  [class.text-signal-rose]="line.startsWith('-') && !line.startsWith('---')"
-                  [class.text-relay-cyan]="line.startsWith('@@')"
-                  [class.text-muted]="line.startsWith('+++') || line.startsWith('---')"
-                  class="block"
-                >{{ line || ' ' }}</span>}</pre>
+
+                @if (diffMode() === 'split') {
+                  <div class="rounded overflow-auto max-h-[500px] bg-surface-2 font-mono text-[10px]">
+                    <table class="w-full border-collapse">
+                      <tbody>
+                        @for (row of d.structured.split; track $index) {
+                          <tr>
+                            <td class="w-10 text-right pr-2 text-muted select-none border-r border-hairline">{{ row.left.lineNo ?? '' }}</td>
+                            <td
+                              class="px-2 whitespace-pre-wrap break-all"
+                              [ngClass]="{
+                                'bg-signal-rose/10 text-signal-rose': row.left.type === 'del',
+                                'text-muted': row.left.type === 'blank'
+                              }"
+                            >{{ row.left.text || ' ' }}</td>
+                            <td class="w-10 text-right pr-2 text-muted select-none border-l border-r border-hairline">{{ row.right.lineNo ?? '' }}</td>
+                            <td
+                              class="px-2 whitespace-pre-wrap break-all"
+                              [ngClass]="{
+                                'bg-signal-green/10 text-signal-green': row.right.type === 'add',
+                                'text-muted': row.right.type === 'blank'
+                              }"
+                            >{{ row.right.text || ' ' }}</td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+                } @else {
+                  <pre class="bg-surface-2 p-3 rounded text-[10px] overflow-auto max-h-[500px] font-mono">@for (line of diffLines(); track $index) {<span
+                    [class.text-signal-green]="line.startsWith('+') && !line.startsWith('+++')"
+                    [class.text-signal-rose]="line.startsWith('-') && !line.startsWith('---')"
+                    [class.text-relay-cyan]="line.startsWith('@@')"
+                    [class.text-muted]="line.startsWith('+++') || line.startsWith('---')"
+                    class="block"
+                  >{{ line || ' ' }}</span>}</pre>
+                }
               }
             } @else if (compareA() && compareB()) {
               <button (click)="runDiff()" [disabled]="diffing()" class="btn-primary text-xs">
@@ -129,6 +177,7 @@ export class WorkflowVersionsDrawerComponent implements OnInit {
   compareMode = signal(false);
   compareA = signal<WorkflowVersionDetail | null>(null);
   compareB = signal<WorkflowVersionDetail | null>(null);
+  diffMode = signal<'split' | 'unified'>('split');
 
   diffResult = signal<{
     fromVersion: number;
@@ -136,6 +185,13 @@ export class WorkflowVersionsDrawerComponent implements OnInit {
     identical: boolean;
     stats: { added: number; removed: number };
     unified: string;
+    structured: {
+      hunks: Array<{ oldStart: number; oldLines: number; newStart: number; newLines: number }>;
+      split: Array<{
+        left: { lineNo: number | null; text: string; type: 'ctx' | 'del' | 'blank' };
+        right: { lineNo: number | null; text: string; type: 'ctx' | 'add' | 'blank' };
+      }>;
+    };
   } | null>(null);
 
   diffing = signal(false);
@@ -240,7 +296,7 @@ export class WorkflowVersionsDrawerComponent implements OnInit {
   exitCompare(): void {
     this.compareMode.set(false);
     this.compareA.set(null);
-    this.compareB.set(null);  
+    this.compareB.set(null);
     this.diffResult.set(null);
   }
 }

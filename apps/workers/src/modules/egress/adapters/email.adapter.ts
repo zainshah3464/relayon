@@ -10,8 +10,41 @@ const RESEND_ENDPOINT = 'https://api.resend.com/emails';
 @DestinationAdapter({
   type: 'email',
   displayName: 'Email (Resend)',
-  configSchema: {
-    required: ['apiKey', 'to', 'from'],
+  fields: [
+    {
+      key: 'apiKey',
+      label: 'Resend API key',
+      type: 'password',
+      required: true,
+      sensitive: true,
+      placeholder: 're_...',
+    },
+    {
+      key: 'to',
+      label: 'To',
+      type: 'string-array',
+      required: true,
+      placeholder: 'ops@example.com',
+      help: 'Comma-separated recipients',
+    },
+    {
+      key: 'from',
+      label: 'From',
+      type: 'text',
+      required: true,
+      placeholder: 'Relayon <noreply@yourdomain.com>',
+    },
+    {
+      key: 'subject',
+      label: 'Subject',
+      type: 'text',
+      required: false,
+      placeholder: 'Relayon event',
+    },
+  ],
+  testPayload: {
+    summary: 'Relayon dry-run email',
+    type: 'relayon.test',
   },
 })
 export class EmailAdapter implements DeliveryAdapter {

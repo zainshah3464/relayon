@@ -12,6 +12,13 @@ import {
 import { environment } from '../../../environments/environment';
 import { WorkflowScheduleCardComponent } from './workflow-schedule-card.component';
 import { WorkflowVersionsDrawerComponent } from './workflow-versions-drawer.component';
+import { SchemaFormComponent } from '../../shared/forms/schema-form.component';
+import {
+  buildSchemaForm,
+  readSchemaForm,
+  type SchemaField,
+} from '../../shared/forms/schema-form.types';
+import type { AdapterCatalogEntry } from '../../core/api/workflows.service';
 
 @Component({
   selector: 'app-workflow-detail',
@@ -23,6 +30,7 @@ import { WorkflowVersionsDrawerComponent } from './workflow-versions-drawer.comp
     FormsModule,
     WorkflowScheduleCardComponent,
     WorkflowVersionsDrawerComponent,
+    SchemaFormComponent,
   ],
   template: `
     <div class="space-y-6">
@@ -45,7 +53,9 @@ import { WorkflowVersionsDrawerComponent } from './workflow-versions-drawer.comp
             {{ exporting() ? 'Exporting...' : 'Export YAML' }}
           </button>
           <button (click)="openTestRun()" class="btn-primary text-xs">▶ Test run</button>
-          <button (click)="showVersions.set(true)" class="btn-secondary text-xs">Version history</button>
+          <button (click)="showVersions.set(true)" class="btn-secondary">
+            Version history
+          </button>
         </div>
       </div>
 
@@ -62,7 +72,7 @@ import { WorkflowVersionsDrawerComponent } from './workflow-versions-drawer.comp
           </code>
         </div>
 
-        <!-- v1.3: Schedule Card -->
+        <!-- Schedule Card -->
         <app-workflow-schedule-card [workflowId]="wf.id" />
 
         <!-- Transform editor -->
@@ -140,6 +150,9 @@ import { WorkflowVersionsDrawerComponent } from './workflow-versions-drawer.comp
                     <div class="flex items-center gap-2">
                       <span class="text-white font-medium">{{ d.name }}</span>
                       <span class="text-xs px-2 py-0.5 rounded bg-surface-2 text-relay-cyan font-mono">{{ d.type }}</span>
+                      @if (!d.enabled) {
+                        <span class="text-xs px-2 py-0.5 rounded bg-signal-rose/20 text-signal-rose">Disabled</span>
+                      }
                       @if (d.lastValidationOk === true) {
                         <span class="text-xs px-2 py-0.5 rounded bg-signal-green/20 text-signal-green" [title]="'Last validated: ' + (d.lastValidatedAt | date: 'short')">
                           ✓ verified
@@ -148,9 +161,6 @@ import { WorkflowVersionsDrawerComponent } from './workflow-versions-drawer.comp
                         <span class="text-xs px-2 py-0.5 rounded bg-signal-rose/20 text-signal-rose" [title]="d.lastValidationError || 'Validation failed'">
                           ✗ failed
                         </span>
-                      }
-                      @if (!d.enabled) {
-                        <span class="text-xs px-2 py-0.5 rounded bg-signal-rose/20 text-signal-rose">Disabled</span>
                       }
                     </div>
                     <p class="text-xs text-muted font-mono mt-1">{{ destinationSummary(d) }}</p>
@@ -167,7 +177,7 @@ import { WorkflowVersionsDrawerComponent } from './workflow-versions-drawer.comp
           }
         </div>
 
-        <!-- v1.3: Version Drawer -->
+        <!-- Version Drawer -->
         @if (showVersions()) {
           <app-workflow-versions-drawer
             [workflowId]="id()"
@@ -182,119 +192,44 @@ import { WorkflowVersionsDrawerComponent } from './workflow-versions-drawer.comp
         <div class="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" (click)="closeCreateDest()">
           <div class="card w-full max-w-lg max-h-[90vh] overflow-y-auto" (click)="$event.stopPropagation()">
             <h2 class="text-lg font-semibold text-white mb-4">Add destination</h2>
-            <form [formGroup]="destForm" (ngSubmit)="submitDest()" class="space-y-4">
+            <form [formGroup]="destMetaForm" (ngSubmit)="submitDest()" class="space-y-4">
               <div>
                 <label class="label">Type</label>
-                <select formControlName="type" class="input">
-                  <option value="http">HTTP webhook</option>
-                  <option value="slack">Slack</option>
-                  <option value="email">Email (Resend)</option>
-                  <option value="sheets">Google Sheets</option>
-                  <option value="discord">Discord</option>
-                  <option value="airtable">Airtable</option>
-                  <option value="notion">Notion</option>
+                <select
+                  formControlName="type"
+                  (change)="onAdapterTypeChange(destMetaForm.controls.type.value)"
+                  class="input"
+                >
+                  @for (a of adapterCatalog(); track a.type) {
+                    <option [value]="a.type">{{ a.displayName }}</option>
+                  }
                 </select>
               </div>
               <div>
                 <label class="label">Name</label>
                 <input formControlName="name" class="input" placeholder="Production alerts" />
               </div>
-              @switch (destForm.controls.type.value) {
-                @case ('http') {
-                  <div>
-                    <label class="label">URL</label>
-                    <input formControlName="url" class="input font-mono" placeholder="https://api.example.com/webhook" />
-                  </div>
-                }
-                @case ('slack') {
-                  <div>
-                    <label class="label">Slack webhook URL</label>
-                    <input formControlName="webhookUrl" class="input font-mono" placeholder="https://hooks.slack.com/services/..." />
-                  </div>
-                }
-                @case ('email') {
-                  <div>
-                    <label class="label">Resend API key</label>
-                    <input formControlName="apiKey" class="input font-mono" placeholder="re_..." />
-                  </div>
-                  <div>
-                    <label class="label">To (comma-separated)</label>
-                    <input formControlName="to" class="input" placeholder="you@example.com" />
-                  </div>
-                  <div>
-                    <label class="label">From</label>
-                    <input formControlName="from" class="input" />
-                  </div>
-                }
-                @case ('sheets') {
-                  <div>
-                    <label class="label">Spreadsheet ID</label>
-                    <input formControlName="spreadsheetId" class="input font-mono" />
-                  </div>
-                  <div>
-                    <label class="label">Range</label>
-                    <input formControlName="range" class="input" placeholder="Sheet1!A:Z" />
-                  </div>
-                  <div>
-                    <label class="label">Service account email</label>
-                    <input formControlName="serviceAccountEmail" class="input font-mono" />
-                  </div>
-                  <div>
-                    <label class="label">Private key (PEM)</label>
-                    <textarea formControlName="privateKey" rows="4" class="input font-mono text-xs"></textarea>
-                  </div>
-                }
-                @case ('discord') {
-                  <div>
-                    <label class="label">Discord webhook URL</label>
-                    <input formControlName="webhookUrl" class="input font-mono" placeholder="https://discord.com/api/webhooks/..." />
-                  </div>
-                }
-                @case ('airtable') {
-                  <div>
-                    <label class="label">Personal access token</label>
-                    <input formControlName="apiKey" class="input font-mono" placeholder="pat..." />
-                  </div>
-                  <div>
-                    <label class="label">Base ID</label>
-                    <input formControlName="baseId" class="input font-mono" placeholder="appXXXXXXXXXXXXXX" />
-                  </div>
-                  <div>
-                    <label class="label">Table name</label>
-                    <input formControlName="tableName" class="input" placeholder="Leads" />
-                  </div>
-                }
-                @case ('notion') {
-                  <div>
-                    <label class="label">Integration token</label>
-                    <input formControlName="apiKey" class="input font-mono" placeholder="secret_..." />
-                  </div>
-                  <div>
-                    <label class="label">Data source ID</label>
-                    <input formControlName="dataSourceId" class="input font-mono" />
-                  </div>
-                  <div>
-                    <label class="label">Title property name</label>
-                    <input formControlName="titleProperty" class="input" placeholder="Name" />
-                  </div>
-                  <p class="text-xs text-muted">Share the database with your Notion integration, otherwise the API returns 404.</p>
-                }
-              }
+
+              <div [formGroup]="configForm">
+                <app-schema-form [fields]="configFields()" [form]="configForm" />
+              </div>
+
               @if (destError()) {
                 <div class="text-sm text-signal-rose">{{ destError() }}</div>
               }
+
               <div class="flex justify-between gap-2 pt-2">
                 <button
                   type="button"
                   (click)="validateDest()"
-                  [disabled]="validating() || destForm.invalid"
+                  [disabled]="validating() || destMetaForm.invalid"
                   class="btn-secondary"
                 >
                   {{ validating() ? 'Testing...' : 'Test connection' }}
                 </button>
                 <div class="flex gap-2">
                   <button type="button" (click)="closeCreateDest()" class="btn-secondary">Cancel</button>
-                  <button type="submit" [disabled]="destForm.invalid || savingDest()" class="btn-primary">
+                  <button type="submit" [disabled]="destMetaForm.invalid || configForm.invalid || savingDest()" class="btn-primary">
                     {{ savingDest() ? 'Adding...' : 'Add' }}
                   </button>
                 </div>
@@ -310,7 +245,7 @@ import { WorkflowVersionsDrawerComponent } from './workflow-versions-drawer.comp
                     'bg-signal-rose/5': !r.ok
                   }"
                 >
-                  <p [class.text-signal-green]="r.ok" [class.text-signal-rose]="!r.ok" class="font-medium">
+                  <p [ngClass]="r.ok ? 'text-signal-green' : 'text-signal-rose'" class="font-medium">
                     {{ r.ok ? '✓ Connection verified' : '✗ Validation failed' }}
                   </p>
                   @if (r.dryRun) {
@@ -329,14 +264,14 @@ import { WorkflowVersionsDrawerComponent } from './workflow-versions-drawer.comp
         </div>
       }
 
-      <!-- Test-run modal -->
+      <!-- Test run modal -->
       @if (showTestRun()) {
         <div class="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" (click)="closeTestRun()">
           <div class="card w-full max-w-3xl max-h-[90vh] overflow-y-auto" (click)="$event.stopPropagation()">
             <div class="flex justify-between items-center mb-4">
               <div>
                 <h2 class="text-lg font-semibold text-white">Test run pipeline</h2>
-                <p class="text-xs text-muted mt-1">Runs enrich → transform → routing. No delivery, no DB writes.</p>
+                <p class="text-xs text-muted mt-1">Runs enrich → transform → routing. No DB writes.</p>
               </div>
               <button (click)="closeTestRun()" class="text-muted hover:text-white">✕</button>
             </div>
@@ -348,6 +283,16 @@ import { WorkflowVersionsDrawerComponent } from './workflow-versions-drawer.comp
               rows="8"
               class="input font-mono text-xs"
             ></textarea>
+
+            <label class="flex items-center gap-2 text-sm text-white mt-3">
+              <input
+                type="checkbox"
+                [checked]="dryRunDestinations()"
+                (change)="dryRunDestinations.set($any($event.target).checked)"
+                class="rounded border-hairline"
+              />
+              <span>Also dry-run matched destinations (adds ~1–2s each)</span>
+            </label>
 
             <div class="flex justify-end gap-2 mt-3">
               <button (click)="closeTestRun()" class="btn-secondary">Close</button>
@@ -421,6 +366,30 @@ import { WorkflowVersionsDrawerComponent } from './workflow-versions-drawer.comp
                     </div>
                   }
                 </div>
+
+                @if (r.dryRuns.length > 0) {
+                  <div class="card bg-surface-2">
+                    <div class="flex justify-between items-center mb-2">
+                      <h3 class="text-sm font-medium text-white">4. Destination dry-runs</h3>
+                      <span class="text-xs text-muted">{{ r.dryRuns.length }} checked</span>
+                    </div>
+                    <div class="space-y-1">
+                      @for (d of r.dryRuns; track d.destinationId) {
+                        <div class="flex justify-between text-xs">
+                          <span class="font-mono text-white">{{ d.destinationType }}</span>
+                          <span
+                            [ngClass]="d.ok ? 'text-signal-green' : 'text-signal-rose'"
+                          >
+                            {{ d.ok ? '✓' : '✗' }}
+                            {{ d.statusCode > 0 ? 'HTTP ' + d.statusCode : '' }}
+                            · {{ d.latencyMs }}ms
+                            @if (d.error) { · {{ d.error }} }
+                          </span>
+                        </div>
+                      }
+                    </div>
+                  </div>
+                }
               </div>
             }
           </div>
@@ -456,6 +425,17 @@ export class WorkflowDetailComponent implements OnInit {
     durationMs: number;
   } | null>(null);
 
+  // Dynamic destination form
+  adapterCatalog = signal<AdapterCatalogEntry[]>([]);
+  selectedAdapter = signal<AdapterCatalogEntry | null>(null);
+  configFields = signal<SchemaField[]>([]);
+
+  destMetaForm = this.fb.nonNullable.group({
+    type: ['http' as DestinationType, Validators.required],
+    name: ['', [Validators.required, Validators.minLength(2)]],
+  });
+  configForm = this.fb.group({});
+
   showCreateDest = signal(false);
   savingDest = signal(false);
   destError = signal<string | null>(null);
@@ -469,15 +449,9 @@ export class WorkflowDetailComponent implements OnInit {
     dryRun: { attempted: boolean; success: boolean; latencyMs: number; detail: string } | null;
   } | null>(null);
 
-  // ── Test-run state ───────────────────────────────────────────
+  // Test run
   showTestRun = signal(false);
   testRunLoading = signal(false);
-  testRunResult = signal<{
-    enrichment: { enabled: boolean; result: unknown; cached: boolean; error: string | null; durationMs: number };
-    transform: { applied: boolean; result: unknown; error: string | null; durationMs: number };
-    routing: { destinationIds: string[]; matchedRule: number | null; reason: string };
-    destinations: Array<{ id: string; name: string; type: string }>;
-  } | null>(null);
   testRunPayload = signal<string>(
     JSON.stringify(
       {
@@ -489,6 +463,21 @@ export class WorkflowDetailComponent implements OnInit {
     ),
   );
   testRunError = signal<string | null>(null);
+  dryRunDestinations = signal(true);
+  testRunResult = signal<{
+    enrichment: { enabled: boolean; result: unknown; cached: boolean; error: string | null; durationMs: number };
+    transform: { applied: boolean; result: unknown; error: string | null; durationMs: number };
+    routing: { destinationIds: string[]; matchedRule: number | null; reason: string };
+    destinations: Array<{ id: string; name: string; type: string }>;
+    dryRuns: Array<{
+      destinationId: string;
+      destinationType: string;
+      ok: boolean;
+      statusCode: number;
+      latencyMs: number;
+      error: string | null;
+    }>;
+  } | null>(null);
 
   private readonly samplePayload = {
     type: 'checkout.session.completed',
@@ -499,26 +488,9 @@ export class WorkflowDetailComponent implements OnInit {
     },
   };
 
-  destForm = this.fb.nonNullable.group({
-    type: ['http' as DestinationType, Validators.required],
-    name: ['', [Validators.required, Validators.minLength(2)]],
-    url: [''],
-    webhookUrl: [''],
-    apiKey: [''],
-    to: [''],
-    from: [''],
-    spreadsheetId: [''],
-    range: [''],
-    serviceAccountEmail: [''],
-    privateKey: [''],
-    baseId: [''],
-    tableName: [''],
-    dataSourceId: [''],
-    titleProperty: [''],
-  });
-
   ngOnInit(): void {
     this.load();
+    this.loadAdapters();
   }
 
   load(): void {
@@ -536,6 +508,27 @@ export class WorkflowDetailComponent implements OnInit {
       next: (d) => this.destinations.set(d),
       error: (err) => this.error.set(err?.error?.message ?? 'Failed to load destinations'),
     });
+  }
+
+  private loadAdapters(): void {
+    this.svc.listAdapters().subscribe({
+      next: (res) => {
+        this.adapterCatalog.set(res.adapters);
+        if (res.adapters.length > 0) {
+          this.onAdapterTypeChange(res.adapters[0]!.type);
+        }
+      },
+      error: () => this.adapterCatalog.set([]),
+    });
+  }
+
+  onAdapterTypeChange(type: string): void {
+    const adapter = this.adapterCatalog().find((a) => a.type === type) ?? null;
+    this.selectedAdapter.set(adapter);
+    const fields = adapter?.fields ?? [];
+    this.configFields.set(fields);
+    this.configForm = buildSchemaForm(fields, this.fb);
+    this.validationResult.set(null);
   }
 
   copyWebhookUrl(): void {
@@ -627,7 +620,133 @@ export class WorkflowDetailComponent implements OnInit {
     });
   }
 
-  // ── Test-run methods ─────────────────────────────────────────
+  destinationSummary(d: Destination): string {
+    const cfg = d.config as Record<string, unknown>;
+    if (typeof cfg['url'] === 'string') return cfg['url'] as string;
+    if (typeof cfg['webhookUrl'] === 'string')
+      return (cfg['webhookUrl'] as string).startsWith('enc:v')
+        ? '•••••••• (encrypted)'
+        : 'Slack/Discord webhook';
+    if (typeof cfg['to'] === 'string') return cfg['to'] as string;
+    if (Array.isArray(cfg['to'])) return (cfg['to'] as string[]).join(', ');
+    if (typeof cfg['spreadsheetId'] === 'string') return `Sheets: ${cfg['spreadsheetId']}`;
+    if (typeof cfg['baseId'] === 'string') return `Airtable: ${cfg['baseId']}`;
+    if (typeof cfg['dataSourceId'] === 'string') return `Notion: ${cfg['dataSourceId']}`;
+    return '—';
+  }
+
+  openCreateDest(): void {
+    this.destMetaForm.reset({ type: 'http', name: '' });
+    this.onAdapterTypeChange('http');
+    this.destError.set(null);
+    this.validationResult.set(null);
+    this.showCreateDest.set(true);
+  }
+
+  closeCreateDest(): void {
+    if (!this.savingDest()) this.showCreateDest.set(false);
+  }
+
+  private buildConfigFromForm(): Record<string, unknown> {
+    return readSchemaForm(this.configFields(), this.configForm);
+  }
+
+  validateDest(): void {
+    if (this.destMetaForm.invalid || this.validating()) return;
+
+    let config: Record<string, unknown>;
+    try {
+      config = this.buildConfigFromForm();
+    } catch (err) {
+      this.validationResult.set({
+        ok: false,
+        layer: 'schema',
+        errors: [{ field: 'config', message: err instanceof Error ? err.message : String(err) }],
+        warnings: [],
+        dryRun: null,
+      });
+      return;
+    }
+
+    this.validating.set(true);
+    this.validationResult.set(null);
+
+    this.svc
+      .validateDestination({
+        type: this.destMetaForm.controls.type.value,
+        config,
+        dryRun: true,
+      })
+      .subscribe({
+        next: (r) => {
+          this.validationResult.set(r);
+          this.validating.set(false);
+        },
+        error: (err) => {
+          this.validationResult.set({
+            ok: false,
+            layer: 'schema',
+            errors: [{ field: 'request', message: err?.error?.message ?? 'Validation failed' }],
+            warnings: [],
+            dryRun: null,
+          });
+          this.validating.set(false);
+        },
+      });
+  }
+
+  submitDest(): void {
+    if (this.destMetaForm.invalid || this.configForm.invalid || this.savingDest()) return;
+
+    let config: Record<string, unknown>;
+    try {
+      config = this.buildConfigFromForm();
+    } catch (err) {
+      this.destError.set(err instanceof Error ? err.message : String(err));
+      return;
+    }
+
+    this.savingDest.set(true);
+    this.destError.set(null);
+
+    this.svc
+      .createDestination(this.id(), {
+        type: this.destMetaForm.controls.type.value,
+        name: this.destMetaForm.controls.name.value,
+        config,
+      })
+      .subscribe({
+        next: () => {
+          this.savingDest.set(false);
+          this.showCreateDest.set(false);
+          this.loadDestinations();
+        },
+        error: (err) => {
+          this.savingDest.set(false);
+          this.destError.set(err?.error?.message ?? 'Failed to add destination');
+        },
+      });
+  }
+
+  toggleDestination(d: Destination): void {
+    this.svc.updateDestination(d.id, { enabled: !d.enabled }).subscribe({
+      next: () => this.loadDestinations(),
+    });
+  }
+
+  deleteDestination(d: Destination): void {
+    if (!confirm(`Delete destination "${d.name}"?`)) return;
+    this.svc.removeDestination(d.id).subscribe({
+      next: () => this.loadDestinations(),
+    });
+  }
+
+  onVersionRestored(): void {
+    this.showVersions.set(false);
+    this.load();
+  }
+
+  // ── Test run ──────────────────────────────────────────────
 
   openTestRun(): void {
     this.testRunResult.set(null);
@@ -655,7 +774,7 @@ export class WorkflowDetailComponent implements OnInit {
     this.testRunError.set(null);
     this.testRunResult.set(null);
 
-    this.svc.testRun(wf.id, payload).subscribe({
+    this.svc.testRun(wf.id, payload, this.dryRunDestinations()).subscribe({
       next: (r) => {
         this.testRunResult.set(r);
         this.testRunLoading.set(false);
@@ -665,133 +784,5 @@ export class WorkflowDetailComponent implements OnInit {
         this.testRunLoading.set(false);
       },
     });
-  }
-
-  destinationSummary(d: Destination): string {
-    const cfg = d.config as Record<string, unknown>;
-    if (typeof cfg['url'] === 'string') return cfg['url'] as string;
-    if (typeof cfg['webhookUrl'] === 'string')
-      return (cfg['webhookUrl'] as string).startsWith('enc:v1:')
-        ? '•••••••• (encrypted)'
-        : 'Slack/Discord webhook';
-    if (typeof cfg['to'] === 'string') return cfg['to'] as string;
-    if (Array.isArray(cfg['to'])) return (cfg['to'] as string[]).join(', ');
-    if (typeof cfg['spreadsheetId'] === 'string') return `Sheets: ${cfg['spreadsheetId']}`;
-    if (typeof cfg['baseId'] === 'string') return `Airtable: ${cfg['baseId']}`;
-    if (typeof cfg['dataSourceId'] === 'string') return `Notion: ${cfg['dataSourceId']}`;
-    return '—';
-  }
-
-  openCreateDest(): void {
-    this.destForm.reset();
-    this.destError.set(null);
-    this.validationResult.set(null);
-    this.showCreateDest.set(true);
-  }
-
-  closeCreateDest(): void {
-    if (!this.savingDest()) this.showCreateDest.set(false);
-  }
-
-  validateDest(): void {
-    if (this.destForm.invalid || this.validating()) return;
-    const v = this.destForm.getRawValue();
-    const config = this.buildDestinationConfig(v);
-
-    this.validating.set(true);
-    this.validationResult.set(null);
-
-    this.svc.validateDestination({
-      type: v.type,
-      config,
-      dryRun: true,
-      destinationId: undefined, // naye destination ke liye undefined
-    }).subscribe({
-      next: (r) => {
-        this.validationResult.set(r);
-        this.validating.set(false);
-      },
-      error: (err) => {
-        this.validationResult.set({
-          ok: false,
-          layer: 'schema',
-          errors: [{ field: 'request', message: err?.error?.message ?? 'Validation failed' }],
-          warnings: [],
-          dryRun: null,
-        });
-        this.validating.set(false);
-      },
-    });
-  }
-
-  private buildDestinationConfig(
-    v: ReturnType<typeof this.destForm.getRawValue>,
-  ): Record<string, unknown> {
-    switch (v.type) {
-      case 'http':
-        return { url: v.url, method: 'POST' };
-      case 'slack':
-        return { webhookUrl: v.webhookUrl };
-      case 'email':
-        return {
-          apiKey: v.apiKey,
-          to: v.to.split(',').map((s) => s.trim()).filter(Boolean),
-          from: v.from,
-        };
-      case 'sheets':
-        return {
-          spreadsheetId: v.spreadsheetId,
-          range: v.range,
-          serviceAccountEmail: v.serviceAccountEmail,
-          privateKey: v.privateKey,
-        };
-      case 'discord':
-        return { webhookUrl: v.webhookUrl };
-      case 'airtable':
-        return { apiKey: v.apiKey, baseId: v.baseId, tableName: v.tableName };
-      case 'notion':
-        return { apiKey: v.apiKey, dataSourceId: v.dataSourceId, titleProperty: v.titleProperty };
-      default:
-        return {};
-    }
-  }
-
-  submitDest(): void {
-    if (this.destForm.invalid || this.savingDest()) return;
-    const v = this.destForm.getRawValue();
-    const config = this.buildDestinationConfig(v);
-
-    this.savingDest.set(true);
-    this.destError.set(null);
-
-    this.svc.createDestination(this.id(), { type: v.type, name: v.name, config }).subscribe({
-      next: () => {
-        this.savingDest.set(false);
-        this.showCreateDest.set(false);
-        this.loadDestinations();
-      },
-      error: (err) => {
-        this.savingDest.set(false);
-        this.destError.set(err?.error?.message ?? 'Failed to add destination');
-      },
-    });
-  }
-
-  toggleDestination(d: Destination): void {
-    this.svc.updateDestination(d.id, { enabled: !d.enabled }).subscribe({
-      next: () => this.loadDestinations(),
-    });
-  }
-
-  deleteDestination(d: Destination): void {
-    if (!confirm(`Delete destination "${d.name}"?`)) return;
-    this.svc.removeDestination(d.id).subscribe({
-      next: () => this.loadDestinations(),
-    });
-  }
-
-  onVersionRestored(): void {
-    this.showVersions.set(false);
-    this.load();
   }
 }

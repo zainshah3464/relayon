@@ -310,6 +310,7 @@ export class WorkflowsService {
     tenantId: string,
     workflowId: string,
     payload: unknown,
+    dryRunDestinations: boolean,
   ) {
     await this.get(tenantId, workflowId);
 
@@ -327,7 +328,12 @@ export class WorkflowsService {
         'Content-Type': 'application/json',
         'X-Cron-Secret': cronSecret,
       },
-      body: JSON.stringify({ tenantId, workflowId, payload }),
+      body: JSON.stringify({
+        tenantId,
+        workflowId,
+        payload,
+        dryRunDestinations,
+      }),
     });
 
     if (!res.ok) {

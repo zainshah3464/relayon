@@ -66,7 +66,6 @@ export class AdapterRegistry implements OnModuleInit {
       this.logger.error('No destination adapters registered — delivery will fail');
     }
 
-    // Keep scanner referenced so Nest doesn't tree-shake the import
     void this.scanner;
   }
 
@@ -74,11 +73,17 @@ export class AdapterRegistry implements OnModuleInit {
     return this.byType.get(type) ?? null;
   }
 
-  list(): Array<{ type: string; displayName: string; configSchema: unknown }> {
+  list(): Array<{
+    type: string;
+    displayName: string;
+    fields: DestinationAdapterMetadata['fields'];
+    testPayload: unknown;
+  }> {
     return Array.from(this.byType.values()).map((r) => ({
       type: r.meta.type,
       displayName: r.meta.displayName,
-      configSchema: r.meta.configSchema,
+      fields: r.meta.fields,
+      testPayload: r.meta.testPayload ?? null,
     }));
   }
 
