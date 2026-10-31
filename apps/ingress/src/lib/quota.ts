@@ -3,6 +3,7 @@ import { redis } from './redis';
 import { logger } from './logger';
 
 export type QuotaMetric = 'events' | 'ai_tokens';
+export type QuotaMode = 'hard' | 'soft';
 
 export interface QuotaDecision {
   allowed: boolean;
@@ -11,13 +12,18 @@ export interface QuotaDecision {
   remaining: number;
   period: string;
   resetAt: string;
+  mode: QuotaMode;
+  warning: boolean;
 }
 
 const TENANT_CACHE_TTL = 300; // 5 min
+const SOFT_MODE_OVERSHOOT_MULTIPLIER = 2;
+const WARNING_THRESHOLD = 0.8; // warn at 80% of nominal limit
 
 interface TenantLimits {
   events: number;
   aiTokens: number;
+  mode: QuotaMode;
 }
 
 function periodKey(now = new Date()): string {
@@ -48,6 +54,7 @@ async function getTenantLimits(
     select: {
       quotaEventsPerMonth: true,
       quotaAiTokensPerMonth: true,
+      quotaMode: true,
     },
   });
   if (!tenant) return null;
@@ -55,6 +62,7 @@ async function getTenantLimits(
   const limits: TenantLimits = {
     events: tenant.quotaEventsPerMonth,
     aiTokens: tenant.quotaAiTokensPerMonth,
+    mode: tenant.quotaMode === 'soft' ? 'soft' : 'hard',
   };
 
   await redis.set(cacheKey, JSON.stringify(limits), 'EX', TENANT_CACHE_TTL);
@@ -64,6 +72,12 @@ async function getTenantLimits(
 /**
  * Atomic event-quota reservation. Wraps all `usage_counters` queries
  * in a single transaction with `app.tenant_id` set (required for RLS).
+ *
+ * Modes:
+ *   - hard: reject as soon as count + cost > limit
+ *   - soft: allow overshoot up to (limit * 2), then reject.
+ *           Useful for billing-based tenants who don't want sudden
+ *           webhook drops at the exact limit.
  */
 export async function checkEventQuota(
   tenantId: string,
@@ -81,10 +95,17 @@ export async function checkEventQuota(
       remaining: 0,
       period,
       resetAt,
+      mode: 'hard',
+      warning: false,
     };
   }
 
   const limit = limits.events;
+  const mode = limits.mode;
+  const effectiveLimit =
+    mode === 'soft'
+      ? Math.floor(limit * SOFT_MODE_OVERSHOOT_MULTIPLIER)
+      : limit;
 
   const outcome = await prisma.$transaction(async (tx) => {
     await tx.$executeRaw`SELECT set_config('app.tenant_id', ${tenantId}, true)`;
@@ -101,7 +122,7 @@ export async function checkEventQuota(
       WHERE tenant_id = ${tenantId}
         AND period = ${period}
         AND metric = 'events'
-        AND count + ${cost} <= ${limit}
+        AND count + ${cost} <= ${effectiveLimit}
       RETURNING count
     `;
 
@@ -122,8 +143,21 @@ export async function checkEventQuota(
       metric: 'events',
       used: outcome.used,
       limit,
+      effectiveLimit,
+      mode,
+    });
+  } else if (outcome.used >= limit * WARNING_THRESHOLD && outcome.used < limit) {
+    logger.warn('quota.approaching', {
+      tenantId,
+      metric: 'events',
+      used: outcome.used,
+      limit,
+      mode,
     });
   }
+
+  const warning =
+    outcome.used >= limit * WARNING_THRESHOLD && outcome.used < limit;
 
   return {
     allowed: outcome.allowed,
@@ -132,5 +166,7 @@ export async function checkEventQuota(
     remaining: Math.max(0, limit - outcome.used),
     period,
     resetAt,
+    mode,
+    warning,
   };
 }

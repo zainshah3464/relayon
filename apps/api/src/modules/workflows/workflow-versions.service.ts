@@ -183,10 +183,12 @@ export class WorkflowVersionsService {
       ? (snap['destinations'] as Array<Record<string, unknown>>)
       : [];
 
-    await this.prisma.withTenant(tenantId, async (tx) => {
+    // Single transaction: delete old destinations, update workflow,
+    // recreate destinations (with tenantId) — all atomic.
+    const restored = await this.prisma.withTenant(tenantId, async (tx) => {
       await tx.destination.deleteMany({ where: { workflowId } });
 
-      await tx.workflow.update({
+      return tx.workflow.update({
         where: { id: workflowId },
         data: {
           name: snap['name'] as string,
@@ -201,6 +203,7 @@ export class WorkflowVersionsService {
             snap['isActive'] === undefined ? true : Boolean(snap['isActive']),
           destinations: {
             create: destinations.map((d) => ({
+              tenantId, // ← v1.9: required field
               type: d['type'] as never,
               name: d['name'] as string,
               config: (d['config'] ?? {}) as never,
@@ -209,9 +212,11 @@ export class WorkflowVersionsService {
             })),
           },
         },
+        include: { destinations: true },
       });
     });
 
+    // Snapshot the restore as a new version (capture runs its own tx).
     await this.capture(
       workflowId,
       tenantId,
@@ -219,10 +224,13 @@ export class WorkflowVersionsService {
       `Restored from v${version}`,
     );
 
-    return this.prisma.workflow.findUnique({
-      where: { id: workflowId },
-      include: { destinations: true },
-    });
+    // Return fresh read inside tenant context (RLS-safe).
+    return this.prisma.withTenant(tenantId, (tx) =>
+      tx.workflow.findUnique({
+        where: { id: workflowId },
+        include: { destinations: true },
+      }),
+    );
   }
 
   async diff(

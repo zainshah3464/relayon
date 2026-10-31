@@ -21,4 +21,18 @@ export class PrismaService
   async onModuleDestroy(): Promise<void> {
     await this.$disconnect();
   }
+
+  /**
+   * Cross-tenant operations ONLY (e.g. schedule tick across all tenants).
+   * Uses `SET LOCAL ROLE` — Postgres auto-reverts on COMMIT/ROLLBACK.
+   * No RESET ROLE, no try/finally, so original errors aren't masked.
+   */
+  async withoutTenant<T>(
+    fn: (client: PrismaClient) => Promise<T>,
+  ): Promise<T> {
+    return this.$transaction(async (tx) => {
+      await tx.$executeRawUnsafe(`SET LOCAL ROLE relayon_system`);
+      return fn(tx as unknown as PrismaClient);
+    });
+  }
 }

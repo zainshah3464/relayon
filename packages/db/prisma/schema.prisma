@@ -8,10 +8,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ═══════════════════════════════════════════════════════════════
-// ENUMS
-// ═══════════════════════════════════════════════════════════════
-
 enum Plan {
   free
   pro
@@ -44,10 +40,6 @@ enum DestinationType {
   mongodb
 }
 
-// ═══════════════════════════════════════════════════════════════
-// CORE — TENANTS & USERS
-// ═══════════════════════════════════════════════════════════════
-
 model Tenant {
   id                    String   @id @default(uuid())
   name                  String
@@ -55,6 +47,7 @@ model Tenant {
   plan                  Plan     @default(free)
   quotaEventsPerMonth   Int      @default(10000) @map("quota_events_per_month")
   quotaAiTokensPerMonth Int      @default(100000) @map("quota_ai_tokens_per_month")
+  quotaMode             String   @default("hard") @map("quota_mode")
   currentPeriodStart    DateTime @default(now()) @map("current_period_start")
   createdAt             DateTime @default(now()) @map("created_at")
   updatedAt             DateTime @updatedAt @map("updated_at")
@@ -104,10 +97,6 @@ model RefreshToken {
   @@map("refresh_tokens")
 }
 
-// ═══════════════════════════════════════════════════════════════
-// WORKFLOWS & DESTINATIONS
-// ═══════════════════════════════════════════════════════════════
-
 model Workflow {
   id                  String     @id @default(uuid())
   tenantId            String     @map("tenant_id")
@@ -134,6 +123,7 @@ model Workflow {
 model Destination {
   id          String          @id @default(uuid())
   workflowId  String          @map("workflow_id")
+  tenantId    String          @map("tenant_id")
   type        DestinationType
   name        String
   config      Json            @default("{}")
@@ -150,12 +140,9 @@ model Destination {
   workflow Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
 
   @@index([workflowId])
+  @@index([tenantId])
   @@map("destinations")
 }
-
-// ═══════════════════════════════════════════════════════════════
-// API KEYS
-// ═══════════════════════════════════════════════════════════════
 
 model ApiKey {
   id          String    @id @default(uuid())
@@ -176,13 +163,10 @@ model ApiKey {
   @@map("api_keys")
 }
 
-// ═══════════════════════════════════════════════════════════════
-// SCHEDULES & VERSIONS
-// ═══════════════════════════════════════════════════════════════
-
 model WorkflowSchedule {
   id              String    @id @default(uuid())
   workflowId      String    @unique @map("workflow_id")
+  tenantId        String    @map("tenant_id")
   cronExpression  String    @map("cron_expression")
   timezone        String    @default("UTC")
   payloadTemplate Json      @default("{}") @map("payload_template")
@@ -195,6 +179,7 @@ model WorkflowSchedule {
   workflow Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
 
   @@index([isActive, nextRunAt])
+  @@index([tenantId])
   @@map("workflow_schedules")
 }
 
@@ -215,10 +200,6 @@ model WorkflowVersion {
   @@map("workflow_versions")
 }
 
-// ═══════════════════════════════════════════════════════════════
-// API KEY ROTATION AUDIT
-// ═══════════════════════════════════════════════════════════════
-
 model ApiKeyRotation {
   id         String   @id @default(uuid())
   tenantId   String   @map("tenant_id")
@@ -233,10 +214,6 @@ model ApiKeyRotation {
   @@index([tenantId, createdAt])
   @@map("api_key_rotations")
 }
-
-// ═══════════════════════════════════════════════════════════════
-// USAGE / QUOTA (v1.8)
-// ═══════════════════════════════════════════════════════════════
 
 model UsageCounter {
   tenantId  String   @map("tenant_id")

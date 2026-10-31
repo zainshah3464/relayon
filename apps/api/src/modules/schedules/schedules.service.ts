@@ -13,7 +13,9 @@ export class SchedulesService {
 
   async get(tenantId: string, workflowId: string) {
     await this.assertWorkflow(tenantId, workflowId);
-    return this.prisma.workflowSchedule.findUnique({ where: { workflowId } });
+    return this.prisma.withTenant(tenantId, (tx) =>
+      tx.workflowSchedule.findUnique({ where: { workflowId } }),
+    );
   }
 
   async upsert(tenantId: string, workflowId: string, dto: UpsertScheduleDto) {
@@ -22,14 +24,28 @@ export class SchedulesService {
     const timezone = dto.timezone ?? 'UTC';
     const nextRunAt = this.nextRun(dto.cronExpression, timezone);
 
-    const existing = await this.prisma.workflowSchedule.findUnique({
-      where: { workflowId },
-    });
-
-    if (existing) {
-      return this.prisma.workflowSchedule.update({
+    return this.prisma.withTenant(tenantId, async (tx) => {
+      const existing = await tx.workflowSchedule.findUnique({
         where: { workflowId },
+      });
+
+      if (existing) {
+        return tx.workflowSchedule.update({
+          where: { workflowId },
+          data: {
+            cronExpression: dto.cronExpression,
+            timezone,
+            payloadTemplate: (dto.payloadTemplate ?? {}) as never,
+            isActive: dto.isActive ?? true,
+            nextRunAt,
+          },
+        });
+      }
+
+      return tx.workflowSchedule.create({
         data: {
+          workflowId,
+          tenantId,
           cronExpression: dto.cronExpression,
           timezone,
           payloadTemplate: (dto.payloadTemplate ?? {}) as never,
@@ -37,36 +53,27 @@ export class SchedulesService {
           nextRunAt,
         },
       });
-    }
-
-    return this.prisma.workflowSchedule.create({
-      data: {
-        workflowId,
-        cronExpression: dto.cronExpression,
-        timezone,
-        payloadTemplate: (dto.payloadTemplate ?? {}) as never,
-        isActive: dto.isActive ?? true,
-        nextRunAt,
-      },
     });
   }
 
   async remove(tenantId: string, workflowId: string) {
     await this.assertWorkflow(tenantId, workflowId);
-    const existing = await this.prisma.workflowSchedule.findUnique({
-      where: { workflowId },
+    return this.prisma.withTenant(tenantId, async (tx) => {
+      const existing = await tx.workflowSchedule.findUnique({
+        where: { workflowId },
+      });
+      if (!existing) throw new NotFoundException('Schedule not found');
+      await tx.workflowSchedule.delete({ where: { workflowId } });
+      return { deleted: true, workflowId };
     });
-    if (!existing) throw new NotFoundException('Schedule not found');
-    await this.prisma.workflowSchedule.delete({ where: { workflowId } });
-    return { deleted: true, workflowId };
   }
 
   async runNow(tenantId: string, workflowId: string) {
     await this.assertWorkflow(tenantId, workflowId);
 
-    const schedule = await this.prisma.workflowSchedule.findUnique({
-      where: { workflowId },
-    });
+    const schedule = await this.prisma.withTenant(tenantId, (tx) =>
+      tx.workflowSchedule.findUnique({ where: { workflowId } }),
+    );
     if (!schedule) {
       throw new NotFoundException('No schedule configured for this workflow');
     }
@@ -97,10 +104,12 @@ export class SchedulesService {
 
     const body = (await res.json()) as Record<string, unknown>;
 
-    await this.prisma.workflowSchedule.update({
-      where: { workflowId },
-      data: { lastRunAt: new Date() },
-    });
+    await this.prisma.withTenant(tenantId, (tx) =>
+      tx.workflowSchedule.update({
+        where: { workflowId },
+        data: { lastRunAt: new Date() },
+      }),
+    );
 
     return {
       triggered: true,
@@ -119,54 +128,58 @@ export class SchedulesService {
     tenantId: string,
     active: boolean,
   ): Promise<{ updated: number }> {
-    const workflows = await this.prisma.workflow.findMany({
-      where: { tenantId },
-      select: { id: true },
-    });
-    const workflowIds = workflows.map((w) => w.id);
-
-    const schedules = await this.prisma.workflowSchedule.findMany({
-      where: { workflowId: { in: workflowIds } },
-    });
-
-    if (schedules.length === 0) return { updated: 0 };
-
-    if (!active) {
-      const result = await this.prisma.workflowSchedule.updateMany({
-        where: { workflowId: { in: workflowIds }, isActive: true },
-        data: { isActive: false },
+    return this.prisma.withTenant(tenantId, async (tx) => {
+      const workflows = await tx.workflow.findMany({
+        where: { tenantId },
+        select: { id: true },
       });
-      return { updated: result.count };
-    }
+      const workflowIds = workflows.map((w) => w.id);
 
-    // Resume: recompute nextRunAt per schedule
-    let updated = 0;
-    for (const s of schedules) {
-      if (s.isActive) continue;
-      const nextRunAt = this.nextRun(s.cronExpression, s.timezone);
-      await this.prisma.workflowSchedule.update({
-        where: { id: s.id },
-        data: { isActive: true, nextRunAt },
+      const schedules = await tx.workflowSchedule.findMany({
+        where: { workflowId: { in: workflowIds } },
       });
-      updated++;
-    }
-    return { updated };
+
+      if (schedules.length === 0) return { updated: 0 };
+
+      if (!active) {
+        const result = await tx.workflowSchedule.updateMany({
+          where: { workflowId: { in: workflowIds }, isActive: true },
+          data: { isActive: false },
+        });
+        return { updated: result.count };
+      }
+
+      // Resume: recompute nextRunAt per schedule
+      let updated = 0;
+      for (const s of schedules) {
+        if (s.isActive) continue;
+        const nextRunAt = this.nextRun(s.cronExpression, s.timezone);
+        await tx.workflowSchedule.update({
+          where: { id: s.id },
+          data: { isActive: true, nextRunAt },
+        });
+        updated++;
+      }
+      return { updated };
+    });
   }
 
   /**
    * Deletes ALL schedules for the tenant. Workflows are untouched.
    */
   async bulkDelete(tenantId: string): Promise<{ deleted: number }> {
-    const workflows = await this.prisma.workflow.findMany({
-      where: { tenantId },
-      select: { id: true },
-    });
-    if (workflows.length === 0) return { deleted: 0 };
+    return this.prisma.withTenant(tenantId, async (tx) => {
+      const workflows = await tx.workflow.findMany({
+        where: { tenantId },
+        select: { id: true },
+      });
+      if (workflows.length === 0) return { deleted: 0 };
 
-    const result = await this.prisma.workflowSchedule.deleteMany({
-      where: { workflowId: { in: workflows.map((w) => w.id) } },
+      const result = await tx.workflowSchedule.deleteMany({
+        where: { workflowId: { in: workflows.map((w) => w.id) } },
+      });
+      return { deleted: result.count };
     });
-    return { deleted: result.count };
   }
 
   /** Validates a cron expression and returns the next fire time. */
@@ -185,10 +198,12 @@ export class SchedulesService {
   }
 
   private async assertWorkflow(tenantId: string, workflowId: string) {
-    const wf = await this.prisma.workflow.findFirst({
-      where: { id: workflowId, tenantId },
-      select: { id: true },
-    });
+    const wf = await this.prisma.withTenant(tenantId, (tx) =>
+      tx.workflow.findFirst({
+        where: { id: workflowId, tenantId },
+        select: { id: true },
+      }),
+    );
     if (!wf) throw new NotFoundException('Workflow not found');
   }
 }

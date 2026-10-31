@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "type": "discord-community",
+  "displayName": "Discord (community)",
+  "version": "1.0.0",
+  "trust": "sandboxed",
+  "author": "community",
+  "description": "Community Discord adapter with markdown formatting",
+  "entrypoint": "index.js",
+  "fields": [
+    {
+      "key": "webhookUrl",
+      "label": "Discord webhook URL",
+      "type": "password",
+      "required": true,
+      "sensitive": true,
+      "placeholder": "https://discord.com/api/webhooks/..."
+    },
+    {
+      "key": "username",
+      "label": "Username",
+      "type": "text",
+      "required": false,
+      "placeholder": "Relayon"
+    }
+  ]
+}

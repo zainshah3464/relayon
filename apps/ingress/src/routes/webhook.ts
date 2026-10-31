@@ -54,12 +54,26 @@ async function handleWebhook(req: Request, res: Response): Promise<void> {
   res.setHeader('X-Quota-Limit', String(quota.limit));
   res.setHeader('X-Quota-Remaining', String(quota.remaining));
   res.setHeader('X-Quota-Reset', quota.resetAt);
+  res.setHeader('X-Quota-Mode', quota.mode);
+
+  if (quota.warning) {
+    res.setHeader(
+      'X-Quota-Warning',
+      `Usage at ${Math.round(
+        (quota.used / Math.max(quota.limit, 1)) * 100,
+      )}% — approaching limit`,
+    );
+  }
 
   if (!quota.allowed) {
-    throw new QuotaExceededError(
-      `Monthly event quota exceeded (${quota.limit}). Resets ${quota.resetAt.slice(0, 10)}.`,
-      quota.resetAt,
-    );
+    const message =
+      quota.mode === 'soft'
+        ? `Monthly event quota exceeded in soft mode (hard cap at ${
+            quota.limit * 2
+          }). Resets ${quota.resetAt.slice(0, 10)}.`
+        : `Monthly event quota exceeded (${quota.limit}). Resets ${quota.resetAt.slice(0, 10)}.`;
+
+    throw new QuotaExceededError(message, quota.resetAt);
   }
 
   const event: QueuedEvent = {

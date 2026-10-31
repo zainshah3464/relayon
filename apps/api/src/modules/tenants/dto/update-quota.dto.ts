@@ -1,4 +1,4 @@
-import { IsInt, IsOptional, Max, Min } from 'class-validator';
+import { IsIn, IsInt, IsOptional, Max, Min } from 'class-validator';
 
 export class UpdateQuotaDto {
   @IsOptional()
@@ -12,4 +12,8 @@ export class UpdateQuotaDto {
   @Min(0)
   @Max(1_000_000_000)
   aiTokensPerMonth?: number;
+
+  @IsOptional()
+  @IsIn(['hard', 'soft'])
+  quotaMode?: 'hard' | 'soft';
 }

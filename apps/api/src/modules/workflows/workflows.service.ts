@@ -50,25 +50,29 @@ export class WorkflowsService {
   ) {}
 
   async list(tenantId: string) {
-    return this.prisma.workflow.findMany({
-      where: { tenantId },
-      orderBy: { createdAt: 'desc' },
-      include: {
-        _count: { select: { destinations: true } },
-        schedule: {
-          select: { cronExpression: true, isActive: true, nextRunAt: true },
+    return this.prisma.withTenant(tenantId, (tx) =>
+      tx.workflow.findMany({
+        where: { tenantId },
+        orderBy: { createdAt: 'desc' },
+        include: {
+          _count: { select: { destinations: true } },
+          schedule: {
+            select: { cronExpression: true, isActive: true, nextRunAt: true },
+          },
         },
-      },
-    });
+      }),
+    );
   }
 
   async get(tenantId: string, id: string) {
-    const workflow = await this.prisma.workflow.findFirst({
-      where: { id, tenantId },
-      include: { destinations: true, schedule: true },
+    return this.prisma.withTenant(tenantId, async (tx) => {
+      const workflow = await tx.workflow.findFirst({
+        where: { id, tenantId },
+        include: { destinations: true, schedule: true },
+      });
+      if (!workflow) throw new NotFoundException('Workflow not found');
+      return workflow;
     });
-    if (!workflow) throw new NotFoundException('Workflow not found');
-    return workflow;
   }
 
   async create(
@@ -76,19 +80,21 @@ export class WorkflowsService {
     dto: CreateWorkflowDto,
     actorId: string | null,
   ) {
-    const created = await this.prisma.workflow.create({
-      data: {
-        tenantId,
-        name: dto.name,
-        sourceType: dto.sourceType,
-        sourceConfig: (dto.sourceConfig ?? {}) as Prisma.InputJsonValue,
-        enrichmentEnabled: dto.enrichmentEnabled ?? false,
-        enrichmentPrompt: dto.enrichmentPrompt,
-        transformExpression: dto.transformExpression,
-        routingRules: (dto.routingRules ?? []) as Prisma.InputJsonValue,
-        isActive: dto.isActive ?? true,
-      },
-    });
+    const created = await this.prisma.withTenant(tenantId, (tx) =>
+      tx.workflow.create({
+        data: {
+          tenantId,
+          name: dto.name,
+          sourceType: dto.sourceType,
+          sourceConfig: (dto.sourceConfig ?? {}) as Prisma.InputJsonValue,
+          enrichmentEnabled: dto.enrichmentEnabled ?? false,
+          enrichmentPrompt: dto.enrichmentPrompt,
+          transformExpression: dto.transformExpression,
+          routingRules: (dto.routingRules ?? []) as Prisma.InputJsonValue,
+          isActive: dto.isActive ?? true,
+        },
+      }),
+    );
 
     await this.versions.capture(created.id, tenantId, actorId, 'Initial version');
     return created;
@@ -102,29 +108,31 @@ export class WorkflowsService {
   ) {
     await this.get(tenantId, id);
 
-    const updated = await this.prisma.workflow.update({
-      where: { id },
-      data: {
-        ...(dto.name !== undefined && { name: dto.name }),
-        ...(dto.sourceType !== undefined && { sourceType: dto.sourceType }),
-        ...(dto.sourceConfig !== undefined && {
-          sourceConfig: dto.sourceConfig as Prisma.InputJsonValue,
-        }),
-        ...(dto.enrichmentEnabled !== undefined && {
-          enrichmentEnabled: dto.enrichmentEnabled,
-        }),
-        ...(dto.enrichmentPrompt !== undefined && {
-          enrichmentPrompt: dto.enrichmentPrompt,
-        }),
-        ...(dto.transformExpression !== undefined && {
-          transformExpression: dto.transformExpression,
-        }),
-        ...(dto.routingRules !== undefined && {
-          routingRules: dto.routingRules as Prisma.InputJsonValue,
-        }),
-        ...(dto.isActive !== undefined && { isActive: dto.isActive }),
-      },
-    });
+    const updated = await this.prisma.withTenant(tenantId, (tx) =>
+      tx.workflow.update({
+        where: { id },
+        data: {
+          ...(dto.name !== undefined && { name: dto.name }),
+          ...(dto.sourceType !== undefined && { sourceType: dto.sourceType }),
+          ...(dto.sourceConfig !== undefined && {
+            sourceConfig: dto.sourceConfig as Prisma.InputJsonValue,
+          }),
+          ...(dto.enrichmentEnabled !== undefined && {
+            enrichmentEnabled: dto.enrichmentEnabled,
+          }),
+          ...(dto.enrichmentPrompt !== undefined && {
+            enrichmentPrompt: dto.enrichmentPrompt,
+          }),
+          ...(dto.transformExpression !== undefined && {
+            transformExpression: dto.transformExpression,
+          }),
+          ...(dto.routingRules !== undefined && {
+            routingRules: dto.routingRules as Prisma.InputJsonValue,
+          }),
+          ...(dto.isActive !== undefined && { isActive: dto.isActive }),
+        },
+      }),
+    );
 
     await this.versions.capture(
       id,
@@ -138,7 +146,9 @@ export class WorkflowsService {
 
   async remove(tenantId: string, id: string) {
     await this.get(tenantId, id);
-    await this.prisma.workflow.delete({ where: { id } });
+    await this.prisma.withTenant(tenantId, (tx) =>
+      tx.workflow.delete({ where: { id } }),
+    );
     return { deleted: true, id };
   }
 
@@ -182,11 +192,13 @@ export class WorkflowsService {
   async exportAll(tenantId: string): Promise<
     Array<{ id: string; name: string; filename: string; yaml: string }>
   > {
-    const workflows = await this.prisma.workflow.findMany({
-      where: { tenantId },
-      select: { id: true, name: true },
-      orderBy: { createdAt: 'asc' },
-    });
+    const workflows = await this.prisma.withTenant(tenantId, (tx) =>
+      tx.workflow.findMany({
+        where: { tenantId },
+        select: { id: true, name: true },
+        orderBy: { createdAt: 'asc' },
+      }),
+    );
 
     const out: Array<{
       id: string;
@@ -262,10 +274,12 @@ export class WorkflowsService {
 
     // ── Upsert path ─────────────────────────────────────────────
     if (mode === 'upsert') {
-      const existing = await this.prisma.workflow.findFirst({
-        where: { tenantId, name },
-        select: { id: true },
-      });
+      const existing = await this.prisma.withTenant(tenantId, (tx) =>
+        tx.workflow.findFirst({
+          where: { tenantId, name },
+          select: { id: true },
+        }),
+      );
 
       if (existing) {
         await this.update(
@@ -284,18 +298,18 @@ export class WorkflowsService {
           actorId,
         );
 
-        await this.prisma.destination.deleteMany({
-          where: { workflowId: existing.id },
-        });
-
-        const created = await this.prisma.destination.createMany({
-          data: (spec.destinations ?? []).map((d) => ({
-            workflowId: existing.id,
-            type: d.type as never,
-            name: d.name,
-            config: (d.config ?? {}) as Prisma.InputJsonValue,
-            enabled: d.enabled ?? true,
-          })),
+        const created = await this.prisma.withTenant(tenantId, async (tx) => {
+          await tx.destination.deleteMany({ where: { workflowId: existing.id } });
+          return tx.destination.createMany({
+            data: (spec.destinations ?? []).map((d) => ({
+              workflowId: existing.id,
+              tenantId,
+              type: d.type as never,
+              name: d.name,
+              config: (d.config ?? {}) as Prisma.InputJsonValue,
+              enabled: d.enabled ?? true,
+            })),
+          });
         });
 
         return {
@@ -308,28 +322,31 @@ export class WorkflowsService {
     }
 
     // ── Create path ─────────────────────────────────────────────
-    const created = await this.prisma.workflow.create({
-      data: {
-        tenantId,
-        name,
-        sourceType: spec.sourceType as never,
-        sourceConfig: (spec.sourceConfig ?? {}) as Prisma.InputJsonValue,
-        enrichmentEnabled: spec.enrichmentEnabled ?? false,
-        enrichmentPrompt: spec.enrichmentPrompt ?? null,
-        transformExpression: spec.transformExpression ?? null,
-        routingRules: (spec.routingRules ?? []) as Prisma.InputJsonValue,
-        isActive: spec.isActive ?? true,
-        destinations: {
-          create: (spec.destinations ?? []).map((d) => ({
-            type: d.type as never,
-            name: d.name,
-            config: (d.config ?? {}) as Prisma.InputJsonValue,
-            enabled: d.enabled ?? true,
-          })),
+    const created = await this.prisma.withTenant(tenantId, (tx) =>
+      tx.workflow.create({
+        data: {
+          tenantId,
+          name,
+          sourceType: spec.sourceType as never,
+          sourceConfig: (spec.sourceConfig ?? {}) as Prisma.InputJsonValue,
+          enrichmentEnabled: spec.enrichmentEnabled ?? false,
+          enrichmentPrompt: spec.enrichmentPrompt ?? null,
+          transformExpression: spec.transformExpression ?? null,
+          routingRules: (spec.routingRules ?? []) as Prisma.InputJsonValue,
+          isActive: spec.isActive ?? true,
+          destinations: {
+            create: (spec.destinations ?? []).map((d) => ({
+              tenantId,
+              type: d.type as never,
+              name: d.name,
+              config: (d.config ?? {}) as Prisma.InputJsonValue,
+              enabled: d.enabled ?? true,
+            })),
+          },
         },
-      },
-      include: { _count: { select: { destinations: true } } },
-    });
+        include: { _count: { select: { destinations: true } } },
+      }),
+    );
 
     await this.versions.capture(
       created.id,

@@ -5,6 +5,7 @@ import {
   DESTINATION_ADAPTER_METADATA,
   type DestinationAdapterMetadata,
 } from './plugin.decorator';
+import { AdapterLoaderService } from './loader/adapter-loader.service';
 
 export interface RegisteredAdapter {
   instance: DeliveryAdapter;
@@ -20,6 +21,7 @@ export class AdapterRegistry implements OnModuleInit {
     private readonly discovery: DiscoveryService,
     private readonly scanner: MetadataScanner,
     private readonly reflector: Reflector,
+    private readonly external: AdapterLoaderService,
   ) {}
 
   onModuleInit(): void {
@@ -42,16 +44,12 @@ export class AdapterRegistry implements OnModuleInit {
       if (!meta) continue;
 
       if (typeof (instance as DeliveryAdapter).send !== 'function') {
-        this.logger.warn(
-          `Adapter ${className} has @DestinationAdapter but no send() method — skipped`,
-        );
+        this.logger.warn(`Adapter ${className} has no send() — skipped`);
         continue;
       }
 
       if (this.byType.has(meta.type)) {
-        this.logger.warn(
-          `Duplicate adapter type '${meta.type}' (${className}) — ignoring duplicate`,
-        );
+        this.logger.warn(`Duplicate adapter type '${meta.type}' — ignored`);
         continue;
       }
 
@@ -63,31 +61,54 @@ export class AdapterRegistry implements OnModuleInit {
     }
 
     if (this.byType.size === 0) {
-      this.logger.error('No destination adapters registered — delivery will fail');
+      this.logger.error('No built-in destination adapters registered');
     }
+
+    this.logger.log(
+      `Registry ready: ${this.byType.size} built-in + ${this.external.list().length} external`,
+    );
 
     void this.scanner;
   }
 
   get(type: string): RegisteredAdapter | null {
-    return this.byType.get(type) ?? null;
+    const builtin = this.byType.get(type);
+    if (builtin) return builtin;
+
+    const ext = this.external.get(type);
+    if (ext) {
+      return {
+        instance: ext,
+        meta: {
+          type,
+          displayName: type,
+          fields: [],
+        },
+      };
+    }
+    return null;
   }
 
-  list(): Array<{
-    type: string;
-    displayName: string;
-    fields: DestinationAdapterMetadata['fields'];
-    testPayload: unknown;
-  }> {
-    return Array.from(this.byType.values()).map((r) => ({
+  list() {
+    const builtins = Array.from(this.byType.values()).map((r) => ({
       type: r.meta.type,
       displayName: r.meta.displayName,
+      trust: 'builtin' as const,
+      version: '1.0.0',
+      source: 'builtin' as const,
       fields: r.meta.fields,
       testPayload: r.meta.testPayload ?? null,
     }));
+
+    const externals = this.external.list().map((e) => ({
+      ...e,
+      testPayload: null,
+    }));
+
+    return [...builtins, ...externals];
   }
 
   has(type: string): boolean {
-    return this.byType.has(type);
+    return this.byType.has(type) || this.external.get(type) !== null;
   }
 }

@@ -14,6 +14,7 @@ interface TenantInfo {
   plan: string;
   quotaEventsPerMonth: number;
   quotaAiTokensPerMonth: number;
+  quotaMode: 'hard' | 'soft';
 }
 
 type Tab = 'workspace' | 'api-keys';
@@ -99,6 +100,20 @@ type Tab = 'workspace' | 'api-keys';
                   />
                 </div>
               </div>
+              <div class="mt-3">
+                <label class="label">Enforcement mode</label>
+                <select
+                  [value]="quotaMode()"
+                  (change)="quotaMode.set($any($event.target).value)"
+                  class="input"
+                >
+                  <option value="hard">Hard — block at limit</option>
+                  <option value="soft">Soft — allow up to 2× with warnings</option>
+                </select>
+                <p class="text-xs text-muted mt-1">
+                  Soft mode sends <code>X-Quota-Warning</code> headers at 80%; hard ceiling at 2× prevents runaway costs.
+                </p>
+              </div>
               <div class="flex gap-2 mt-3">
                 <button (click)="saveQuota()" [disabled]="quotaSaving()" class="btn-primary text-xs">
                   {{ quotaSaving() ? 'Saving...' : 'Update quota' }}
@@ -113,6 +128,12 @@ type Tab = 'workspace' | 'api-keys';
               <h2 class="text-sm font-medium text-white mb-2">Quotas</h2>
               <p class="text-xs text-muted">Events/month: {{ t.quotaEventsPerMonth.toLocaleString() }}</p>
               <p class="text-xs text-muted">AI tokens/month: {{ t.quotaAiTokensPerMonth.toLocaleString() }}</p>
+              <p class="text-xs text-muted mt-1">
+                Mode: <span class="font-mono">{{ t.quotaMode }}</span>
+                @if (t.quotaMode === 'soft') {
+                  <span class="text-signal-amber">(soft — 2× hard ceiling with warnings)</span>
+                }
+              </p>
             </div>
           }
         }
@@ -137,6 +158,7 @@ export class SettingsComponent implements OnInit {
 
   quotaEvents = signal(0);
   quotaTokens = signal(0);
+  quotaMode = signal<'hard' | 'soft'>('hard');
   quotaSaving = signal(false);
   quotaSaved = signal(false);
 
@@ -151,6 +173,7 @@ export class SettingsComponent implements OnInit {
         this.form.patchValue({ name: t.name });
         this.quotaEvents.set(t.quotaEventsPerMonth);
         this.quotaTokens.set(t.quotaAiTokensPerMonth);
+        this.quotaMode.set(t.quotaMode === 'soft' ? 'soft' : 'hard');
       },
     });
   }
@@ -182,6 +205,7 @@ export class SettingsComponent implements OnInit {
       .updateQuota({
         eventsPerMonth: this.quotaEvents(),
         aiTokensPerMonth: this.quotaTokens(),
+        quotaMode: this.quotaMode(),
       })
       .subscribe({
         next: () => {

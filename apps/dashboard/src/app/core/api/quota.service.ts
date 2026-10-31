@@ -5,6 +5,7 @@ import { environment } from '../../../environments/environment';
 
 export interface QuotaSnapshot {
   period: string;
+  mode: 'hard' | 'soft';
   metrics: Record<
     'events' | 'ai_tokens' | 'deliveries',
     { used: number; limit: number; remaining: number; resetAt: string }
@@ -23,15 +24,18 @@ export class QuotaService {
   updateQuota(payload: {
     eventsPerMonth?: number;
     aiTokensPerMonth?: number;
+    quotaMode?: 'hard' | 'soft';
   }): Observable<{
     id: string;
     quotaEventsPerMonth: number;
     quotaAiTokensPerMonth: number;
+    quotaMode: string;
   }> {
     return this.http.patch<{
       id: string;
       quotaEventsPerMonth: number;
       quotaAiTokensPerMonth: number;
+      quotaMode: string;
     }>(`${this.base}/api/tenants/me/quota`, payload);
   }
 }

@@ -10,12 +10,21 @@ function getClient(): PrismaClient {
 }
 
 export type QuotaMetric = 'events' | 'ai_tokens';
+export type QuotaMode = 'hard' | 'soft';
+
+const SOFT_MODE_OVERSHOOT_MULTIPLIER = 2;
 
 export async function checkQuota(
   tenantId: string,
   metric: QuotaMetric,
   cost: number,
-): Promise<{ allowed: boolean; used: number; limit: number }> {
+): Promise<{
+  allowed: boolean;
+  used: number;
+  limit: number;
+  mode: QuotaMode;
+  effectiveLimit: number;
+}> {
   if (cost < 0 || !Number.isFinite(cost)) cost = 1;
   const prisma = getClient();
 
@@ -24,14 +33,31 @@ export async function checkQuota(
     select: {
       quotaEventsPerMonth: true,
       quotaAiTokensPerMonth: true,
+      quotaMode: true,
     },
   });
-  if (!tenant) return { allowed: false, used: 0, limit: 0 };
+  if (!tenant) {
+    return {
+      allowed: false,
+      used: 0,
+      limit: 0,
+      mode: 'hard',
+      effectiveLimit: 0,
+    };
+  }
 
   const limit =
     metric === 'ai_tokens'
       ? tenant.quotaAiTokensPerMonth
       : tenant.quotaEventsPerMonth;
+
+  const mode: QuotaMode =
+    tenant.quotaMode === 'soft' ? 'soft' : 'hard';
+
+  const effectiveLimit =
+    mode === 'soft'
+      ? Math.floor(limit * SOFT_MODE_OVERSHOOT_MULTIPLIER)
+      : limit;
 
   const now = new Date();
   const period = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
@@ -51,18 +77,30 @@ export async function checkQuota(
       WHERE tenant_id = ${tenantId}
         AND period = ${period}
         AND metric = ${metric}
-        AND count + ${cost} <= ${limit}
+        AND count + ${cost} <= ${effectiveLimit}
       RETURNING count
     `;
 
     if (rows.length > 0) {
-      return { allowed: true, used: Number(rows[0]!.count), limit };
+      return {
+        allowed: true,
+        used: Number(rows[0]!.count),
+        limit,
+        mode,
+        effectiveLimit,
+      };
     }
 
     const current = await tx.$queryRaw<Array<{ count: bigint }>>`
       SELECT count FROM usage_counters
       WHERE tenant_id = ${tenantId} AND period = ${period} AND metric = ${metric}
     `;
-    return { allowed: false, used: Number(current[0]?.count ?? 0n), limit };
+    return {
+      allowed: false,
+      used: Number(current[0]?.count ?? 0n),
+      limit,
+      mode,
+      effectiveLimit,
+    };
   });
 }

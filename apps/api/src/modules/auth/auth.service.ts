@@ -41,38 +41,44 @@ export class AuthService {
   async signup(dto: SignupDto): Promise<AuthResult> {
     const email = dto.email.toLowerCase();
 
-    const existing = await this.prisma.user.findUnique({ where: { email } });
+    // Email uniqueness — cross-tenant check via withoutTenant
+    const existing = await this.prisma.withoutTenant((c) =>
+      c.user.findUnique({ where: { email } }),
+    );
     if (existing) {
       throw new ConflictException('Email already in use');
     }
 
     const baseSlug = this.slugify(dto.tenantName);
-    const slugTaken = await this.prisma.tenant.findUnique({
-      where: { slug: baseSlug },
-    });
+    const slugTaken = await this.prisma.withoutTenant((c) =>
+      c.tenant.findUnique({ where: { slug: baseSlug } }),
+    );
     const finalSlug = slugTaken
       ? `${baseSlug}-${randomBytes(3).toString('hex')}`
       : baseSlug;
 
     const passwordHash = await bcrypt.hash(dto.password, 12);
 
-    const tenant = await this.prisma.tenant.create({
-      data: {
-        name: dto.tenantName,
-        slug: finalSlug,
-        users: {
-          create: {
-            email,
-            name: dto.name,
-            passwordHash,
-            role: 'owner',
-          },
-        },
-      },
-      include: { users: true },
-    });
+    // Tenant doesn't exist yet — use withoutTenant
+    const tenant = await this.prisma.withoutTenant((c) =>
+      c.tenant.create({
+        data: { name: dto.tenantName, slug: finalSlug },
+      }),
+    );
 
-    const user = tenant.users[0];
+    // Now tenant exists — use withTenant for user creation
+    const user = await this.prisma.withTenant(tenant.id, (tx) =>
+      tx.user.create({
+        data: {
+          tenantId: tenant.id,
+          email,
+          name: dto.name,
+          passwordHash,
+          role: 'owner',
+        },
+      }),
+    );
+
     this.logger.log(`New tenant signup: ${tenant.slug} (${user.email})`);
 
     return this.issueTokens({
@@ -89,10 +95,10 @@ export class AuthService {
   async login(dto: LoginDto): Promise<AuthResult> {
     const email = dto.email.toLowerCase();
 
-    const user = await this.prisma.user.findUnique({
-      where: { email },
-      include: { tenant: true },
-    });
+    // Email uniqueness global — cross-tenant lookup
+    const user = await this.prisma.withoutTenant((c) =>
+      c.user.findUnique({ where: { email }, include: { tenant: true } }),
+    );
 
     if (!user) {
       throw new UnauthorizedException('Invalid email or password');
@@ -103,10 +109,12 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password');
     }
 
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: { lastLoginAt: new Date() },
-    });
+    await this.prisma.withTenant(user.tenantId, (tx) =>
+      tx.user.update({
+        where: { id: user.id },
+        data: { lastLoginAt: new Date() },
+      }),
+    );
 
     return this.issueTokens({
       id: user.id,
@@ -122,10 +130,12 @@ export class AuthService {
   async refresh(refreshToken: string): Promise<AuthResult> {
     const tokenHash = this.hashToken(refreshToken);
 
-    const stored = await this.prisma.refreshToken.findUnique({
-      where: { tokenHash },
-      include: { user: { include: { tenant: true } } },
-    });
+    const stored = await this.prisma.withoutTenant((c) =>
+      c.refreshToken.findUnique({
+        where: { tokenHash },
+        include: { user: { include: { tenant: true } } },
+      }),
+    );
 
     if (!stored) {
       throw new UnauthorizedException('Invalid refresh token');
@@ -138,10 +148,12 @@ export class AuthService {
     }
 
     // Rotation: revoke old token immediately
-    await this.prisma.refreshToken.update({
-      where: { id: stored.id },
-      data: { revokedAt: new Date() },
-    });
+    await this.prisma.withTenant(stored.tenantId, (tx) =>
+      tx.refreshToken.update({
+        where: { id: stored.id },
+        data: { revokedAt: new Date() },
+      }),
+    );
 
     return this.issueTokens({
       id: stored.user.id,
@@ -156,27 +168,28 @@ export class AuthService {
 
   async logout(refreshToken: string): Promise<void> {
     const tokenHash = this.hashToken(refreshToken);
-    await this.prisma.refreshToken.updateMany({
-      where: { tokenHash, revokedAt: null },
-      data: { revokedAt: new Date() },
-    });
+    // Cross-tenant — token hash alone identifies tenant
+    await this.prisma.withoutTenant((c) =>
+      c.refreshToken.updateMany({
+        where: { tokenHash, revokedAt: null },
+        data: { revokedAt: new Date() },
+      }),
+    );
   }
 
-  private async issueTokens(
-    user: AuthResultUser,
-  ): Promise<AuthResult> {
-const accessToken = await this.jwt.signAsync(
-  {
-    sub: user.id,
-    email: user.email,
-    role: user.role,
-    tenantId: user.tenantId,
-  },
-  {
-    secret: this.config.getOrThrow<string>('JWT_SECRET'),
-    expiresIn: (this.config.get<string>('JWT_EXPIRES_IN') ?? '15m') as any,
-  },
-);
+  private async issueTokens(user: AuthResultUser): Promise<AuthResult> {
+    const accessToken = await this.jwt.signAsync(
+      {
+        sub: user.id,
+        email: user.email,
+        role: user.role,
+        tenantId: user.tenantId,
+      },
+      {
+        secret: this.config.getOrThrow<string>('JWT_SECRET'),
+        expiresIn: (this.config.get<string>('JWT_EXPIRES_IN') ?? '15m') as any,
+      },
+    );
 
     const refreshToken = randomBytes(48).toString('base64url');
     const tokenHash = this.hashToken(refreshToken);
@@ -184,14 +197,16 @@ const accessToken = await this.jwt.signAsync(
       this.config.get<string>('JWT_REFRESH_EXPIRES_IN') ?? '7d';
     const expiresAt = this.calculateExpiry(refreshExpiresIn);
 
-    await this.prisma.refreshToken.create({
-      data: {
-        userId: user.id,
-        tenantId: user.tenantId,
-        tokenHash,
-        expiresAt,
-      },
-    });
+    await this.prisma.withTenant(user.tenantId, (tx) =>
+      tx.refreshToken.create({
+        data: {
+          userId: user.id,
+          tenantId: user.tenantId,
+          tokenHash,
+          expiresAt,
+        },
+      }),
+    );
 
     return { accessToken, refreshToken, user };
   }

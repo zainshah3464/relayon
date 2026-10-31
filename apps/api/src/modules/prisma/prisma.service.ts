@@ -23,9 +23,8 @@ export class PrismaService
   }
 
   /**
-   * Runs `fn` inside a transaction with `app.tenant_id` set for the
-   * transaction. Required for any query against an RLS-enabled table.
-   * `set_config(..., true)` is transaction-local — safe with pooling.
+   * Tenant-scoped transaction. Required for ALL queries against
+   * RLS-enabled tables. `set_config(..., true)` is transaction-local.
    */
   async withTenant<T>(
     tenantId: string,
@@ -33,6 +32,32 @@ export class PrismaService
   ): Promise<T> {
     return this.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT set_config('app.tenant_id', ${tenantId}, true)`;
+      return fn(tx);
+    });
+  }
+
+  /**
+   * Cross-tenant operations ONLY. Temporarily assumes `relayon_system`
+   * role (BYPASSRLS + table grants) inside a transaction.
+   *
+   * Uses `SET LOCAL ROLE` (transaction-scoped) — Postgres automatically
+   * reverts the role on COMMIT/ROLLBACK. No `RESET ROLE` needed, and
+   * importantly NO try/finally: if `fn()` throws, we don't run a second
+   * failing statement that would mask the original error with 25P02
+   * "current transaction is aborted".
+   *
+   * Legitimate uses: schedule tick (all tenants), signup (tenant
+   * doesn't exist yet), API key prefix lookup (tenant unknown),
+   * refresh-token lookup by hash (tenant unknown).
+   *
+   * NEVER pass user-supplied tenant filters to this method without
+   * explicit WHERE tenant_id enforcement in the caller.
+   */
+  async withoutTenant<T>(
+    fn: (client: Prisma.TransactionClient) => Promise<T>,
+  ): Promise<T> {
+    return this.$transaction(async (tx) => {
+      await tx.$executeRawUnsafe(`SET LOCAL ROLE relayon_system`);
       return fn(tx);
     });
   }

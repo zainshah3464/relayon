@@ -42,10 +42,12 @@ export class DestinationsService {
 
   async list(tenantId: string, workflowId: string) {
     await this.assertWorkflow(tenantId, workflowId);
-    const rows = await this.prisma.destination.findMany({
-      where: { workflowId },
-      orderBy: { createdAt: 'asc' },
-    });
+    const rows = await this.prisma.withTenant(tenantId, (tx) =>
+      tx.destination.findMany({
+        where: { workflowId },
+        orderBy: { createdAt: 'asc' },
+      }),
+    );
     return rows.map((r) => this.toClient(r));
   }
 
@@ -62,23 +64,26 @@ export class DestinationsService {
         ? encryptConfigAll(config, tenantId)
         : encryptConfig(config, tenantId);
 
-    const created = await this.prisma.destination.create({
-      data: {
-        workflowId,
-        type: dto.type,
-        name: dto.name,
-        config: encrypted as never,
-        enabled: dto.enabled ?? true,
-      },
-    });
+    const created = await this.prisma.withTenant(tenantId, (tx) =>
+      tx.destination.create({
+        data: {
+          workflowId,
+          tenantId,
+          type: dto.type,
+          name: dto.name,
+          config: encrypted as never,
+          enabled: dto.enabled ?? true,
+        },
+      }),
+    );
 
     return this.toClient(created);
   }
 
   async update(tenantId: string, id: string, dto: UpdateDestinationDto) {
-    const dest = await this.prisma.destination.findFirst({
-      where: { id, workflow: { tenantId } },
-    });
+    const dest = await this.prisma.withTenant(tenantId, (tx) =>
+      tx.destination.findFirst({ where: { id, tenantId } }),
+    );
     if (!dest) throw new NotFoundException('Destination not found');
 
     let nextConfig: Record<string, unknown> | undefined;
@@ -100,24 +105,28 @@ export class DestinationsService {
       nextConfig = encryptionFn(merged, tenantId);
     }
 
-    const updated = await this.prisma.destination.update({
-      where: { id },
-      data: {
-        ...(dto.name !== undefined && { name: dto.name }),
-        ...(nextConfig !== undefined && { config: nextConfig as never }),
-        ...(dto.enabled !== undefined && { enabled: dto.enabled }),
-      },
-    });
+    const updated = await this.prisma.withTenant(tenantId, (tx) =>
+      tx.destination.update({
+        where: { id },
+        data: {
+          ...(dto.name !== undefined && { name: dto.name }),
+          ...(nextConfig !== undefined && { config: nextConfig as never }),
+          ...(dto.enabled !== undefined && { enabled: dto.enabled }),
+        },
+      }),
+    );
 
     return this.toClient(updated);
   }
 
   async remove(tenantId: string, id: string) {
-    const dest = await this.prisma.destination.findFirst({
-      where: { id, workflow: { tenantId } },
-    });
+    const dest = await this.prisma.withTenant(tenantId, (tx) =>
+      tx.destination.findFirst({ where: { id, tenantId } }),
+    );
     if (!dest) throw new NotFoundException('Destination not found');
-    await this.prisma.destination.delete({ where: { id } });
+    await this.prisma.withTenant(tenantId, (tx) =>
+      tx.destination.delete({ where: { id } }),
+    );
     return { deleted: true, id };
   }
 
@@ -244,19 +253,23 @@ export class DestinationsService {
     error: string | null,
   ): Promise<void> {
     if (!destinationId) return;
-    const owned = await this.prisma.destination.findFirst({
-      where: { id: destinationId, workflow: { tenantId } },
-      select: { id: true },
-    });
+    const owned = await this.prisma.withTenant(tenantId, (tx) =>
+      tx.destination.findFirst({
+        where: { id: destinationId, tenantId },
+        select: { id: true },
+      }),
+    );
     if (!owned) return;
-    await this.prisma.destination.update({
-      where: { id: destinationId },
-      data: {
-        lastValidatedAt: new Date(),
-        lastValidationOk: ok,
-        lastValidationError: error ? error.slice(0, 500) : null,
-      },
-    });
+    await this.prisma.withTenant(tenantId, (tx) =>
+      tx.destination.update({
+        where: { id: destinationId },
+        data: {
+          lastValidatedAt: new Date(),
+          lastValidationOk: ok,
+          lastValidationError: error ? error.slice(0, 500) : null,
+        },
+      }),
+    );
   }
 
   private requiredKeys(type: string): string[] {
@@ -322,10 +335,12 @@ export class DestinationsService {
   }
 
   private async assertWorkflow(tenantId: string, workflowId: string) {
-    const wf = await this.prisma.workflow.findFirst({
-      where: { id: workflowId, tenantId },
-      select: { id: true },
-    });
+    const wf = await this.prisma.withTenant(tenantId, (tx) =>
+      tx.workflow.findFirst({
+        where: { id: workflowId, tenantId },
+        select: { id: true },
+      }),
+    );
     if (!wf) throw new NotFoundException('Workflow not found');
   }
 }

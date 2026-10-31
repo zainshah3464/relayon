@@ -4,6 +4,7 @@ import { EgressController } from './egress.controller';
 import { EgressService } from './egress.service';
 import { CircuitBreakerService } from './circuit-breaker.service';
 import { AdapterRegistry } from './adapters/registry';
+import { AdapterLoaderService } from './adapters/loader/adapter-loader.service';
 import { HttpAdapter } from './adapters/http.adapter';
 import { SlackAdapter } from './adapters/slack.adapter';
 import { EmailAdapter } from './adapters/email.adapter';
@@ -20,6 +21,7 @@ import { MongoDbAdapter } from './adapters/mongodb.adapter';
   providers: [
     EgressService,
     CircuitBreakerService,
+    AdapterLoaderService,
     AdapterRegistry,
     HttpAdapter,
     SlackAdapter,
