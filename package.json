@@ -22,6 +22,10 @@
     "db:deploy": "npm run migrate:deploy --workspace=db",
     "db:studio": "npm run studio --workspace=db",
     "db:reset": "npm run reset --workspace=db",
+    "db:rls": "node scripts/apply-rls.mjs",
+    "workflows:pull": "node scripts/relayon-sync.mjs pull",
+    "workflows:validate": "node scripts/relayon-sync.mjs validate",
+    "workflows:push": "node scripts/relayon-sync.mjs push",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
@@ -29,8 +33,8 @@
     "deploy:db": "npm run db:deploy"
   },
   "dependencies": {
-    "prisma": "6.19.3",
-    "@prisma/client": "6.19.3"
+    "@prisma/client": "6.19.3",
+    "prisma": "6.19.3"
   },
   "allowScripts": {
     "@prisma/client@6.19.3": true,
@@ -42,7 +46,9 @@
     "msgpackr-extract@3.0.4": true,
     "@parcel/watcher@2.6.0": true
   },
-  "devDependencies": {},
+  "devDependencies": {
+    "js-yaml": "^4.1.0"
+  },
   "engines": {
     "node": ">=20.0.0"
   }

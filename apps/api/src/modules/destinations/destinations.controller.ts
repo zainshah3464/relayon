@@ -42,8 +42,22 @@ export class DestinationsController {
       if (!res.ok) {
         return { adapters: [], warning: `Workers returned ${res.status}` };
       }
-      const body = (await res.json()) as { adapters?: unknown[] };
-      return body;
+
+      const body: unknown = await res.json();
+
+      // Workers can return either:
+      //   1. Raw array: [adapter1, adapter2, ...]   (current registry.list())
+      //   2. Wrapped:   { adapters: [...] }         (future-proof)
+      // Normalize to { adapters: [] } so the dashboard always works.
+      const adapters = Array.isArray(body)
+        ? body
+        : body &&
+          typeof body === 'object' &&
+          Array.isArray((body as { adapters?: unknown[] }).adapters)
+        ? (body as { adapters: unknown[] }).adapters
+        : [];
+
+      return { adapters };
     } catch (err) {
       return {
         adapters: [],

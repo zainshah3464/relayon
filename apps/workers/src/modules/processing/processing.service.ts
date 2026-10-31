@@ -416,21 +416,47 @@ export class ProcessingService {
 
     if (workflow.enrichmentEnabled) {
       try {
-        const enrich: EnrichmentResult = await this.groq.enrich({
-          workflowId: workflow.id,
-          prompt: workflow.enrichmentPrompt,
-          payload: event.rawPayload,
-        });
-        enrichedPayload = enrich.enrichedPayload;
-        enrichmentMeta = {
-          enabled: true,
-          cached: enrich.cached,
-          model: enrich.model,
-          durationMs: enrich.durationMs,
-          error: null,
-        };
-        if (enrich.cached) result.breakdown.enrichmentCacheHits++;
-        else result.breakdown.enriched++;
+        // ── AI token quota check (before Groq call) ─────────────
+        const { checkQuota } = await import('../../lib/quota');
+        const estimatedTokens =
+          Math.ceil(JSON.stringify(event.rawPayload).length / 4) + 1024;
+
+        const quota = await checkQuota(
+          event.tenantId,
+          'ai_tokens',
+          estimatedTokens,
+        );
+
+        if (!quota.allowed) {
+          this.logger.warn(
+            `ai_quota_exceeded tenant=${event.tenantId} used=${quota.used}/${quota.limit}`,
+          );
+          result.breakdown.enrichmentFailures++;
+          enrichmentMeta = {
+            enabled: true,
+            cached: false,
+            model: null,
+            durationMs: 0,
+            error: `Monthly AI token quota exceeded (${quota.limit})`,
+          };
+          // Skip Groq call — event still routes without enrichment
+        } else {
+          const enrich: EnrichmentResult = await this.groq.enrich({
+            workflowId: workflow.id,
+            prompt: workflow.enrichmentPrompt,
+            payload: event.rawPayload,
+          });
+          enrichedPayload = enrich.enrichedPayload;
+          enrichmentMeta = {
+            enabled: true,
+            cached: enrich.cached,
+            model: enrich.model,
+            durationMs: enrich.durationMs,
+            error: null,
+          };
+          if (enrich.cached) result.breakdown.enrichmentCacheHits++;
+          else result.breakdown.enriched++;
+        }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         this.logger.warn(`enrichment.failed ${event.correlationId}: ${msg}`);

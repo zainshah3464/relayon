@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
 import { AnalyticsService, Overview } from '../../core/api/analytics.service';
+import { QuotaService, QuotaSnapshot } from '../../core/api/quota.service';
 
 @Component({
   selector: 'app-dashboard',
@@ -45,6 +46,35 @@ import { AnalyticsService, Overview } from '../../core/api/analytics.service';
         </div>
       </div>
 
+      @if (quota(); as q) {
+        <div class="card">
+          <div class="flex justify-between items-center mb-3">
+            <h2 class="text-sm font-medium text-white">Monthly usage</h2>
+            <span class="text-xs text-muted">{{ q.period }}</span>
+          </div>
+          <div class="grid gap-3 sm:grid-cols-2">
+            <div>
+              <div class="flex justify-between text-xs mb-1">
+                <span class="text-muted">Events</span>
+                <span class="text-white">{{ q.metrics.events.used }} / {{ q.metrics.events.limit }}</span>
+              </div>
+              <div class="h-1.5 rounded-full bg-surface-2 overflow-hidden">
+                <div class="h-full bg-relay-violet" [style.width.%]="Math.min(100, q.metrics.events.used / Math.max(q.metrics.events.limit, 1) * 100)"></div>
+              </div>
+            </div>
+            <div>
+              <div class="flex justify-between text-xs mb-1">
+                <span class="text-muted">AI tokens</span>
+                <span class="text-white">{{ q.metrics.ai_tokens.used }} / {{ q.metrics.ai_tokens.limit }}</span>
+              </div>
+              <div class="h-1.5 rounded-full bg-surface-2 overflow-hidden">
+                <div class="h-full bg-relay-cyan" [style.width.%]="Math.min(100, q.metrics.ai_tokens.used / Math.max(q.metrics.ai_tokens.limit, 1) * 100)"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      }
+
       <div class="grid gap-4 md:grid-cols-2">
         <a routerLink="/workflows" class="card block hover:bg-surface-2 transition">
           <div class="flex items-center gap-3">
@@ -79,10 +109,13 @@ import { AnalyticsService, Overview } from '../../core/api/analytics.service';
   `,
 })
 export class DashboardComponent implements OnInit {
-  auth = inject(AuthService);
+  readonly auth = inject(AuthService);
   private analytics = inject(AnalyticsService);
+  private quotaSvc = inject(QuotaService);
 
+  readonly Math = Math;
   stats = signal<Overview | null>(null);
+  quota = signal<QuotaSnapshot | null>(null);
 
   readonly hasData = computed(() => (this.stats()?.events24h ?? 0) > 0);
 
@@ -90,6 +123,10 @@ export class DashboardComponent implements OnInit {
     this.analytics.overview().subscribe({
       next: (o) => this.stats.set(o),
       error: () => this.stats.set(null),
+    });
+    this.quotaSvc.snapshot().subscribe({
+      next: (q) => this.quota.set(q),
+      error: () => this.quota.set(null),
     });
   }
 }

@@ -40,3 +40,9 @@ export class PayloadTooLargeError extends ApiError {
     super(413, 'payload_too_large', message);
   }
 }
+
+export class QuotaExceededError extends ApiError {
+  constructor(message: string, public readonly resetAt: string) {
+    super(429, 'quota_exceeded', message);
+  }
+}

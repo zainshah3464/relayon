@@ -7,16 +7,12 @@ import { enforceRateLimit } from '../middleware/rateLimit';
 import { enqueueEvent, type QueuedEvent } from '../lib/queue';
 import { hashIp } from '../lib/hash';
 import { config } from '../config';
-import { BadRequestError } from '../lib/errors';
+import { BadRequestError, QuotaExceededError } from '../lib/errors';
+import { checkEventQuota } from '../lib/quota';
 import { logger } from '../lib/logger';
 
 export const webhookRouter = Router();
 
-/**
- * Assign a correlation ID to every request. Included in responses and
- * all logs, so a webhook can be traced end-to-end across ingress,
- * workers, and egress.
- */
 webhookRouter.use((req, _res, next) => {
   const existing = req.headers['x-correlation-id'];
   req.correlationId =
@@ -26,16 +22,6 @@ webhookRouter.use((req, _res, next) => {
   next();
 });
 
-/**
- * POST /webhook/:tenantId/:workflowId
- *
- * Middleware chain:
- *   1. resolveWorkflow   — loads + validates workflow from DB
- *   2. enforceSignature  — validates HMAC per source type
- *   3. enforceIdempotency — 200 if duplicate, else marks as seen
- *   4. enforceRateLimit  — 429 if workflow exceeds quota
- *   5. handler           — enqueues event, returns 202
- */
 webhookRouter.post(
   '/:tenantId/:workflowId',
   resolveWorkflow,
@@ -59,6 +45,21 @@ async function handleWebhook(req: Request, res: Response): Promise<void> {
     Buffer.isBuffer(payload)
   ) {
     throw new BadRequestError('Payload must be a JSON object');
+  }
+
+  // ── Quota check (atomic decrement, RLS-safe) ────────────────
+  const quota = await checkEventQuota(workflow.tenantId, 1);
+
+  res.setHeader('X-Quota-Metric', 'events');
+  res.setHeader('X-Quota-Limit', String(quota.limit));
+  res.setHeader('X-Quota-Remaining', String(quota.remaining));
+  res.setHeader('X-Quota-Reset', quota.resetAt);
+
+  if (!quota.allowed) {
+    throw new QuotaExceededError(
+      `Monthly event quota exceeded (${quota.limit}). Resets ${quota.resetAt.slice(0, 10)}.`,
+      quota.resetAt,
+    );
   }
 
   const event: QueuedEvent = {

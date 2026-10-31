@@ -33,12 +33,12 @@ export class UpdateWorkflowDto {
   @IsOptional()
   @IsString()
   @MaxLength(2000)
-  enrichmentPrompt?: string;
+  enrichmentPrompt?: string | null;
 
   @IsOptional()
   @IsString()
   @MaxLength(2000)
-  transformExpression?: string;
+  transformExpression?: string | null;
 
   @IsOptional()
   @IsArray()

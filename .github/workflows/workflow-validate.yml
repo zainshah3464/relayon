@@ -1,0 +1,23 @@
+name: Validate workflows
+
+on:
+  pull_request:
+    paths:
+      - 'workflows/**'
+  push:
+    branches: [main]
+    paths:
+      - 'workflows/**'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install validator deps
+        run: npm install --no-save js-yaml
+      - name: Validate workflow YAML
+        run: node scripts/relayon-sync.mjs validate

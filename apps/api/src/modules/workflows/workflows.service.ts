@@ -179,11 +179,51 @@ export class WorkflowsService {
     return dump(doc, { noRefs: true, lineWidth: 120 });
   }
 
+  async exportAll(tenantId: string): Promise<
+    Array<{ id: string; name: string; filename: string; yaml: string }>
+  > {
+    const workflows = await this.prisma.workflow.findMany({
+      where: { tenantId },
+      select: { id: true, name: true },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    const out: Array<{
+      id: string;
+      name: string;
+      filename: string;
+      yaml: string;
+    }> = [];
+
+    for (const wf of workflows) {
+      const yaml = await this.exportYaml(tenantId, wf.id);
+      const slug = wf.name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '')
+        .slice(0, 50);
+      out.push({
+        id: wf.id,
+        name: wf.name,
+        filename: `${slug || 'workflow'}-${wf.id.slice(0, 8)}.yaml`,
+        yaml,
+      });
+    }
+
+    return out;
+  }
+
   async importYaml(
     tenantId: string,
     yamlText: string,
     actorId: string | null,
-  ): Promise<{ id: string; name: string; destinationsCreated: number }> {
+    mode: 'create' | 'upsert' = 'create',
+  ): Promise<{
+    id: string;
+    name: string;
+    destinationsCreated: number;
+    updated: boolean;
+  }> {
     let parsed: unknown;
     try {
       parsed = load(yamlText);
@@ -220,6 +260,54 @@ export class WorkflowsService {
       );
     }
 
+    // ── Upsert path ─────────────────────────────────────────────
+    if (mode === 'upsert') {
+      const existing = await this.prisma.workflow.findFirst({
+        where: { tenantId, name },
+        select: { id: true },
+      });
+
+      if (existing) {
+        await this.update(
+          tenantId,
+          existing.id,
+          {
+            name,
+            sourceType: spec.sourceType as never,
+            sourceConfig: (spec.sourceConfig ?? {}) as Record<string, unknown>,
+            enrichmentEnabled: spec.enrichmentEnabled ?? false,
+            enrichmentPrompt: spec.enrichmentPrompt ?? null,
+            transformExpression: spec.transformExpression ?? null,
+            routingRules: spec.routingRules ?? [],
+            isActive: spec.isActive ?? true,
+          },
+          actorId,
+        );
+
+        await this.prisma.destination.deleteMany({
+          where: { workflowId: existing.id },
+        });
+
+        const created = await this.prisma.destination.createMany({
+          data: (spec.destinations ?? []).map((d) => ({
+            workflowId: existing.id,
+            type: d.type as never,
+            name: d.name,
+            config: (d.config ?? {}) as Prisma.InputJsonValue,
+            enabled: d.enabled ?? true,
+          })),
+        });
+
+        return {
+          id: existing.id,
+          name,
+          destinationsCreated: created.count,
+          updated: true,
+        };
+      }
+    }
+
+    // ── Create path ─────────────────────────────────────────────
     const created = await this.prisma.workflow.create({
       data: {
         tenantId,
@@ -254,6 +342,7 @@ export class WorkflowsService {
       id: created.id,
       name: created.name,
       destinationsCreated: created._count.destinations,
+      updated: false,
     };
   }
 

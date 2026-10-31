@@ -64,6 +64,7 @@ model Tenant {
   refreshTokens   RefreshToken[]
   apiKeys         ApiKey[]
   apiKeyRotations ApiKeyRotation[]
+  usageCounters   UsageCounter[]
 
   @@map("tenants")
 }
@@ -231,4 +232,22 @@ model ApiKeyRotation {
 
   @@index([tenantId, createdAt])
   @@map("api_key_rotations")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// USAGE / QUOTA (v1.8)
+// ═══════════════════════════════════════════════════════════════
+
+model UsageCounter {
+  tenantId  String   @map("tenant_id")
+  period    String
+  metric    String
+  count     BigInt   @default(0)
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@id([tenantId, period, metric])
+  @@index([tenantId, period])
+  @@map("usage_counters")
 }

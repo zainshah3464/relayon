@@ -25,6 +25,7 @@ import {
 import { CreateWorkflowDto } from './dto/create-workflow.dto';
 import { UpdateWorkflowDto } from './dto/update-workflow.dto';
 import { TestRunDto } from './dto/test-run.dto';
+import { ImportWorkflowDto } from './dto/import-mode.dto';
 
 @Controller('workflows')
 @UseGuards(JwtOrApiKeyGuard)
@@ -38,6 +39,13 @@ export class WorkflowsController {
   @RequireScopes('workflows:read')
   list(@CurrentUser() user: JwtUser) {
     return this.workflows.list(user.tenantId);
+  }
+
+  @Get('export-all')
+  @RequireScopes('workflows:read')
+  async exportAll(@CurrentUser() user: JwtUser) {
+    const workflows = await this.workflows.exportAll(user.tenantId);
+    return { workflows };
   }
 
   @Get(':id')
@@ -87,8 +95,13 @@ export class WorkflowsController {
 
   @Post('import')
   @RequireScopes('workflows:write')
-  import(@CurrentUser() user: JwtUser, @Body() body: { yaml: string }) {
-    return this.workflows.importYaml(user.tenantId, body.yaml ?? '', user.sub);
+  import(@CurrentUser() user: JwtUser, @Body() dto: ImportWorkflowDto) {
+    return this.workflows.importYaml(
+      user.tenantId,
+      dto.yaml,
+      user.sub,
+      dto.mode ?? 'create',
+    );
   }
 
   @Post(':id/preview-transform')

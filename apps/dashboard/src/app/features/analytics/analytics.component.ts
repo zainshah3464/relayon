@@ -7,6 +7,7 @@ import {
   CostAnalytics,
   TimeSeriesResponse,
 } from '../../core/api/analytics.service';
+import { QuotaService, QuotaSnapshot } from '../../core/api/quota.service';
 import { TimeSeriesChartComponent } from '../../shared/charts/time-series-chart.component';
 
 type Range = '24h' | '7d' | '30d';
@@ -112,20 +113,57 @@ type Range = '24h' | '7d' | '30d';
             }
           </div>
         }
+
+        @if (quota(); as q) {
+          <div class="card">
+            <h2 class="text-lg font-semibold text-white mb-4">Usage — {{ q.period }}</h2>
+            <div class="space-y-3">
+              @for (key of quotaKeys; track key) {
+                @if (q.metrics[key]; as m) {
+                  <div>
+                    <div class="flex justify-between text-xs mb-1">
+                      <span class="text-white font-medium capitalize">{{ key.split('_').join(' ') }}</span>
+                      <span class="text-muted">{{ m.used }} / {{ m.limit }}</span>
+                    </div>
+                    <div class="h-2 rounded-full bg-surface-2 overflow-hidden">
+                      <div
+                        class="h-full transition-all"
+                        [class.bg-signal-green]="m.used / m.limit < 0.7"
+                        [class.bg-signal-amber]="m.used / m.limit >= 0.7 && m.used / m.limit < 0.9"
+                        [class.bg-signal-rose]="m.used / m.limit >= 0.9"
+                        [style.width.%]="Math.min(100, (m.used / Math.max(m.limit, 1)) * 100)"
+                      ></div>
+                    </div>
+                    <p class="text-xs text-muted mt-1">Resets {{ m.resetAt | date: 'mediumDate' }}</p>
+                  </div>
+                }
+              }
+            </div>
+          </div>
+        }
       }
     </div>
   `,
 })
 export class AnalyticsComponent implements OnInit {
   private svc = inject(AnalyticsService);
+  private quotaSvc = inject(QuotaService);
 
+  readonly Math = Math;
   readonly ranges: Range[] = ['24h', '7d', '30d'];
+  readonly quotaKeys: Array<'events' | 'ai_tokens' | 'deliveries'> = [
+    'events',
+    'ai_tokens',
+    'deliveries',
+  ];
+
   range = signal<Range>('24h');
 
   overview = signal<Overview | null>(null);
   delivery = signal<DeliveryStats | null>(null);
   cost = signal<CostAnalytics | null>(null);
   series = signal<TimeSeriesResponse | null>(null);
+  quota = signal<QuotaSnapshot | null>(null);
   loading = signal(true);
   error = signal<string | null>(null);
 
@@ -151,7 +189,7 @@ export class AnalyticsComponent implements OnInit {
             this.svc.cost().subscribe({
               next: (c) => {
                 this.cost.set(c);
-                this.loadSeries();
+                this.loadQuotaAndSeries();
               },
               error: (err) => {
                 this.error.set(err?.error?.message ?? 'Failed to load cost analytics');
@@ -168,6 +206,19 @@ export class AnalyticsComponent implements OnInit {
       error: (err) => {
         this.error.set(err?.error?.message ?? 'Failed to load overview');
         this.loading.set(false);
+      },
+    });
+  }
+
+  private loadQuotaAndSeries(): void {
+    this.quotaSvc.snapshot().subscribe({
+      next: (q) => {
+        this.quota.set(q);
+        this.loadSeries();
+      },
+      error: () => {
+        this.quota.set(null);
+        this.loadSeries();
       },
     });
   }

@@ -73,85 +73,101 @@ export class WorkflowVersionsService {
     actorId: string | null,
     message: string | null,
   ): Promise<void> {
-    const workflow = await this.prisma.workflow.findFirst({
-      where: { id: workflowId, tenantId },
-      include: { destinations: true },
-    });
-    if (!workflow) return;
-
-    const last = await this.prisma.workflowVersion.findFirst({
-      where: { workflowId },
-      orderBy: { version: 'desc' },
-      select: { version: true },
-    });
-
-    const nextVersion = (last?.version ?? 0) + 1;
-
-    const snapshot = {
-      name: workflow.name,
-      sourceType: workflow.sourceType,
-      sourceConfig: workflow.sourceConfig,
-      enrichmentEnabled: workflow.enrichmentEnabled,
-      enrichmentPrompt: workflow.enrichmentPrompt,
-      transformExpression: workflow.transformExpression,
-      routingRules: workflow.routingRules,
-      isActive: workflow.isActive,
-      destinations: workflow.destinations.map((d) => ({
-        type: d.type,
-        name: d.name,
-        config: d.config,
-        enabled: d.enabled,
-        retryPolicy: d.retryPolicy,
-      })),
-    };
-
-    await this.prisma.workflowVersion.create({
-      data: {
-        workflowId,
-        tenantId,
-        version: nextVersion,
-        snapshot: snapshot as never,
-        message,
-        createdBy: actorId,
-      },
-    });
-
-    const excess = await this.prisma.workflowVersion.findMany({
-      where: { workflowId },
-      orderBy: { version: 'desc' },
-      skip: MAX_VERSIONS_PER_WORKFLOW,
-      select: { id: true },
-    });
-
-    if (excess.length > 0) {
-      await this.prisma.workflowVersion.deleteMany({
-        where: { id: { in: excess.map((v) => v.id) } },
+    await this.prisma.withTenant(tenantId, async (tx) => {
+      const workflow = await tx.workflow.findFirst({
+        where: { id: workflowId, tenantId },
+        include: { destinations: true },
       });
-    }
+      if (!workflow) return;
+
+      const last = await tx.workflowVersion.findFirst({
+        where: { workflowId },
+        orderBy: { version: 'desc' },
+        select: { version: true },
+      });
+
+      const nextVersion = (last?.version ?? 0) + 1;
+
+      const snapshot = {
+        name: workflow.name,
+        sourceType: workflow.sourceType,
+        sourceConfig: workflow.sourceConfig,
+        enrichmentEnabled: workflow.enrichmentEnabled,
+        enrichmentPrompt: workflow.enrichmentPrompt,
+        transformExpression: workflow.transformExpression,
+        routingRules: workflow.routingRules,
+        isActive: workflow.isActive,
+        destinations: workflow.destinations.map((d) => ({
+          type: d.type,
+          name: d.name,
+          config: d.config,
+          enabled: d.enabled,
+          retryPolicy: d.retryPolicy,
+        })),
+      };
+
+      await tx.workflowVersion.create({
+        data: {
+          workflowId,
+          tenantId,
+          version: nextVersion,
+          snapshot: snapshot as never,
+          message,
+          createdBy: actorId,
+        },
+      });
+
+      const excess = await tx.workflowVersion.findMany({
+        where: { workflowId },
+        orderBy: { version: 'desc' },
+        skip: MAX_VERSIONS_PER_WORKFLOW,
+        select: { id: true },
+      });
+
+      if (excess.length > 0) {
+        await tx.workflowVersion.deleteMany({
+          where: { id: { in: excess.map((v) => v.id) } },
+        });
+      }
+    });
   }
 
   async list(tenantId: string, workflowId: string): Promise<VersionSummary[]> {
-    await this.assertOwnership(tenantId, workflowId);
-    return this.prisma.workflowVersion.findMany({
-      where: { workflowId, tenantId },
-      orderBy: { version: 'desc' },
-      select: {
-        id: true,
-        version: true,
-        message: true,
-        createdBy: true,
-        createdAt: true,
-      },
+    return this.prisma.withTenant(tenantId, async (tx) => {
+      const wf = await tx.workflow.findFirst({
+        where: { id: workflowId, tenantId },
+        select: { id: true },
+      });
+      if (!wf) throw new NotFoundException('Workflow not found');
+
+      return tx.workflowVersion.findMany({
+        where: { workflowId, tenantId },
+        orderBy: { version: 'desc' },
+        select: {
+          id: true,
+          version: true,
+          message: true,
+          createdBy: true,
+          createdAt: true,
+        },
+      });
     });
   }
 
   async get(tenantId: string, workflowId: string, version: number) {
-    await this.assertOwnership(tenantId, workflowId);
-    const row = await this.prisma.workflowVersion.findFirst({
-      where: { workflowId, tenantId, version },
+    return this.prisma.withTenant(tenantId, async (tx) => {
+      const wf = await tx.workflow.findFirst({
+        where: { id: workflowId, tenantId },
+        select: { id: true },
+      });
+      if (!wf) throw new NotFoundException('Workflow not found');
+
+      const row = await tx.workflowVersion.findFirst({
+        where: { workflowId, tenantId, version },
+      });
+      if (!row) throw new NotFoundException(`Version ${version} not found`);
+      return row;
     });
-    if (!row) throw new NotFoundException(`Version ${version} not found`);
-    return row;
   }
 
   async restore(
@@ -167,7 +183,7 @@ export class WorkflowVersionsService {
       ? (snap['destinations'] as Array<Record<string, unknown>>)
       : [];
 
-    await this.prisma.$transaction(async (tx) => {
+    await this.prisma.withTenant(tenantId, async (tx) => {
       await tx.destination.deleteMany({ where: { workflowId } });
 
       await tx.workflow.update({
@@ -215,19 +231,8 @@ export class WorkflowVersionsService {
     fromVersion: number,
     toVersion: number,
   ): Promise<VersionDiffResult> {
-    await this.assertOwnership(tenantId, workflowId);
-
-    const [fromRow, toRow] = await Promise.all([
-      this.prisma.workflowVersion.findFirst({
-        where: { workflowId, tenantId, version: fromVersion },
-      }),
-      this.prisma.workflowVersion.findFirst({
-        where: { workflowId, tenantId, version: toVersion },
-      }),
-    ]);
-
-    if (!fromRow) throw new NotFoundException(`Version ${fromVersion} not found`);
-    if (!toRow) throw new NotFoundException(`Version ${toVersion} not found`);
+    const fromRow = await this.get(tenantId, workflowId, fromVersion);
+    const toRow = await this.get(tenantId, workflowId, toVersion);
 
     const fromText = JSON.stringify(fromRow.snapshot, null, 2);
     const toText = JSON.stringify(toRow.snapshot, null, 2);
@@ -343,13 +348,5 @@ export class WorkflowVersionsService {
     }
 
     return rows;
-  }
-
-  private async assertOwnership(tenantId: string, workflowId: string) {
-    const wf = await this.prisma.workflow.findFirst({
-      where: { id: workflowId, tenantId },
-      select: { id: true },
-    });
-    if (!wf) throw new NotFoundException('Workflow not found');
   }
 }

@@ -1,6 +1,10 @@
 import { Component, input } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormGroup, ReactiveFormsModule } from '@angular/forms';
+import {
+  FormControl,
+  FormGroup,
+  ReactiveFormsModule,
+} from '@angular/forms';
 import type { SchemaField } from './schema-form.types';
 
 @Component({
@@ -22,7 +26,7 @@ import type { SchemaField } from './schema-form.types';
             @case ('textarea') {
               <textarea
                 [id]="'field-' + field.key"
-                [formControlName]="field.key"
+                [formControl]="control(field.key)"
                 rows="4"
                 class="input font-mono text-xs"
                 [placeholder]="field.placeholder ?? ''"
@@ -31,7 +35,7 @@ import type { SchemaField } from './schema-form.types';
             @case ('json') {
               <textarea
                 [id]="'field-' + field.key"
-                [formControlName]="field.key"
+                [formControl]="control(field.key)"
                 rows="3"
                 class="input font-mono text-xs"
                 [placeholder]="field.placeholder ?? ''"
@@ -42,7 +46,7 @@ import type { SchemaField } from './schema-form.types';
                 <input
                   [id]="'field-' + field.key"
                   type="checkbox"
-                  [formControlName]="field.key"
+                  [formControl]="control(field.key)"
                   class="rounded border-hairline"
                 />
                 <span>{{ field.help ?? 'Enable' }}</span>
@@ -51,7 +55,7 @@ import type { SchemaField } from './schema-form.types';
             @case ('select') {
               <select
                 [id]="'field-' + field.key"
-                [formControlName]="field.key"
+                [formControl]="control(field.key)"
                 class="input"
               >
                 @if (!field.required) {
@@ -66,7 +70,7 @@ import type { SchemaField } from './schema-form.types';
               <input
                 [id]="'field-' + field.key"
                 type="number"
-                [formControlName]="field.key"
+                [formControl]="control(field.key)"
                 class="input"
                 [placeholder]="field.placeholder ?? ''"
               />
@@ -75,7 +79,7 @@ import type { SchemaField } from './schema-form.types';
               <input
                 [id]="'field-' + field.key"
                 [type]="inputType(field)"
-                [formControlName]="field.key"
+                [formControl]="control(field.key)"
                 class="input"
                 [class.font-mono]="field.sensitive"
                 [placeholder]="field.placeholder ?? ''"
@@ -99,6 +103,25 @@ import type { SchemaField } from './schema-form.types';
 export class SchemaFormComponent {
   readonly fields = input.required<SchemaField[]>();
   readonly form = input.required<FormGroup>();
+
+  /**
+   * Returns the FormControl instance for a field key.
+   *
+   * - [formControl] requires a FormControl (not AbstractControl)
+   * - buildSchemaForm() always creates FormControls, so the cast is safe
+   * - Angular's [formGroup] does NOT cross component boundaries, which is
+   *   why we bind [formControl] here instead of [formControlName] in the
+   *   parent template
+   */
+  control(key: string): FormControl {
+    const c = this.form().get(key);
+    if (!c) {
+      throw new Error(
+        `schema-form: control "${key}" missing from FormGroup — check buildSchemaForm()`,
+      );
+    }
+    return c as FormControl;
+  }
 
   inputType(field: SchemaField): string {
     switch (field.type) {
