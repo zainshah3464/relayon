@@ -25,7 +25,8 @@
     "jsonata": "^2.2.2",
     "mongoose": "^8.9.0",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.1"
+    "rxjs": "^7.8.1",
+    "stripe": "^23.1.0"
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.0",

@@ -49,6 +49,15 @@ model Tenant {
   quotaAiTokensPerMonth Int      @default(100000) @map("quota_ai_tokens_per_month")
   quotaMode             String   @default("hard") @map("quota_mode")
   currentPeriodStart    DateTime @default(now()) @map("current_period_start")
+
+  // ── v2.0 billing (STRIPE TEST MODE ONLY) ─────────────────────
+  stripeCustomerId     String?   @unique @map("stripe_customer_id")
+  stripeSubscriptionId String?   @map("stripe_subscription_id")
+  stripePriceId        String?   @map("stripe_price_id")
+  subscriptionStatus   String    @default("none") @map("subscription_status")
+  currentPeriodEnd     DateTime? @map("current_period_end")
+  // ─────────────────────────────────────────────────────────────
+
   createdAt             DateTime @default(now()) @map("created_at")
   updatedAt             DateTime @updatedAt @map("updated_at")
 

@@ -5,6 +5,7 @@ import { HttpClient } from '@angular/common/http';
 import { AuthService } from '../../core/auth/auth.service';
 import { environment } from '../../../environments/environment';
 import { ApiKeysComponent } from './api-keys.component';
+import { BillingComponent } from './billing.component';
 import { QuotaService } from '../../core/api/quota.service';
 
 interface TenantInfo {
@@ -17,17 +18,17 @@ interface TenantInfo {
   quotaMode: 'hard' | 'soft';
 }
 
-type Tab = 'workspace' | 'api-keys';
+type Tab = 'workspace' | 'api-keys' | 'billing';
 
 @Component({
   selector: 'app-settings',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, ApiKeysComponent],
+  imports: [CommonModule, ReactiveFormsModule, ApiKeysComponent, BillingComponent],
   template: `
     <div class="space-y-6 max-w-4xl">
       <div>
         <h1 class="text-2xl font-bold tracking-tightest text-white">Settings</h1>
-        <p class="text-sm text-muted mt-1">Workspace configuration and API access.</p>
+        <p class="text-sm text-muted mt-1">Workspace configuration, API access, billing.</p>
       </div>
 
       <div class="flex gap-1 border-b border-hairline">
@@ -47,6 +48,14 @@ type Tab = 'workspace' | 'api-keys';
           [class.text-muted]="tab() !== 'api-keys'"
           [class.border-transparent]="tab() !== 'api-keys'"
         >API Keys</button>
+        <button
+          (click)="tab.set('billing')"
+          class="px-4 py-2 text-sm border-b-2 -mb-px"
+          [class.border-relay-violet]="tab() === 'billing'"
+          [class.text-white]="tab() === 'billing'"
+          [class.text-muted]="tab() !== 'billing'"
+          [class.border-transparent]="tab() !== 'billing'"
+        >Billing</button>
       </div>
 
       @if (tab() === 'workspace') {
@@ -141,6 +150,10 @@ type Tab = 'workspace' | 'api-keys';
 
       @if (tab() === 'api-keys') {
         <app-api-keys />
+      }
+
+      @if (tab() === 'billing') {
+        <app-billing />
       }
     </div>
   `,

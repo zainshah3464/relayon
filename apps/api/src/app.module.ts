@@ -14,6 +14,8 @@ import { ApiKeysModule } from './modules/api-keys/api-keys.module';
 import { JwtOrApiKeyGuard } from './common/guards/jwt-or-api-key.guard';
 import { SchedulesModule } from './modules/schedules/schedules.module';
 import { QuotaModule } from './modules/quota/quota.module';
+import { BillingModule } from './modules/billing/billing.module';
+import { WorkflowTestModule } from './modules/workflows/testing/workflow-test.module';
 
 @Module({
   imports: [
@@ -34,6 +36,8 @@ import { QuotaModule } from './modules/quota/quota.module';
     ApiKeysModule,
     SchedulesModule,
     QuotaModule,
+    BillingModule,
+    WorkflowTestModule,
   ],
   providers: [JwtOrApiKeyGuard],
   exports: [JwtOrApiKeyGuard],

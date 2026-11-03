@@ -185,7 +185,7 @@ export class WorkflowVersionsService {
 
     // Single transaction: delete old destinations, update workflow,
     // recreate destinations (with tenantId) — all atomic.
-    const restored = await this.prisma.withTenant(tenantId, async (tx) => {
+    await this.prisma.withTenant(tenantId, async (tx) => {
       await tx.destination.deleteMany({ where: { workflowId } });
 
       return tx.workflow.update({
@@ -203,7 +203,7 @@ export class WorkflowVersionsService {
             snap['isActive'] === undefined ? true : Boolean(snap['isActive']),
           destinations: {
             create: destinations.map((d) => ({
-              tenantId, // ← v1.9: required field
+              tenantId, // ← v1.9: required field (RLS enforce)
               type: d['type'] as never,
               name: d['name'] as string,
               config: (d['config'] ?? {}) as never,

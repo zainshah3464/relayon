@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { BillingService } from '../billing/billing.service';
 
 export type QuotaMetric = 'events' | 'ai_tokens' | 'deliveries';
 export type QuotaMode = 'hard' | 'soft';
@@ -29,14 +30,18 @@ const METRICS: QuotaMetric[] = ['events', 'ai_tokens', 'deliveries'];
 
 @Injectable()
 export class QuotaService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly billing: BillingService,
+  ) {}
 
   async checkAndConsume(
-    tenantId: string, metric: QuotaMetric, cost: number,
+    tenantId: string,
+    metric: QuotaMetric,
+    cost: number,
   ): Promise<QuotaResult> {
     if (cost < 0 || !Number.isFinite(cost)) cost = 1;
 
-    // Tenant lookup — cross-tenant via withoutTenant (called before quota context set)
     const tenant = await this.prisma.withoutTenant((c) =>
       c.tenant.findUnique({
         where: { id: tenantId },
@@ -90,10 +95,21 @@ export class QuotaService {
 
     const warning = outcome.used >= limit * 0.8 && outcome.used < limit;
 
+    // Fire-and-forget Stripe reporting (no-op in test mode)
+    if (outcome.allowed && (metric === 'events' || metric === 'ai_tokens')) {
+      void this.billing.reportUsageForQuota(tenantId, metric, cost);
+    }
+
     return {
-      metric, allowed: outcome.allowed, used: outcome.used, limit,
+      metric,
+      allowed: outcome.allowed,
+      used: outcome.used,
+      limit,
       remaining: Math.max(0, limit - outcome.used),
-      period, resetAt, mode, warning,
+      period,
+      resetAt,
+      mode,
+      warning,
     };
   }
 
@@ -127,7 +143,8 @@ export class QuotaService {
       const used = byMetric.get(metric) ?? 0;
       const limit = limits[metric];
       metrics[metric] = {
-        used, limit,
+        used,
+        limit,
         remaining: Math.max(0, limit - used),
         resetAt: this.nextPeriodStart(),
       };
@@ -145,6 +162,8 @@ export class QuotaService {
   }
 
   private nextPeriodStart(now = new Date()): string {
-    return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)).toISOString();
+    return new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1),
+    ).toISOString();
   }
 }
