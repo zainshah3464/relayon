@@ -14,6 +14,7 @@ out/
 .env
 .env.local
 .env.*.local
+.env.test
 
 # Logs
 *.log
@@ -37,6 +38,9 @@ Thumbs.db
 # Test
 coverage/
 .nyc_output/
+test-results/
+playwright-report/
+coverage/
 
 # Cache
 .cache/

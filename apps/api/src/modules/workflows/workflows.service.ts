@@ -75,13 +75,14 @@ export class WorkflowsService {
     });
   }
 
+  // ── CREATE (inline version capture, same transaction) ─────────
   async create(
     tenantId: string,
     dto: CreateWorkflowDto,
     actorId: string | null,
   ) {
-    const created = await this.prisma.withTenant(tenantId, (tx) =>
-      tx.workflow.create({
+    return this.prisma.withTenant(tenantId, async (tx) => {
+      const created = await tx.workflow.create({
         data: {
           tenantId,
           name: dto.name,
@@ -93,23 +94,48 @@ export class WorkflowsService {
           routingRules: (dto.routingRules ?? []) as Prisma.InputJsonValue,
           isActive: dto.isActive ?? true,
         },
-      }),
-    );
+      });
 
-    await this.versions.capture(created.id, tenantId, actorId, 'Initial version');
-    return created;
+      // Inline version capture — SAME transaction to avoid FK race
+      const snapshot = {
+        name: created.name,
+        sourceType: created.sourceType,
+        sourceConfig: created.sourceConfig,
+        enrichmentEnabled: created.enrichmentEnabled,
+        enrichmentPrompt: created.enrichmentPrompt,
+        transformExpression: created.transformExpression,
+        routingRules: created.routingRules,
+        isActive: created.isActive,
+        destinations: [],
+      };
+
+      await tx.workflowVersion.create({
+        data: {
+          workflowId: created.id,
+          tenantId,
+          version: 1,
+          snapshot: snapshot as never,
+          message: 'Initial version',
+          createdBy: actorId,
+        },
+      });
+
+      return created;
+    });
   }
 
+  // ── UPDATE (inline version capture, same transaction) ─────────
   async update(
     tenantId: string,
     id: string,
     dto: UpdateWorkflowDto,
     actorId: string | null,
   ) {
+    // First check existence (throws NotFoundException if missing)
     await this.get(tenantId, id);
 
-    const updated = await this.prisma.withTenant(tenantId, (tx) =>
-      tx.workflow.update({
+    return this.prisma.withTenant(tenantId, async (tx) => {
+      const updated = await tx.workflow.update({
         where: { id },
         data: {
           ...(dto.name !== undefined && { name: dto.name }),
@@ -131,17 +157,50 @@ export class WorkflowsService {
           }),
           ...(dto.isActive !== undefined && { isActive: dto.isActive }),
         },
-      }),
-    );
+        include: { destinations: true },
+      });
 
-    await this.versions.capture(
-      id,
-      tenantId,
-      actorId,
-      dto.name !== undefined ? `Renamed to "${dto.name}"` : 'Configuration updated',
-    );
+      // Inline version capture — SAME transaction
+      const lastVersion = await tx.workflowVersion.findFirst({
+        where: { workflowId: id },
+        orderBy: { version: 'desc' },
+        select: { version: true },
+      });
 
-    return updated;
+      const snapshot = {
+        name: updated.name,
+        sourceType: updated.sourceType,
+        sourceConfig: updated.sourceConfig,
+        enrichmentEnabled: updated.enrichmentEnabled,
+        enrichmentPrompt: updated.enrichmentPrompt,
+        transformExpression: updated.transformExpression,
+        routingRules: updated.routingRules,
+        isActive: updated.isActive,
+        destinations: updated.destinations.map((d) => ({
+          type: d.type,
+          name: d.name,
+          config: d.config,
+          enabled: d.enabled,
+          retryPolicy: d.retryPolicy,
+        })),
+      };
+
+      await tx.workflowVersion.create({
+        data: {
+          workflowId: id,
+          tenantId,
+          version: (lastVersion?.version ?? 0) + 1,
+          snapshot: snapshot as never,
+          message:
+            dto.name !== undefined
+              ? `Renamed to "${dto.name}"`
+              : 'Configuration updated',
+          createdBy: actorId,
+        },
+      });
+
+      return updated;
+    });
   }
 
   async remove(tenantId: string, id: string) {
