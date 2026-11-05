@@ -1,35 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { createTwoFilesPatch, structuredPatch } from 'diff';
 import { PrismaService } from '../prisma/prisma.service';
-
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const { createTwoFilesPatch, structuredPatch } = require('diff') as {
-  createTwoFilesPatch: (
-    oldFile: string,
-    newFile: string,
-    oldStr: string,
-    newStr: string,
-    oldHeader?: string,
-    newHeader?: string,
-    options?: { context?: number },
-  ) => string;
-  structuredPatch: (
-    oldFileName: string,
-    newFileName: string,
-    oldStr: string,
-    newStr: string,
-    oldHeader?: string,
-    newHeader?: string,
-    options?: { context?: number },
-  ) => {
-    hunks: Array<{
-      oldStart: number;
-      oldLines: number;
-      newStart: number;
-      newLines: number;
-      lines: string[];
-    }>;
-  };
-};
 
 export interface VersionSummary {
   id: string;
@@ -183,8 +154,6 @@ export class WorkflowVersionsService {
       ? (snap['destinations'] as Array<Record<string, unknown>>)
       : [];
 
-    // Single transaction: delete old destinations, update workflow,
-    // recreate destinations (with tenantId) — all atomic.
     await this.prisma.withTenant(tenantId, async (tx) => {
       await tx.destination.deleteMany({ where: { workflowId } });
 
@@ -203,7 +172,7 @@ export class WorkflowVersionsService {
             snap['isActive'] === undefined ? true : Boolean(snap['isActive']),
           destinations: {
             create: destinations.map((d) => ({
-              tenantId, // ← v1.9: required field (RLS enforce)
+              tenantId,
               type: d['type'] as never,
               name: d['name'] as string,
               config: (d['config'] ?? {}) as never,
@@ -216,7 +185,6 @@ export class WorkflowVersionsService {
       });
     });
 
-    // Snapshot the restore as a new version (capture runs its own tx).
     await this.capture(
       workflowId,
       tenantId,
@@ -224,7 +192,6 @@ export class WorkflowVersionsService {
       `Restored from v${version}`,
     );
 
-    // Return fresh read inside tenant context (RLS-safe).
     return this.prisma.withTenant(tenantId, (tx) =>
       tx.workflow.findUnique({
         where: { id: workflowId },

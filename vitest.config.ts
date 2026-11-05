@@ -23,6 +23,12 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     setupFiles: [resolve(__dirname, 'test/setup/vitest-setup.ts')],
+
+    // ⚠️ FIX for hang — forked processes so Vitest can force-kill on timeout
+    pool: 'forks',
+    poolOptions: { forks: { singleFork: true } },
+    teardownTimeout: 10_000,
+
     include: ['apps/*/src/**/*.spec.ts'],
     exclude: [
       '**/node_modules/**',
