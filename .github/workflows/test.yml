@@ -95,3 +95,59 @@ jobs:
       - run: npx prisma migrate deploy --schema packages/db/prisma/schema.prisma
       - run: npm run db:rls
       - run: npm run test:integration
+
+  rls:
+    name: RLS enforcement
+    runs-on: ubuntu-latest
+    needs: integration
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: relayon_ci
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd="pg_isready -U ci"
+          --health-interval=5s
+    env:
+      TEST_DATABASE_URL: postgresql://ci:ci@localhost:5432/relayon_ci?sslmode=disable
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npm run db:generate
+      - run: npx prisma migrate deploy --schema packages/db/prisma/schema.prisma
+      - run: npm run db:rls
+      - run: npx vitest run --config vitest.integration.config.ts test/integration/rls.integration.spec.ts
+
+  mutation:
+    name: Mutation (critical paths)
+    runs-on: ubuntu-latest
+    needs: unit
+    if: github.event_name == 'pull_request'
+    continue-on-error: true
+    env:
+      TEST_DATABASE_URL: postgresql://ci:ci@localhost:5432/relayon_ci?sslmode=disable
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env: { POSTGRES_USER: ci, POSTGRES_PASSWORD: ci, POSTGRES_DB: relayon_ci }
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd="pg_isready -U ci"
+          --health-interval=5s
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npm run db:generate
+      - run: npm run test:mutation:critical
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mutation-report
+          path: reports/mutation/

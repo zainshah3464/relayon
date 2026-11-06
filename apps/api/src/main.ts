@@ -7,7 +7,9 @@ import { initSentry } from './lib/sentry';
 initSentry('relayon-api');
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule);
+  // ⚠️ rawBody: true — required for Stripe webhook signature verification
+  // (Stripe sends raw bytes; re-serializing breaks HMAC validation)
+  const app = await NestFactory.create(AppModule, { rawBody: true });
 
   app.enableCors({
     origin: (process.env['CORS_ORIGIN'] ?? 'http://localhost:4200').split(','),

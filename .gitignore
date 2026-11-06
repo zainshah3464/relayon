@@ -50,3 +50,5 @@ coverage/
 bin_staf
 bin_staf/
 .bin_staf
+.stryker-tmp/
+reports/
