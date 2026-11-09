@@ -16,6 +16,7 @@ import { SchedulesModule } from './modules/schedules/schedules.module';
 import { QuotaModule } from './modules/quota/quota.module';
 import { BillingModule } from './modules/billing/billing.module';
 import { WorkflowTestModule } from './modules/workflows/testing/workflow-test.module';
+import { RedisModule } from './modules/redis/redis.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { WorkflowTestModule } from './modules/workflows/testing/workflow-test.mo
     QuotaModule,
     BillingModule,
     WorkflowTestModule,
+    RedisModule,
   ],
   providers: [JwtOrApiKeyGuard],
   exports: [JwtOrApiKeyGuard],

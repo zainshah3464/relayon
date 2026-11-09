@@ -72,21 +72,61 @@ model Tenant {
 }
 
 model User {
-  id           String    @id @default(uuid())
-  tenantId     String    @map("tenant_id")
-  email        String    @unique
-  passwordHash String    @map("password_hash")
-  name         String
-  role         UserRole  @default(owner)
-  lastLoginAt  DateTime? @map("last_login_at")
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime  @updatedAt @map("updated_at")
+  id            String    @id @default(uuid())
+  tenantId      String    @map("tenant_id")
+  email         String    @unique
+  // ⚠️ v2.1 — nullable for OAuth-only users (no password set)
+  passwordHash  String?   @map("password_hash")
+  name          String
+  role          UserRole  @default(owner)
+  // ⚠️ v2.1 — existing users grandfathered as verified
+  emailVerified Boolean   @default(true) @map("email_verified")
+  // ⚠️ v2.1 — OAuth provider IDs
+  googleId      String?   @unique @map("google_id")
+  githubId      String?   @unique @map("github_id")
+  lastLoginAt   DateTime? @map("last_login_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
 
-  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  refreshTokens RefreshToken[]
+  tenant             Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  refreshTokens      RefreshToken[]
+  emailVerifications EmailVerification[]
+  passwordResets     PasswordReset[]
 
   @@index([tenantId])
   @@map("users")
+}
+
+// ⚠️ v2.1 — NEW model
+model EmailVerification {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("email_verifications")
+}
+
+// ⚠️ v2.1 — NEW model
+model PasswordReset {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("password_resets")
 }
 
 model RefreshToken {

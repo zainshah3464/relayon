@@ -3,23 +3,65 @@ import { authGuard, guestGuard } from './core/auth/auth.guard';
 
 export const routes: Routes = [
   { path: '', redirectTo: '/dashboard', pathMatch: 'full' },
+
+  // ── Public auth pages (guest only) ─────────────────────────
   {
     path: 'login',
     canActivate: [guestGuard],
     loadComponent: () =>
-      import('./features/auth/login/login.component').then((m) => m.LoginComponent),
+      import('./features/auth/login/login.component').then(
+        (m) => m.LoginComponent,
+      ),
   },
   {
     path: 'signup',
     canActivate: [guestGuard],
     loadComponent: () =>
-      import('./features/auth/signup/signup.component').then((m) => m.SignupComponent),
+      import('./features/auth/signup/signup.component').then(
+        (m) => m.SignupComponent,
+      ),
   },
+  {
+    path: 'forgot-password',
+    canActivate: [guestGuard],
+    loadComponent: () =>
+      import('./features/auth/forgot-password/forgot-password.component').then(
+        (m) => m.ForgotPasswordComponent,
+      ),
+  },
+  {
+    path: 'reset-password',
+    canActivate: [guestGuard],
+    loadComponent: () =>
+      import('./features/auth/reset-password/reset-password.component').then(
+        (m) => m.ResetPasswordComponent,
+      ),
+  },
+
+  // ── Public utility pages (no guard) ────────────────────────
+  {
+    path: 'verify-email',
+    loadComponent: () =>
+      import('./features/auth/verify-email/verify-email.component').then(
+        (m) => m.VerifyEmailComponent,
+      ),
+  },
+  {
+    path: 'auth/oauth-callback',
+    loadComponent: () =>
+      import('./features/auth/oauth-callback/oauth-callback.component').then(
+        (m) => m.OAuthCallbackComponent,
+      ),
+  },
+
+  // ── Protected routes (auth required) ───────────────────────
   {
     path: '',
     canActivate: [authGuard],
     loadComponent: () =>
-      import('./shared/layout/shell/shell.component').then((m) => m.ShellComponent),
+      import('./shared/layout/shell/shell.component').then(
+        (m) => m.ShellComponent,
+      ),
     children: [
       {
         path: 'dashboard',
@@ -72,5 +114,6 @@ export const routes: Routes = [
       },
     ],
   },
+
   { path: '**', redirectTo: '/dashboard' },
 ];

@@ -11,6 +11,10 @@ import { createHash, randomBytes } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { SignupDto } from './dto/signup.dto';
 import { LoginDto } from './dto/login.dto';
+import { EmailVerificationService } from './email-verification.service';
+import { PasswordResetService } from './password-reset.service';
+import { AuthEmailService } from './email/email.service';
+import type { OAuthProfile } from './strategies/google.strategy';
 
 export interface AuthResultUser {
   id: string;
@@ -36,19 +40,21 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
+    private readonly verification: EmailVerificationService,
+    private readonly passwordReset: PasswordResetService,
+    private readonly email: AuthEmailService,
   ) {}
 
+  // ─── SIGNUP ────────────────────────────────────────────────────────
   async signup(dto: SignupDto): Promise<AuthResult> {
     const email = dto.email.toLowerCase();
 
-    // Email uniqueness — cross-tenant check via withoutTenant
     const existing = await this.prisma.withoutTenant((c) =>
       c.user.findUnique({ where: { email } }),
     );
-    if (existing) {
-      throw new ConflictException('Email already in use');
-    }
+    if (existing) throw new ConflictException('Email already in use');
 
+    const passwordHash = await bcrypt.hash(dto.password, 12);
     const baseSlug = this.slugify(dto.tenantName);
     const slugTaken = await this.prisma.withoutTenant((c) =>
       c.tenant.findUnique({ where: { slug: baseSlug } }),
@@ -57,16 +63,10 @@ export class AuthService {
       ? `${baseSlug}-${randomBytes(3).toString('hex')}`
       : baseSlug;
 
-    const passwordHash = await bcrypt.hash(dto.password, 12);
-
-    // Tenant doesn't exist yet — use withoutTenant
     const tenant = await this.prisma.withoutTenant((c) =>
-      c.tenant.create({
-        data: { name: dto.tenantName, slug: finalSlug },
-      }),
+      c.tenant.create({ data: { name: dto.tenantName, slug: finalSlug } }),
     );
 
-    // Now tenant exists — use withTenant for user creation
     const user = await this.prisma.withTenant(tenant.id, (tx) =>
       tx.user.create({
         data: {
@@ -75,11 +75,18 @@ export class AuthService {
           name: dto.name,
           passwordHash,
           role: 'owner',
+          // ⚠️ v2.1 — local signups require verification
+          emailVerified: false,
         },
       }),
     );
 
-    this.logger.log(`New tenant signup: ${tenant.slug} (${user.email})`);
+    this.logger.log(`Signup: ${tenant.slug}/${user.email}`);
+
+    // Fire-and-forget verification email (non-blocking)
+    this.verification.sendVerification(user.id, tenant.id).catch((err) => {
+      this.logger.error(`Verification email failed: ${err.message}`);
+    });
 
     return this.issueTokens({
       id: user.id,
@@ -92,21 +99,28 @@ export class AuthService {
     });
   }
 
+  // ─── LOGIN (email/password) ────────────────────────────────────────
   async login(dto: LoginDto): Promise<AuthResult> {
     const email = dto.email.toLowerCase();
-
-    // Email uniqueness global — cross-tenant lookup
     const user = await this.prisma.withoutTenant((c) =>
       c.user.findUnique({ where: { email }, include: { tenant: true } }),
     );
 
-    if (!user) {
+    // ⚠️ v2.1 — OAuth-only users have null passwordHash
+    if (!user || !user.passwordHash) {
       throw new UnauthorizedException('Invalid email or password');
     }
 
-    const passwordValid = await bcrypt.compare(dto.password, user.passwordHash);
-    if (!passwordValid) {
-      throw new UnauthorizedException('Invalid email or password');
+    const valid = await bcrypt.compare(dto.password, user.passwordHash);
+    if (!valid) throw new UnauthorizedException('Invalid email or password');
+
+    // ⚠️ v2.1 — block login until email verified
+    if (!user.emailVerified) {
+      throw new UnauthorizedException({
+        message:
+          'Please verify your email before logging in. Check your inbox.',
+        code: 'EMAIL_NOT_VERIFIED',
+      });
     }
 
     await this.prisma.withTenant(user.tenantId, (tx) =>
@@ -127,9 +141,110 @@ export class AuthService {
     });
   }
 
+  // ─── OAUTH LOGIN (Google / GitHub) ─────────────────────────────────
+  async loginWithOAuth(profile: OAuthProfile): Promise<AuthResult> {
+    const email = profile.email.toLowerCase();
+    const providerField =
+      profile.provider === 'google' ? 'googleId' : 'githubId';
+
+    // 1. Existing user by provider ID
+    const byProvider = await this.prisma.withoutTenant((c) =>
+      c.user.findFirst({
+        where: { [providerField]: profile.providerId } as never,
+        include: { tenant: true },
+      }),
+    );
+    if (byProvider) return this.issueOAuthSession(byProvider);
+
+    // 2. Existing user by email — link provider
+    const byEmail = await this.prisma.withoutTenant((c) =>
+      c.user.findUnique({ where: { email }, include: { tenant: true } }),
+    );
+
+    if (byEmail) {
+      await this.prisma.withTenant(byEmail.tenantId, (tx) =>
+        tx.user.update({
+          where: { id: byEmail.id },
+          data: {
+            [providerField]: profile.providerId,
+            emailVerified: true, // OAuth provider already verified
+          } as never,
+        }),
+      );
+      return this.issueOAuthSession(byEmail);
+    }
+
+    // 3. Brand new user via OAuth
+    const baseSlug = this.slugify(profile.name || email.split('@')[0]!);
+    const slugTaken = await this.prisma.withoutTenant((c) =>
+      c.tenant.findUnique({ where: { slug: baseSlug } }),
+    );
+    const finalSlug = slugTaken
+      ? `${baseSlug}-${randomBytes(3).toString('hex')}`
+      : baseSlug;
+
+    const tenant = await this.prisma.withoutTenant((c) =>
+      c.tenant.create({
+        data: { name: profile.name || email.split('@')[0]!, slug: finalSlug },
+      }),
+    );
+
+    const user = await this.prisma.withTenant(tenant.id, (tx) =>
+      tx.user.create({
+        data: {
+          tenantId: tenant.id,
+          email,
+          name: profile.name,
+          passwordHash: null, // OAuth-only — no password
+          role: 'owner',
+          emailVerified: true, // trusted provider
+          [providerField]: profile.providerId,
+        } as never,
+      }),
+    );
+
+    this.logger.log(`OAuth signup: ${profile.provider}/${user.email}`);
+    return this.issueTokens({
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      tenantId: tenant.id,
+      tenantName: tenant.name,
+      tenantSlug: tenant.slug,
+    });
+  }
+
+  // Used by OAuth callback controllers
+  async issueSessionForUser(user: {
+    id: string;
+    email: string;
+    name: string;
+    role: string;
+    tenantId: string;
+    tenant: { name: string; slug: string };
+  }): Promise<AuthResult> {
+    return this.issueTokens({
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      tenantId: user.tenantId,
+      tenantName: user.tenant.name,
+      tenantSlug: user.tenant.slug,
+    });
+  }
+
+  // ─── PASSWORD RESET ────────────────────────────────────────────────
+  async resetPassword(token: string, newPassword: string): Promise<void> {
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    const { email, name } = await this.passwordReset.reset(token, passwordHash);
+    this.email.sendPasswordChanged(email, name).catch(() => undefined);
+  }
+
+  // ─── REFRESH / LOGOUT ──────────────────────────────────────────────
   async refresh(refreshToken: string): Promise<AuthResult> {
     const tokenHash = this.hashToken(refreshToken);
-
     const stored = await this.prisma.withoutTenant((c) =>
       c.refreshToken.findUnique({
         where: { tokenHash },
@@ -137,17 +252,12 @@ export class AuthService {
       }),
     );
 
-    if (!stored) {
-      throw new UnauthorizedException('Invalid refresh token');
-    }
-    if (stored.revokedAt) {
+    if (!stored) throw new UnauthorizedException('Invalid refresh token');
+    if (stored.revokedAt)
       throw new UnauthorizedException('Refresh token has been revoked');
-    }
-    if (stored.expiresAt < new Date()) {
+    if (stored.expiresAt < new Date())
       throw new UnauthorizedException('Refresh token has expired');
-    }
 
-    // Rotation: revoke old token immediately
     await this.prisma.withTenant(stored.tenantId, (tx) =>
       tx.refreshToken.update({
         where: { id: stored.id },
@@ -168,13 +278,38 @@ export class AuthService {
 
   async logout(refreshToken: string): Promise<void> {
     const tokenHash = this.hashToken(refreshToken);
-    // Cross-tenant — token hash alone identifies tenant
     await this.prisma.withoutTenant((c) =>
       c.refreshToken.updateMany({
         where: { tokenHash, revokedAt: null },
         data: { revokedAt: new Date() },
       }),
     );
+  }
+
+  // ─── INTERNAL HELPERS ──────────────────────────────────────────────
+  private async issueOAuthSession(user: {
+    id: string;
+    email: string;
+    name: string;
+    role: string;
+    tenantId: string;
+    tenant: { name: string; slug: string };
+  }): Promise<AuthResult> {
+    await this.prisma.withTenant(user.tenantId, (tx) =>
+      tx.user.update({
+        where: { id: user.id },
+        data: { lastLoginAt: new Date() },
+      }),
+    );
+    return this.issueTokens({
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      tenantId: user.tenantId,
+      tenantName: user.tenant.name,
+      tenantSlug: user.tenant.slug,
+    });
   }
 
   private async issueTokens(user: AuthResultUser): Promise<AuthResult> {
@@ -187,7 +322,7 @@ export class AuthService {
       },
       {
         secret: this.config.getOrThrow<string>('JWT_SECRET'),
-        expiresIn: (this.config.get<string>('JWT_EXPIRES_IN') ?? '15m') as any,
+        expiresIn: (this.config.get<string>('JWT_EXPIRES_IN') ?? '15m') as never,
       },
     );
 
@@ -216,19 +351,16 @@ export class AuthService {
   }
 
   private calculateExpiry(duration: string): Date {
-    const match = duration.match(/^(\d+)([smhd])$/);
-    if (!match) {
-      throw new Error(`Invalid duration format: ${duration}`);
-    }
-    const value = parseInt(match[1], 10);
-    const unit = match[2];
+    const m = duration.match(/^(\d+)([smhd])$/);
+    if (!m) throw new Error(`Invalid duration format: ${duration}`);
+    const v = parseInt(m[1]!, 10);
     const msPerUnit: Record<string, number> = {
       s: 1_000,
       m: 60_000,
       h: 3_600_000,
       d: 86_400_000,
     };
-    return new Date(Date.now() + value * msPerUnit[unit]);
+    return new Date(Date.now() + v * msPerUnit[m[2]!]!);
   }
 
   private slugify(text: string): string {

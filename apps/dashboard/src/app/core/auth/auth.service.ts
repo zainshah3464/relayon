@@ -14,6 +14,10 @@ export interface User {
   tenantId: string;
   tenantName: string;
   tenantSlug: string;
+  // ⚠️ v2.1 — new fields
+  emailVerified: boolean;
+  hasPassword: boolean;
+  provider: 'local' | 'google' | 'github';
 }
 
 export interface AuthResponse {
@@ -49,7 +53,9 @@ export class AuthService {
   readonly user = this._user.asReadonly();
   readonly token = this._token.asReadonly();
 
-  readonly isAuthenticated = computed(() => this._token() !== null && this._user() !== null);
+  readonly isAuthenticated = computed(
+    () => this._token() !== null && this._user() !== null,
+  );
   readonly isOwner = computed(() => this._user()?.role === 'owner');
   readonly isAdmin = computed(() => {
     const r = this._user()?.role;
@@ -60,6 +66,11 @@ export class AuthService {
     if (!u) return '';
     return u.name || u.email.split('@')[0];
   });
+
+  // ⚠️ v2.1 — new computed helpers
+  readonly emailVerified = computed(() => this._user()?.emailVerified ?? true);
+  readonly hasPassword = computed(() => this._user()?.hasPassword ?? true);
+  readonly authProvider = computed(() => this._user()?.provider ?? 'local');
 
   login(payload: LoginPayload): Observable<AuthResponse> {
     return this.http
@@ -77,16 +88,79 @@ export class AuthService {
     const refreshToken = localStorage.getItem(this.REFRESH_KEY);
     if (!refreshToken) return null;
     return this.http
-      .post<AuthResponse>(`${environment.apiUrl}/api/auth/refresh`, { refreshToken })
+      .post<AuthResponse>(`${environment.apiUrl}/api/auth/refresh`, {
+        refreshToken,
+      })
       .pipe(tap((res) => this.setSession(res)));
   }
 
   logout(): void {
-    this.http.post(`${environment.apiUrl}/api/auth/logout`, {}).subscribe({
-      next: () => this.clearSession(),
-      error: () => this.clearSession(),
-    });
+    const refreshToken = localStorage.getItem(this.REFRESH_KEY);
+    this.http
+      .post(`${environment.apiUrl}/api/auth/logout`, { refreshToken })
+      .subscribe({
+        next: () => this.clearSession(),
+        error: () => this.clearSession(),
+      });
   }
+
+  // ── OAuth ──────────────────────────────────────────────────────────
+
+  startGoogleOAuth(returnTo = '/dashboard'): void {
+    window.location.href = `${environment.apiUrl}/api/auth/google?returnTo=${encodeURIComponent(returnTo)}`;
+  }
+
+  startGitHubOAuth(returnTo = '/dashboard'): void {
+    window.location.href = `${environment.apiUrl}/api/auth/github?returnTo=${encodeURIComponent(returnTo)}`;
+  }
+
+  exchangeOAuthTicket(
+    ticket: string,
+  ): Observable<AuthResponse & { returnTo: string }> {
+    return this.http
+      .post<AuthResponse & { returnTo: string }>(
+        `${environment.apiUrl}/api/auth/oauth-exchange`,
+        { ticket },
+      )
+      .pipe(tap((res) => this.setSession(res)));
+  }
+
+  // ── Email verification ────────────────────────────────────────────
+
+  verifyEmail(token: string): Observable<{ verified: boolean }> {
+    return this.http.post<{ verified: boolean }>(
+      `${environment.apiUrl}/api/auth/verify-email`,
+      { token },
+    );
+  }
+
+  resendVerification(email: string): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(
+      `${environment.apiUrl}/api/auth/resend-verification`,
+      { email },
+    );
+  }
+
+  // ── Password reset ────────────────────────────────────────────────
+
+  requestPasswordReset(email: string): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(
+      `${environment.apiUrl}/api/auth/forgot-password`,
+      { email },
+    );
+  }
+
+  resetPassword(
+    token: string,
+    password: string,
+  ): Observable<{ reset: boolean }> {
+    return this.http.post<{ reset: boolean }>(
+      `${environment.apiUrl}/api/auth/reset-password`,
+      { token, password },
+    );
+  }
+
+  // ── Internal ──────────────────────────────────────────────────────
 
   private setSession(res: AuthResponse): void {
     localStorage.setItem(this.ACCESS_KEY, res.accessToken);
