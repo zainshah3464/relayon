@@ -7,6 +7,7 @@ import {
   SimpleChanges,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { TranslocoModule } from '@jsverse/transloco';
 import zxcvbn from 'zxcvbn';
 
 interface ZxcvbnResult {
@@ -21,7 +22,7 @@ interface ZxcvbnResult {
 @Component({
   selector: 'app-password-strength-meter',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, TranslocoModule],
   template: `
     @if (password) {
       <div class="mt-2">
@@ -38,7 +39,7 @@ interface ZxcvbnResult {
         <!-- Label + crack time -->
         <div class="flex items-center justify-between text-xs">
           <span [ngClass]="labelClass()" class="font-medium">
-            {{ label() }}
+            {{ labelKey() | transloco }}
           </span>
           @if (crackTime()) {
             <span class="text-muted">{{ crackTime() }}</span>
@@ -85,12 +86,13 @@ export class PasswordStrengthMeterComponent implements OnChanges {
     return this.result?.score ?? 0;
   }
 
-  label(): string {
+  // ⚠️ v2.2 — returns translation key instead of hardcoded English string
+  labelKey(): string {
     const s = this.score;
-    if (s <= 1) return 'Weak';
-    if (s === 2) return 'Fair';
-    if (s === 3) return 'Strong';
-    return 'Very strong';
+    if (s <= 1) return 'passwordStrength.weak';
+    if (s === 2) return 'passwordStrength.fair';
+    if (s === 3) return 'passwordStrength.strong';
+    return 'passwordStrength.veryStrong';
   }
 
   labelClass(): string {

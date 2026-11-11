@@ -18,6 +18,8 @@ export interface User {
   emailVerified: boolean;
   hasPassword: boolean;
   provider: 'local' | 'google' | 'github';
+  // ⚠️ v2.2 — user's preferred UI + email language
+  locale: 'en' | 'ur' | 'ar';
 }
 
 export interface AuthResponse {
@@ -71,6 +73,9 @@ export class AuthService {
   readonly emailVerified = computed(() => this._user()?.emailVerified ?? true);
   readonly hasPassword = computed(() => this._user()?.hasPassword ?? true);
   readonly authProvider = computed(() => this._user()?.provider ?? 'local');
+
+  // ⚠️ v2.2 — user's preferred locale (default 'en' if not yet set)
+  readonly locale = computed<'en' | 'ur' | 'ar'>(() => this._user()?.locale ?? 'en');
 
   login(payload: LoginPayload): Observable<AuthResponse> {
     return this.http

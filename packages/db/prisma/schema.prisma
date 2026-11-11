@@ -84,6 +84,8 @@ model User {
   // ⚠️ v2.1 — OAuth provider IDs
   googleId      String?   @unique @map("google_id")
   githubId      String?   @unique @map("github_id")
+  // ⚠️ v2.2 — user's preferred UI + email language
+  locale        String    @default("en")
   lastLoginAt   DateTime? @map("last_login_at")
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")

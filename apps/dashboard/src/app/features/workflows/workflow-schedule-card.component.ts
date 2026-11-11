@@ -1,35 +1,36 @@
 import { Component, inject, input, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { TranslocoModule, TranslocoService } from '@jsverse/transloco';
 import {
   WorkflowsService,
   WorkflowSchedule,
 } from '../../core/api/workflows.service';
 
 interface Preset {
-  label: string;
+  labelKey: string;
   cron: string;
 }
 
 const PRESETS: Preset[] = [
-  { label: 'Every 15 minutes', cron: '*/15 * * * *' },
-  { label: 'Hourly', cron: '0 * * * *' },
-  { label: 'Daily at 09:00', cron: '0 9 * * *' },
-  { label: 'Weekdays at 09:00', cron: '0 9 * * 1-5' },
-  { label: 'Weekly (Monday 09:00)', cron: '0 9 * * 1' },
+  { labelKey: 'workflows.schedule.presets.every15', cron: '*/15 * * * *' },
+  { labelKey: 'workflows.schedule.presets.hourly', cron: '0 * * * *' },
+  { labelKey: 'workflows.schedule.presets.daily9', cron: '0 9 * * *' },
+  { labelKey: 'workflows.schedule.presets.weekdays9', cron: '0 9 * * 1-5' },
+  { labelKey: 'workflows.schedule.presets.weeklyMon9', cron: '0 9 * * 1' },
 ];
 
 @Component({
   selector: 'app-workflow-schedule-card',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, TranslocoModule],
   template: `
     <div class="card">
       <div class="flex justify-between items-start mb-3">
         <div>
-          <h2 class="text-sm font-medium text-white">Scheduled trigger</h2>
+          <h2 class="text-sm font-medium text-white">{{ 'workflows.schedule.title' | transloco }}</h2>
           <p class="text-xs text-muted mt-1">
-            Relayon generates an event on this cron. It flows through enrichment, transform, and routing like any webhook.
+            {{ 'workflows.schedule.subtitle' | transloco }}
           </p>
         </div>
         @if (schedule(); as s) {
@@ -41,39 +42,39 @@ const PRESETS: Preset[] = [
               'bg-surface-2': !s.isActive,
               'text-muted': !s.isActive
             }"
-          >{{ s.isActive ? 'Active' : 'Paused' }}</span>
+          >{{ (s.isActive ? 'workflows.schedule.active' : 'workflows.schedule.paused') | transloco }}</span>
         }
       </div>
 
       @if (error()) {
-        <div class="text-sm text-signal-rose mb-3">{{ error() }}</div>
+        <div class="text-sm text-signal-rose mb-3">{{ error() | transloco }}</div>
       }
 
       @if (!editing()) {
         @if (schedule(); as s) {
           <div class="grid grid-cols-3 gap-4 mb-3">
             <div>
-              <p class="text-xs uppercase text-muted">Cron</p>
+              <p class="text-xs uppercase text-muted">{{ 'workflows.schedule.cron' | transloco }}</p>
               <p class="text-sm text-white font-mono mt-1">{{ s.cronExpression }}</p>
             </div>
             <div>
-              <p class="text-xs uppercase text-muted">Timezone</p>
+              <p class="text-xs uppercase text-muted">{{ 'workflows.schedule.timezone' | transloco }}</p>
               <p class="text-sm text-white mt-1">{{ s.timezone }}</p>
             </div>
             <div>
-              <p class="text-xs uppercase text-muted">Next run</p>
+              <p class="text-xs uppercase text-muted">{{ 'workflows.schedule.nextRun' | transloco }}</p>
               <p class="text-sm text-white mt-1">{{ s.nextRunAt | date: 'medium' }}</p>
             </div>
           </div>
           <div class="flex gap-2">
-            <button (click)="startEdit(s)" class="btn-secondary text-xs">Edit</button>
+            <button (click)="startEdit(s)" class="btn-secondary text-xs">{{ 'common.edit' | transloco }}</button>
             <button (click)="runNow(s)" [disabled]="running()" class="btn-primary text-xs">
-              {{ running() ? 'Running...' : 'Run now' }}
+              {{ (running() ? 'workflows.schedule.running' : 'workflows.schedule.runNow') | transloco }}
             </button>
             <button (click)="toggleActive(s)" class="btn-secondary text-xs">
-              {{ s.isActive ? 'Pause' : 'Resume' }}
+              {{ (s.isActive ? 'workflows.schedule.pause' : 'workflows.schedule.resume') | transloco }}
             </button>
-            <button (click)="remove()" class="btn-secondary text-xs text-signal-rose">Delete</button>
+            <button (click)="remove()" class="btn-secondary text-xs text-signal-rose">{{ 'common.delete' | transloco }}</button>
           </div>
           @if (runResult(); as r) {
             <p
@@ -82,36 +83,36 @@ const PRESETS: Preset[] = [
               [class.text-signal-rose]="!r.triggered"
             >
               @if (r.triggered) {
-                ✓ Triggered — correlation {{ r.correlationId?.slice(0, 8) }}…
+                ✓ {{ 'workflows.schedule.triggered' | transloco }} — {{ 'workflows.detail.id' | transloco }} {{ r.correlationId?.slice(0, 8) }}…
               } @else {
-                ✗ {{ r.error }}
+                ✗ {{ r.error | transloco }}
               }
             </p>
           }
         } @else {
-          <button (click)="startCreate()" class="btn-primary text-xs">+ Add schedule</button>
+          <button (click)="startCreate()" class="btn-primary text-xs">{{ 'workflows.schedule.addSchedule' | transloco }}</button>
         }
       } @else {
         <div class="space-y-3">
           <div>
-            <label class="label">Preset</label>
+            <label class="label">{{ 'workflows.schedule.preset' | transloco }}</label>
             <select (change)="applyPreset($event)" class="input">
-              <option value="">Custom…</option>
+              <option value="">{{ 'workflows.schedule.custom' | transloco }}</option>
               @for (p of presets; track p.cron) {
-                <option [value]="p.cron">{{ p.label }} — {{ p.cron }}</option>
+                <option [value]="p.cron">{{ p.labelKey | transloco }} — {{ p.cron }}</option>
               }
             </select>
           </div>
           <div>
-            <label class="label">Cron expression</label>
+            <label class="label">{{ 'workflows.schedule.cronExpression' | transloco }}</label>
             <input [(ngModel)]="cronExpression" class="input font-mono" placeholder="0 9 * * *" />
           </div>
           <div>
-            <label class="label">Timezone</label>
+            <label class="label">{{ 'workflows.schedule.timezone' | transloco }}</label>
             <input [(ngModel)]="timezone" class="input" placeholder="UTC" />
           </div>
           <div>
-            <label class="label">Payload template (JSON)</label>
+            <label class="label">{{ 'workflows.schedule.payloadTemplate' | transloco }}</label>
             <textarea
               [(ngModel)]="payloadTemplate"
               rows="3"
@@ -121,9 +122,9 @@ const PRESETS: Preset[] = [
           </div>
           <div class="flex gap-2">
             <button (click)="save()" [disabled]="saving()" class="btn-primary text-xs">
-              {{ saving() ? 'Saving...' : 'Save schedule' }}
+              {{ (saving() ? 'workflows.schedule.saving' : 'workflows.schedule.saveSchedule') | transloco }}
             </button>
-            <button (click)="cancelEdit()" class="btn-secondary text-xs">Cancel</button>
+            <button (click)="cancelEdit()" class="btn-secondary text-xs">{{ 'common.cancel' | transloco }}</button>
           </div>
         </div>
       }
@@ -133,6 +134,7 @@ const PRESETS: Preset[] = [
 export class WorkflowScheduleCardComponent implements OnInit {
   readonly workflowId = input.required<string>();
   private svc = inject(WorkflowsService);
+  private transloco = inject(TranslocoService);
 
   readonly presets = PRESETS;
 
@@ -197,7 +199,7 @@ export class WorkflowScheduleCardComponent implements OnInit {
       try {
         template = JSON.parse(this.payloadTemplate) as Record<string, unknown>;
       } catch {
-        this.error.set('Payload template is not valid JSON');
+        this.error.set('workflows.schedule.errors.invalidJson');
         return;
       }
     }
@@ -220,7 +222,7 @@ export class WorkflowScheduleCardComponent implements OnInit {
         },
         error: (err) => {
           this.saving.set(false);
-          this.error.set(err?.error?.message ?? 'Failed to save schedule');
+          this.error.set(err?.error?.message ?? 'workflows.schedule.errors.saveFailed');
         },
       });
   }
@@ -239,7 +241,8 @@ export class WorkflowScheduleCardComponent implements OnInit {
   }
 
   remove(): void {
-    if (!confirm('Delete this schedule? Events will stop being generated.')) return;
+    const msg = this.transloco.translate('workflows.schedule.confirmDelete');
+    if (!confirm(msg)) return;
     this.svc.deleteSchedule(this.workflowId()).subscribe({
       next: () => this.schedule.set(null),
     });
@@ -261,7 +264,7 @@ export class WorkflowScheduleCardComponent implements OnInit {
         this.running.set(false);
         this.runResult.set({
           triggered: false,
-          error: err?.error?.message ?? 'Run-now failed',
+          error: err?.error?.message ?? 'workflows.schedule.errors.runFailed',
         });
       },
     });

@@ -1,5 +1,6 @@
 import { Component, computed, input, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { TranslocoModule } from '@jsverse/transloco';
 
 export interface TimeSeriesPoint {
   ts: string;
@@ -16,6 +17,12 @@ interface Point {
   raw: TimeSeriesPoint;
 }
 
+interface SeriesLegend {
+  key: string;
+  labelKey: string;
+  color: string;
+}
+
 const VIEW_W = 800;
 const VIEW_H = 240;
 const PAD_LEFT = 40;
@@ -26,26 +33,28 @@ const PAD_BOTTOM = 32;
 @Component({
   selector: 'app-time-series-chart',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, TranslocoModule],
   template: `
     <div class="card">
       <div class="flex items-start justify-between mb-4">
         <div>
-          <h2 class="text-lg font-semibold text-white">{{ title() }}</h2>
-          <p class="text-xs text-muted mt-1">{{ subtitle() }}</p>
+          <h2 class="text-lg font-semibold text-white">{{ title() || ('analytics.chart.title' | transloco) }}</h2>
+          @if (subtitle()) {
+            <p class="text-xs text-muted mt-1">{{ subtitle() }}</p>
+          }
         </div>
         <div class="flex gap-3 text-xs">
           @for (series of legend(); track series.key) {
             <div class="flex items-center gap-1.5">
               <span class="inline-block w-2.5 h-2.5 rounded-full" [style.background]="series.color"></span>
-              <span class="text-muted">{{ series.label }}</span>
+              <span class="text-muted">{{ series.labelKey | transloco }}</span>
             </div>
           }
         </div>
       </div>
 
       @if (points().length === 0) {
-        <div class="text-sm text-muted py-12 text-center">No data in this range.</div>
+        <div class="text-sm text-muted py-12 text-center">{{ 'analytics.chart.noData' | transloco }}</div>
       } @else {
         <div class="relative">
           <svg
@@ -54,7 +63,6 @@ const PAD_BOTTOM = 32;
             preserveAspectRatio="none"
             (mouseleave)="hovered.set(null)"
           >
-            <!-- Y-axis grid lines -->
             @for (tick of yTicks(); track tick.value) {
               <line
                 [attr.x1]="padLeft"
@@ -74,7 +82,6 @@ const PAD_BOTTOM = 32;
               >{{ tick.value }}</text>
             }
 
-            <!-- X-axis labels -->
             @for (tick of xTicks(); track tick.i) {
               <text
                 [attr.x]="tick.x"
@@ -86,7 +93,6 @@ const PAD_BOTTOM = 32;
               >{{ tick.label }}</text>
             }
 
-            <!-- Series polylines -->
             @for (series of seriesList(); track series.key) {
               <polyline
                 [attr.points]="series.points"
@@ -98,7 +104,6 @@ const PAD_BOTTOM = 32;
               />
             }
 
-            <!-- Hover dots -->
             @for (series of seriesList(); track series.key) {
               @for (pt of series.rawPoints; track pt.x) {
                 <circle
@@ -119,9 +124,9 @@ const PAD_BOTTOM = 32;
               [style.top.px]="hoverTop()"
             >
               <p class="font-mono text-[10px] text-muted">{{ h.raw.ts | date: 'short' }}</p>
-              <p>Events: {{ h.raw.events }}</p>
-              <p class="text-signal-green">Delivered: {{ h.raw.delivered }}</p>
-              <p class="text-signal-rose">DLQ: {{ h.raw.dlq }}</p>
+              <p>{{ 'analytics.chart.legend.events' | transloco }}: {{ h.raw.events }}</p>
+              <p class="text-signal-green">{{ 'analytics.chart.legend.delivered' | transloco }}: {{ h.raw.delivered }}</p>
+              <p class="text-signal-rose">{{ 'analytics.chart.legend.dlq' | transloco }}: {{ h.raw.dlq }}</p>
             </div>
           }
         </div>
@@ -130,7 +135,7 @@ const PAD_BOTTOM = 32;
   `,
 })
 export class TimeSeriesChartComponent {
-  title = input<string>('Events over time');
+  title = input<string>('');
   subtitle = input<string>('');
   data = input.required<TimeSeriesPoint[]>();
 
@@ -141,10 +146,10 @@ export class TimeSeriesChartComponent {
 
   hovered = signal<Point | null>(null);
 
-  readonly legend = computed(() => [
-    { key: 'events', label: 'Events', color: '#7C3AED' },
-    { key: 'delivered', label: 'Delivered', color: '#10B981' },
-    { key: 'dlq', label: 'DLQ', color: '#F43F5E' },
+  readonly legend = computed<SeriesLegend[]>(() => [
+    { key: 'events', labelKey: 'analytics.chart.legend.events', color: '#7C3AED' },
+    { key: 'delivered', labelKey: 'analytics.chart.legend.delivered', color: '#10B981' },
+    { key: 'dlq', labelKey: 'analytics.chart.legend.dlq', color: '#F43F5E' },
   ]);
 
   readonly points = computed(() => this.data());

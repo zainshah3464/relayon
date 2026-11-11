@@ -2,6 +2,7 @@ import { Component, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
+import { TranslocoModule } from '@jsverse/transloco';
 import { AuthService } from '../../core/auth/auth.service';
 import { environment } from '../../../environments/environment';
 import { ApiKeysComponent } from './api-keys.component';
@@ -23,12 +24,12 @@ type Tab = 'workspace' | 'api-keys' | 'billing';
 @Component({
   selector: 'app-settings',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, ApiKeysComponent, BillingComponent],
+  imports: [CommonModule, ReactiveFormsModule, TranslocoModule, ApiKeysComponent, BillingComponent],
   template: `
     <div class="space-y-6 max-w-4xl">
       <div>
-        <h1 class="text-2xl font-bold tracking-tightest text-white">Settings</h1>
-        <p class="text-sm text-muted mt-1">Workspace configuration, API access, billing.</p>
+        <h1 class="text-2xl font-bold tracking-tightest text-white">{{ 'settings.title' | transloco }}</h1>
+        <p class="text-sm text-muted mt-1">{{ 'settings.subtitle' | transloco }}</p>
       </div>
 
       <div class="flex gap-1 border-b border-hairline">
@@ -39,7 +40,7 @@ type Tab = 'workspace' | 'api-keys' | 'billing';
           [class.text-white]="tab() === 'workspace'"
           [class.text-muted]="tab() !== 'workspace'"
           [class.border-transparent]="tab() !== 'workspace'"
-        >Workspace</button>
+        >{{ 'settings.tabs.workspace' | transloco }}</button>
         <button
           (click)="tab.set('api-keys')"
           class="px-4 py-2 text-sm border-b-2 -mb-px"
@@ -47,7 +48,7 @@ type Tab = 'workspace' | 'api-keys' | 'billing';
           [class.text-white]="tab() === 'api-keys'"
           [class.text-muted]="tab() !== 'api-keys'"
           [class.border-transparent]="tab() !== 'api-keys'"
-        >API Keys</button>
+        >{{ 'settings.tabs.apiKeys' | transloco }}</button>
         <button
           (click)="tab.set('billing')"
           class="px-4 py-2 text-sm border-b-2 -mb-px"
@@ -55,32 +56,32 @@ type Tab = 'workspace' | 'api-keys' | 'billing';
           [class.text-white]="tab() === 'billing'"
           [class.text-muted]="tab() !== 'billing'"
           [class.border-transparent]="tab() !== 'billing'"
-        >Billing</button>
+        >{{ 'settings.tabs.billing' | transloco }}</button>
       </div>
 
       @if (tab() === 'workspace') {
         @if (tenant(); as t) {
           <div class="card">
-            <h2 class="text-sm font-medium text-white mb-4">Workspace</h2>
+            <h2 class="text-sm font-medium text-white mb-4">{{ 'settings.workspace.title' | transloco }}</h2>
             <form [formGroup]="form" (ngSubmit)="save()" class="space-y-4">
               <div>
-                <label class="label">Name</label>
+                <label class="label">{{ 'settings.workspace.name' | transloco }}</label>
                 <input formControlName="name" class="input" />
               </div>
               <div>
-                <label class="label">Slug</label>
+                <label class="label">{{ 'settings.workspace.slug' | transloco }}</label>
                 <input [value]="t.slug" disabled class="input opacity-60" />
               </div>
               <div>
-                <label class="label">Plan</label>
+                <label class="label">{{ 'settings.workspace.plan' | transloco }}</label>
                 <input [value]="t.plan" disabled class="input opacity-60" />
               </div>
               <div class="flex gap-2">
                 <button type="submit" [disabled]="form.invalid || saving()" class="btn-primary">
-                  {{ saving() ? 'Saving...' : 'Save changes' }}
+                  {{ (saving() ? 'common.saving' : 'settings.workspace.saveChanges') | transloco }}
                 </button>
                 @if (saved()) {
-                  <span class="text-sm text-signal-green self-center">Saved</span>
+                  <span class="text-sm text-signal-green self-center">{{ 'settings.workspace.saved' | transloco }}</span>
                 }
               </div>
             </form>
@@ -88,10 +89,10 @@ type Tab = 'workspace' | 'api-keys' | 'billing';
 
           @if (auth.user()?.role === 'owner') {
             <div class="card">
-              <h2 class="text-sm font-medium text-white mb-4">Quota override</h2>
+              <h2 class="text-sm font-medium text-white mb-4">{{ 'settings.quotaOverride.title' | transloco }}</h2>
               <div class="grid gap-3 sm:grid-cols-2">
                 <div>
-                  <label class="label">Events / month</label>
+                  <label class="label">{{ 'settings.quotaOverride.eventsPerMonth' | transloco }}</label>
                   <input
                     type="number"
                     [value]="quotaEvents()"
@@ -100,7 +101,7 @@ type Tab = 'workspace' | 'api-keys' | 'billing';
                   />
                 </div>
                 <div>
-                  <label class="label">AI tokens / month</label>
+                  <label class="label">{{ 'settings.quotaOverride.aiTokensPerMonth' | transloco }}</label>
                   <input
                     type="number"
                     [value]="quotaTokens()"
@@ -110,37 +111,41 @@ type Tab = 'workspace' | 'api-keys' | 'billing';
                 </div>
               </div>
               <div class="mt-3">
-                <label class="label">Enforcement mode</label>
+                <label class="label">{{ 'settings.quotaOverride.enforcementMode' | transloco }}</label>
                 <select
                   [value]="quotaMode()"
                   (change)="quotaMode.set($any($event.target).value)"
                   class="input"
                 >
-                  <option value="hard">Hard — block at limit</option>
-                  <option value="soft">Soft — allow up to 2× with warnings</option>
+                  <option value="hard">{{ 'settings.quotaOverride.hardOption' | transloco }}</option>
+                  <option value="soft">{{ 'settings.quotaOverride.softOption' | transloco }}</option>
                 </select>
                 <p class="text-xs text-muted mt-1">
-                  Soft mode sends <code>X-Quota-Warning</code> headers at 80%; hard ceiling at 2× prevents runaway costs.
+                  {{ 'settings.quotaOverride.help' | transloco }}
                 </p>
               </div>
               <div class="flex gap-2 mt-3">
                 <button (click)="saveQuota()" [disabled]="quotaSaving()" class="btn-primary text-xs">
-                  {{ quotaSaving() ? 'Saving...' : 'Update quota' }}
+                  {{ (quotaSaving() ? 'common.saving' : 'settings.quotaOverride.updateQuota') | transloco }}
                 </button>
                 @if (quotaSaved()) {
-                  <span class="text-xs text-signal-green self-center">Saved</span>
+                  <span class="text-xs text-signal-green self-center">{{ 'settings.quotaOverride.saved' | transloco }}</span>
                 }
               </div>
             </div>
           } @else {
             <div class="card">
-              <h2 class="text-sm font-medium text-white mb-2">Quotas</h2>
-              <p class="text-xs text-muted">Events/month: {{ t.quotaEventsPerMonth.toLocaleString() }}</p>
-              <p class="text-xs text-muted">AI tokens/month: {{ t.quotaAiTokensPerMonth.toLocaleString() }}</p>
+              <h2 class="text-sm font-medium text-white mb-2">{{ 'settings.quotas.title' | transloco }}</h2>
+              <p class="text-xs text-muted">
+                {{ 'settings.quotas.eventsPerMonth' | transloco }} {{ t.quotaEventsPerMonth.toLocaleString() }}
+              </p>
+              <p class="text-xs text-muted">
+                {{ 'settings.quotas.aiTokensPerMonth' | transloco }} {{ t.quotaAiTokensPerMonth.toLocaleString() }}
+              </p>
               <p class="text-xs text-muted mt-1">
-                Mode: <span class="font-mono">{{ t.quotaMode }}</span>
+                {{ 'settings.quotas.mode' | transloco }} <span class="font-mono">{{ t.quotaMode }}</span>
                 @if (t.quotaMode === 'soft') {
-                  <span class="text-signal-amber">(soft — 2× hard ceiling with warnings)</span>
+                  <span class="text-signal-amber">{{ 'settings.quotas.softNote' | transloco }}</span>
                 }
               </p>
             </div>

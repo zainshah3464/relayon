@@ -24,6 +24,23 @@ export interface SchemaField {
   options?: Array<{ value: string; label: string }>;
 }
 
+// ⚠️ v2.2 — optional translator so errors can be localized by caller
+export type Translator = (key: string, params?: Record<string, unknown>) => string;
+
+const DEFAULT_TRANSLATOR: Translator = (key, params) => {
+  const label = (params?.['label'] as string | undefined) ?? '';
+  switch (key) {
+    case 'schemaForm.errors.fieldRequired':
+      return `Field "${label}" is required`;
+    case 'schemaForm.errors.invalidJson':
+      return `Field "${label}" is not valid JSON`;
+    case 'schemaForm.errors.notNumber':
+      return `Field "${label}" must be a number`;
+    default:
+      return key;
+  }
+};
+
 export function buildSchemaForm(fields: SchemaField[], fb: FormBuilder): FormGroup {
   const controls: Record<string, unknown> = {};
 
@@ -50,6 +67,7 @@ export function buildSchemaForm(fields: SchemaField[], fb: FormBuilder): FormGro
 export function readSchemaForm(
   fields: SchemaField[],
   form: FormGroup,
+  t: Translator = DEFAULT_TRANSLATOR,
 ): Record<string, unknown> {
   const raw = form.getRawValue() as Record<string, unknown>;
   const out: Record<string, unknown> = {};
@@ -59,7 +77,7 @@ export function readSchemaForm(
 
     if (value === '' || value === null || value === undefined) {
       if (field.required) {
-        throw new Error(`Field "${field.label}" is required`);
+        throw new Error(t('schemaForm.errors.fieldRequired', { label: field.label }));
       }
       continue;
     }
@@ -82,7 +100,7 @@ export function readSchemaForm(
           try {
             out[field.key] = JSON.parse(value);
           } catch {
-            throw new Error(`Field "${field.label}" is not valid JSON`);
+            throw new Error(t('schemaForm.errors.invalidJson', { label: field.label }));
           }
         } else {
           out[field.key] = value;
@@ -92,7 +110,7 @@ export function readSchemaForm(
       case 'number': {
         const n = Number(value);
         if (!Number.isFinite(n)) {
-          throw new Error(`Field "${field.label}" must be a number`);
+          throw new Error(t('schemaForm.errors.notNumber', { label: field.label }));
         }
         out[field.key] = n;
         break;

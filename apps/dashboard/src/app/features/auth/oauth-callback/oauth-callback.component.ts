@@ -1,23 +1,24 @@
 import { Component, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { TranslocoModule } from '@jsverse/transloco';
 import { AuthService } from '../../../core/auth/auth.service';
 
 @Component({
   selector: 'app-oauth-callback',
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, RouterLink, TranslocoModule],
   template: `
     <div class="flex min-h-screen items-center justify-center bg-midnight p-4">
       <div class="w-full max-w-md">
         <div class="card text-center py-10">
           @if (loading()) {
-            <div class="text-sm text-muted">Completing sign in...</div>
+            <div class="text-sm text-muted">{{ 'auth.oauthCallback.loading' | transloco }}</div>
           } @else if (error()) {
             <div class="text-4xl mb-3">⚠️</div>
-            <h1 class="text-xl font-bold text-white mb-2">Sign in failed</h1>
-            <p class="text-sm text-signal-rose mb-6">{{ error() }}</p>
-            <a routerLink="/login" class="btn-secondary text-sm">Try again</a>
+            <h1 class="text-xl font-bold text-white mb-2">{{ 'auth.oauthCallback.errorTitle' | transloco }}</h1>
+            <p class="text-sm text-signal-rose mb-6">{{ error() | transloco }}</p>
+            <a routerLink="/login" class="btn-secondary text-sm">{{ 'auth.oauthCallback.tryAgain' | transloco }}</a>
           }
         </div>
       </div>
@@ -41,7 +42,7 @@ export class OAuthCallbackComponent implements OnInit {
     }
     if (!ticket) {
       this.loading.set(false);
-      this.error.set('Missing login ticket');
+      this.error.set('auth.oauthCallback.missingTicket');
       return;
     }
     this.auth.exchangeOAuthTicket(ticket).subscribe({
@@ -52,7 +53,7 @@ export class OAuthCallbackComponent implements OnInit {
       },
       error: (err) => {
         this.loading.set(false);
-        this.error.set(err?.error?.message ?? 'Could not complete sign in');
+        this.error.set(err?.error?.message ?? 'auth.oauthCallback.failed');
       },
     });
   }

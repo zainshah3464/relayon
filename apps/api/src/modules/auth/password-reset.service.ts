@@ -33,10 +33,13 @@ export class PasswordResetService {
     );
 
     const appUrl = this.config.get<string>('APP_ORIGIN') ?? 'http://localhost:4200';
-    await this.email.sendPasswordReset(user.email, user.name, `${appUrl}/reset-password?token=${token}`);
+    await this.email.sendPasswordReset(user.email, user.name, `${appUrl}/reset-password?token=${token}`, user.locale);
   }
 
-  async reset(token: string, newPasswordHash: string): Promise<{ userId: string; tenantId: string; email: string; name: string }> {
+  async reset(
+    token: string,
+    newPasswordHash: string,
+  ): Promise<{ userId: string; tenantId: string; email: string; name: string; locale: string }> {
     const tokenHash = this.hash(token);
     const record = await this.prisma.withoutTenant((c) =>
       c.passwordReset.findUnique({ where: { tokenHash }, include: { user: true } }),
@@ -57,7 +60,13 @@ export class PasswordResetService {
       });
     });
 
-    return { userId: record.userId, tenantId: record.user.tenantId, email: record.user.email, name: record.user.name };
+    return {
+      userId: record.userId,
+      tenantId: record.user.tenantId,
+      email: record.user.email,
+      name: record.user.name,
+      locale: record.user.locale ?? 'en',
+    };
   }
 
   private hash(token: string): string {

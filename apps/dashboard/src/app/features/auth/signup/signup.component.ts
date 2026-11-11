@@ -2,6 +2,7 @@ import { Component, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { TranslocoModule } from '@jsverse/transloco';
 import { AuthService } from '../../../core/auth/auth.service';
 import { PasswordStrengthMeterComponent } from '../../../shared/password-strength/password-strength-meter.component';
 
@@ -12,6 +13,7 @@ import { PasswordStrengthMeterComponent } from '../../../shared/password-strengt
     CommonModule,
     ReactiveFormsModule,
     RouterLink,
+    TranslocoModule,
     PasswordStrengthMeterComponent,
   ],
   template: `
@@ -21,8 +23,8 @@ import { PasswordStrengthMeterComponent } from '../../../shared/password-strengt
           <div class="mb-3 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-relay-violet to-relay-cyan text-xl font-bold text-white">
             R
           </div>
-          <h1 class="text-2xl font-bold tracking-tightest text-white">Create your account</h1>
-          <p class="mt-1 text-sm text-muted">Start relaying webhooks in minutes</p>
+          <h1 class="text-2xl font-bold tracking-tightest text-white">{{ 'auth.signup.title' | transloco }}</h1>
+          <p class="mt-1 text-sm text-muted">{{ 'auth.signup.subtitle' | transloco }}</p>
         </div>
 
         <div class="card">
@@ -30,18 +32,17 @@ import { PasswordStrengthMeterComponent } from '../../../shared/password-strengt
             <!-- Success state — check email -->
             <div class="text-center py-6">
               <div class="text-4xl mb-3">📬</div>
-              <h2 class="text-lg font-semibold text-white mb-2">Check your email</h2>
+              <h2 class="text-lg font-semibold text-white mb-2">{{ 'auth.signup.successTitle' | transloco }}</h2>
               <p class="text-sm text-muted mb-4">
-                We sent a verification link to
-                <strong class="text-white">{{ form.controls.email.value }}</strong>.
+                {{ 'auth.signup.successBody' | transloco: { email: form.controls.email.value } }}
               </p>
               <p class="text-xs text-muted mb-6">
-                Click the link in your inbox to activate your account.
+                {{ 'auth.signup.successHint' | transloco }}
               </p>
 
               @if (resendSuccess()) {
                 <div class="rounded-lg border border-signal-emerald/30 bg-signal-emerald/10 px-3 py-2 text-xs text-signal-emerald mb-3">
-                  Verification email resent. Check your inbox.
+                  {{ 'auth.signup.resendSent' | transloco }}
                 </div>
               }
 
@@ -52,10 +53,10 @@ import { PasswordStrengthMeterComponent } from '../../../shared/password-strengt
                   [disabled]="resending()"
                   class="btn-secondary w-full text-sm"
                 >
-                  {{ resending() ? 'Sending...' : 'Resend verification email' }}
+                  {{ (resending() ? 'auth.signup.resending' : 'auth.signup.resend') | transloco }}
                 </button>
                 <a routerLink="/login" class="btn-primary w-full block text-sm text-center">
-                  Back to sign in
+                  {{ 'auth.login.submit' | transloco }}
                 </a>
               </div>
             </div>
@@ -73,7 +74,7 @@ import { PasswordStrengthMeterComponent } from '../../../shared/password-strengt
                   <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
                   <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
                 </svg>
-                Sign up with Google
+                {{ 'auth.signup.continueWithGoogle' | transloco }}
               </button>
               <button
                 type="button"
@@ -83,7 +84,7 @@ import { PasswordStrengthMeterComponent } from '../../../shared/password-strengt
                 <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
                 </svg>
-                Sign up with GitHub
+                {{ 'auth.signup.continueWithGitHub' | transloco }}
               </button>
             </div>
 
@@ -93,7 +94,7 @@ import { PasswordStrengthMeterComponent } from '../../../shared/password-strengt
                 <div class="w-full border-t border-hairline"></div>
               </div>
               <div class="relative flex justify-center text-xs">
-                <span class="bg-surface px-2 text-muted">OR</span>
+                <span class="bg-surface px-2 text-muted">{{ 'common.or' | transloco }}</span>
               </div>
             </div>
 
@@ -106,7 +107,7 @@ import { PasswordStrengthMeterComponent } from '../../../shared/password-strengt
               }
 
               <div>
-                <label for="name" class="label">Your name</label>
+                <label for="name" class="label">{{ 'auth.signup.name' | transloco }}</label>
                 <input
                   id="name"
                   type="text"
@@ -116,12 +117,12 @@ import { PasswordStrengthMeterComponent } from '../../../shared/password-strengt
                   placeholder="Jane Doe"
                 />
                 @if (form.controls.name.touched && form.controls.name.invalid) {
-                  <p class="mt-1 text-xs text-signal-rose">Name required (min 2 chars)</p>
+                  <p class="mt-1 text-xs text-signal-rose">{{ 'auth.validation.nameMin2' | transloco }}</p>
                 }
               </div>
 
               <div>
-                <label for="tenantName" class="label">Company / team name</label>
+                <label for="tenantName" class="label">{{ 'auth.signup.tenantName' | transloco }}</label>
                 <input
                   id="tenantName"
                   type="text"
@@ -131,12 +132,12 @@ import { PasswordStrengthMeterComponent } from '../../../shared/password-strengt
                   placeholder="Acme Inc."
                 />
                 @if (form.controls.tenantName.touched && form.controls.tenantName.invalid) {
-                  <p class="mt-1 text-xs text-signal-rose">Team name required (min 2 chars)</p>
+                  <p class="mt-1 text-xs text-signal-rose">{{ 'auth.validation.teamMin2' | transloco }}</p>
                 }
               </div>
 
               <div>
-                <label for="email" class="label">Email</label>
+                <label for="email" class="label">{{ 'auth.signup.email' | transloco }}</label>
                 <input
                   id="email"
                   type="email"
@@ -146,12 +147,12 @@ import { PasswordStrengthMeterComponent } from '../../../shared/password-strengt
                   placeholder="you@company.com"
                 />
                 @if (form.controls.email.touched && form.controls.email.invalid) {
-                  <p class="mt-1 text-xs text-signal-rose">Valid email is required</p>
+                  <p class="mt-1 text-xs text-signal-rose">{{ 'auth.validation.emailRequired' | transloco }}</p>
                 }
               </div>
 
               <div>
-                <label for="password" class="label">Password</label>
+                <label for="password" class="label">{{ 'auth.signup.password' | transloco }}</label>
                 <input
                   id="password"
                   type="password"
@@ -166,12 +167,13 @@ import { PasswordStrengthMeterComponent } from '../../../shared/password-strengt
                   <app-password-strength-meter
                     [password]="form.controls.password.value"
                     [userInputs]="userInputs()"
+                    (strengthChange)="onPasswordStrengthChange($event)"
                   />
                 }
 
                 @if (form.controls.password.touched && form.controls.password.invalid) {
                   <p class="mt-1 text-xs text-signal-rose">
-                    Password must be at least 12 characters
+                    {{ 'auth.validation.passwordMin12' | transloco }}
                   </p>
                 }
               </div>
@@ -181,21 +183,21 @@ import { PasswordStrengthMeterComponent } from '../../../shared/password-strengt
                 [disabled]="loading() || form.invalid || !passwordStrong()"
                 class="btn-primary w-full"
               >
-                {{ loading() ? 'Creating account...' : 'Create account' }}
+                {{ (loading() ? 'auth.signup.submitting' : 'auth.signup.submit') | transloco }}
               </button>
             </form>
 
             <p class="mt-6 text-center text-sm text-muted">
-              Already have an account?
+              {{ 'auth.signup.hasAccount' | transloco }}
               <a routerLink="/login" class="font-medium text-relay-cyan hover:underline">
-                Sign in
+                {{ 'auth.signup.signIn' | transloco }}
               </a>
             </p>
           }
         </div>
 
         <p class="mt-6 text-center text-xs text-muted">
-          Relayon · Your webhooks, relayed right.
+          {{ 'footer' | transloco }}
         </p>
       </div>
     </div>
@@ -229,7 +231,7 @@ export class SignupComponent {
     return [email, name, tenant].filter((x): x is string => !!x);
   };
 
-  // Password strength meter emits event to update submit button state
+  // ⚠️ v2.2 — FIXED: this method now receives events via (strengthChange)
   onPasswordStrengthChange(strong: boolean): void {
     this.passwordStrong.set(strong);
   }

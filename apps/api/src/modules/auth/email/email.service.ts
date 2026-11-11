@@ -2,7 +2,16 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';
-import { verificationEmail, resetPasswordEmail, passwordChangedEmail } from './templates';
+import {
+  verificationEmail,
+  resetPasswordEmail,
+  passwordChangedEmail,
+  type Locale,
+} from './templates';
+
+function safeLocale(raw: string | null | undefined): Locale {
+  return raw === 'ur' || raw === 'ar' ? raw : 'en';
+}
 
 @Injectable()
 export class AuthEmailService {
@@ -28,18 +37,18 @@ export class AuthEmailService {
     }
   }
 
-  async sendVerification(to: string, name: string, url: string): Promise<void> {
-    const { subject, html, text } = verificationEmail({ name, verifyUrl: url, expiresInHours: 24 });
+  async sendVerification(to: string, name: string, url: string, locale?: string | null): Promise<void> {
+    const { subject, html, text } = verificationEmail(safeLocale(locale), { name, verifyUrl: url, expiresInHours: 24 });
     await this.send(to, subject, html, text);
   }
 
-  async sendPasswordReset(to: string, name: string, url: string): Promise<void> {
-    const { subject, html, text } = resetPasswordEmail({ name, resetUrl: url, expiresInMinutes: 60 });
+  async sendPasswordReset(to: string, name: string, url: string, locale?: string | null): Promise<void> {
+    const { subject, html, text } = resetPasswordEmail(safeLocale(locale), { name, resetUrl: url, expiresInMinutes: 60 });
     await this.send(to, subject, html, text);
   }
 
-  async sendPasswordChanged(to: string, name: string): Promise<void> {
-    const { subject, html, text } = passwordChangedEmail({ name });
+  async sendPasswordChanged(to: string, name: string, locale?: string | null): Promise<void> {
+    const { subject, html, text } = passwordChangedEmail(safeLocale(locale), { name });
     await this.send(to, subject, html, text);
   }
 
@@ -52,7 +61,6 @@ export class AuthEmailService {
       await this.transporter.sendMail({ from: this.from, to, subject, html, text });
       this.logger.log(`✉️  Email sent: ${subject} → ${to}`);
     } catch (err) {
-      // Never throw — email failure must not break auth flows
       this.logger.error(`Failed to send email to ${to}: ${err instanceof Error ? err.message : String(err)}`);
     }
   }

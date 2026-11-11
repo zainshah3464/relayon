@@ -1,0 +1,535 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "or": "OR",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "back": "Back",
+    "refresh": "Refresh",
+    "close": "Close",
+"edit": "Edit",
+"hide": "Hide",
+"enable": "Enable",
+"disable": "Disable",
+"enabled": "Enabled",
+"disabled": "Disabled",
+"active": "Active",
+"inactive": "Inactive",
+"status": "Status",
+"name": "Name",
+"type": "Type",
+"add": "Add",
+"adding": "Adding...",
+"saving": "Saving...",
+"none": "None",
+"selectAll": "Select all",
+"selected": "selected",
+"clear": "Clear",
+"view": "View"
+  },
+  "settings": {
+  "title": "Settings",
+  "subtitle": "Workspace configuration, API access, billing.",
+  "tabs": {
+    "workspace": "Workspace",
+    "apiKeys": "API Keys",
+    "billing": "Billing"
+  },
+  "workspace": {
+    "title": "Workspace",
+    "name": "Name",
+    "slug": "Slug",
+    "plan": "Plan",
+    "saveChanges": "Save changes",
+    "saved": "Saved"
+  },
+  "quotaOverride": {
+    "title": "Quota override",
+    "eventsPerMonth": "Events / month",
+    "aiTokensPerMonth": "AI tokens / month",
+    "enforcementMode": "Enforcement mode",
+    "hardOption": "Hard — block at limit",
+    "softOption": "Soft — allow up to 2× with warnings",
+    "help": "Soft mode sends X-Quota-Warning headers at 80%; hard ceiling at 2× prevents runaway costs.",
+    "updateQuota": "Update quota",
+    "saved": "Saved"
+  },
+  "quotas": {
+    "title": "Quotas",
+    "eventsPerMonth": "Events/month:",
+    "aiTokensPerMonth": "AI tokens/month:",
+    "mode": "Mode:",
+    "softNote": "(soft — 2× hard ceiling with warnings)"
+  }
+},
+"apiKeys": {
+  "title": "API Keys",
+  "subtitle": "Programmatic access to Relayon. Keys are hashed — raw value shown once.",
+  "newKey": "+ New key",
+  "createdTitle": "✅ Key created — copy now. It won't be shown again.",
+  "copyKey": "Copy key",
+  "copied": "Copied!",
+  "dismiss": "Dismiss",
+  "loading": "Loading API keys...",
+  "empty": "No API keys yet. Create one to enable programmatic access.",
+  "revoked": "Revoked",
+  "created": "Created",
+  "lastUsed": "Last used",
+  "expires": "Expires",
+  "revoke": "Revoke",
+  "revokeConfirm": "Revoke \"{{name}}\"? This cannot be undone.",
+  "rotationHistory": "Rotation history",
+  "graceUntil": "grace until",
+  "modal": {
+    "title": "Create API key",
+    "name": "Name",
+    "namePlaceholder": "CI pipeline",
+    "environment": "Environment",
+    "environments": {
+      "live": "Live",
+      "test": "Test"
+    },
+    "scopes": "Scopes",
+    "neverExpires": "Never expires",
+    "creating": "Creating...",
+    "create": "Create"
+  },
+  "errors": {
+    "createFailed": "Failed to create key"
+  }
+},
+  "noData": "No data in this range.",
+"legend": {
+  "events": "Events",
+  "delivered": "Delivered",
+  "dlq": "DLQ"
+},
+"billing": {
+  "title": "Billing",
+  "subtitle": "Subscription and payment method.",
+  "disabled": "Billing is disabled on this instance. All features are free.",
+  "currentPlan": "Current plan",
+  "statusLabel": "Status:",
+  "renews": "Renews",
+  "manageSubscription": "Manage subscription",
+  "upgradeToPro": "Upgrade to Pro (Free)",
+  "redirecting": "Redirecting...",
+  "testMode": {
+    "label": "TEST MODE",
+    "body": "No real charges are processed. Use card",
+    "tail": "for any future expiry.",
+    "badge": "TEST MODE"
+  },
+  "plans": {
+    "free": "Free",
+    "pro": "Pro",
+    "enterprise": "Enterprise"
+  },
+  "status": {
+    "none": "None",
+    "active": "Active",
+    "trialing": "Trialing",
+    "past_due": "Past due",
+    "canceled": "Canceled",
+    "incomplete": "Incomplete",
+    "incomplete_expired": "Incomplete (expired)",
+    "unpaid": "Unpaid"
+  }
+},
+  "schemaForm": {
+  "errors": {
+    "fieldRequired": "Field \"{{label}}\" is required",
+    "invalidJson": "Field \"{{label}}\" is not valid JSON",
+    "notNumber": "Field \"{{label}}\" must be a number"
+  }
+},
+  "workflows": {
+  "list": {
+    "title": "Workflows",
+    "subtitle": "Webhook pipelines that receive, enrich, and route events.",
+    "newWorkflow": "+ New workflow",
+    "loading": "Loading workflows...",
+    "emptyTitle": "No workflows yet",
+    "emptyBody": "Create your first workflow to start receiving webhooks.",
+    "createWorkflow": "Create workflow",
+    "inactive": "Inactive",
+    "ai": "AI",
+    "destinations": "destination(s)",
+    "modal": {
+      "title": "New workflow",
+      "name": "Name",
+      "namePlaceholder": "Stripe → Slack alerts",
+      "sourceType": "Source type",
+      "signingSecret": "Signing secret",
+      "signingSecretHint": "Shared HMAC secret from the source platform.",
+      "genericHmac": "Generic (HMAC)",
+      "enableAI": "Enable AI enrichment (Groq)",
+      "creating": "Creating...",
+      "create": "Create"
+    },
+    "errors": {
+      "loadFailed": "Failed to load workflows",
+      "createFailed": "Failed to create workflow"
+    }
+  },
+  "detail": {
+    "allWorkflows": "← All workflows",
+    "id": "ID",
+    "copyWebhookUrl": "Copy webhook URL",
+    "copied": "Copied!",
+    "exportYaml": "Export YAML",
+    "exporting": "Exporting...",
+    "testRun": "▶ Test run",
+    "versionHistory": "Version history",
+    "webhookUrl": "Webhook URL",
+    "transformExpression": "Transform expression (JSONata)",
+    "testing": "Testing...",
+    "testWithSample": "Test with sample payload",
+    "saveExpression": "Save expression",
+    "valid": "Valid",
+    "noTransform": "No transform configured",
+    "aiEnrichment": "AI Enrichment",
+    "status": "Status",
+    "transform": "Transform",
+    "customJsonata": "Custom JSONata",
+    "destinations": "Destinations",
+    "addDestination": "+ Add destination",
+    "noDestinations": "No destinations yet.",
+    "verified": "verified",
+    "failed": "failed",
+    "lastValidated": "Last validated",
+    "validationFailed": "Validation failed",
+    "createDestinationTitle": "Add destination",
+    "namePlaceholder": "Production alerts",
+    "testConnection": "Test connection",
+    "connectionVerified": "✓ Connection verified",
+    "validationFailedTitle": "✗ Validation failed",
+    "testRunPipeline": "Test run pipeline",
+    "testRunHint": "Runs enrich → transform → routing. No DB writes.",
+    "samplePayload": "Sample payload (JSON)",
+    "alsoDryRun": "Also dry-run matched destinations (adds ~1–2s each)",
+    "running": "Running...",
+    "runPipeline": "Run pipeline",
+    "stepEnrichment": "1. Enrichment",
+    "stepTransform": "2. Transform",
+    "stepRouting": "3. Routing",
+    "stepDryRuns": "4. Destination dry-runs",
+    "error": "Error",
+    "ok": "OK",
+    "applied": "Applied",
+    "cached": "cached",
+    "noDestinationReceives": "No destination would receive this event.",
+    "destinationsWouldReceive": "destination(s) would receive:",
+    "checked": "checked",
+    "confirmDeleteDest": "Delete destination \"{{name}}\"?",
+    "errors": {
+      "loadFailed": "Failed to load workflow",
+      "loadDestFailed": "Failed to load destinations",
+      "exportFailed": "Export failed",
+      "invalidJson": "Payload is not valid JSON",
+      "testRunFailed": "Test run failed",
+      "addDestFailed": "Failed to add destination",
+      "previewFailed": "Preview failed"
+    }
+  },
+  "schedule": {
+    "title": "Scheduled trigger",
+    "subtitle": "Relayon generates an event on this cron. It flows through enrichment, transform, and routing like any webhook.",
+    "active": "Active",
+    "paused": "Paused",
+    "cron": "Cron",
+    "timezone": "Timezone",
+    "nextRun": "Next run",
+    "runNow": "Run now",
+    "running": "Running...",
+    "pause": "Pause",
+    "resume": "Resume",
+    "addSchedule": "+ Add schedule",
+    "preset": "Preset",
+    "custom": "Custom…",
+    "cronExpression": "Cron expression",
+    "payloadTemplate": "Payload template (JSON)",
+    "saveSchedule": "Save schedule",
+    "saving": "Saving...",
+    "triggered": "Triggered",
+    "confirmDelete": "Delete this schedule? Events will stop being generated.",
+    "errors": {
+      "invalidJson": "Payload template is not valid JSON",
+      "saveFailed": "Failed to save schedule",
+      "runFailed": "Run-now failed"
+    },
+    "presets": {
+      "every15": "Every 15 minutes",
+      "hourly": "Hourly",
+      "daily9": "Daily at 09:00",
+      "weekdays9": "Weekdays at 09:00",
+      "weeklyMon9": "Weekly (Monday 09:00)"
+    }
+  },
+  "versions": {
+    "title": "Version history",
+    "loading": "Loading versions...",
+    "empty": "No versions yet.",
+    "latest": "latest",
+    "noMessage": "No message",
+    "compare": "Compare",
+    "selected": "Selected",
+    "restore": "Restore",
+    "diff": "Diff",
+    "exit": "Exit",
+    "selectHint": "Select two versions from the list — first click is A, second is B.",
+    "identical": "Versions are identical.",
+    "split": "Split",
+    "unified": "Unified",
+    "computing": "Computing...",
+    "computeDiff": "Compute diff",
+    "snapshot": "Snapshot",
+    "restoreConfirm": "Restore to v{{version}}? Current destinations will be replaced. A new version will be created.",
+    "errors": {
+      "loadFailed": "Failed to load versions",
+      "loadOneFailed": "Failed to load version",
+      "restoreFailed": "Restore failed",
+      "diffFailed": "Diff failed"
+    }
+  }
+},
+"dlq": {
+  "title": "Dead Letter Queue",
+  "subtitle": "Deliveries that exhausted retries. Inspect errors and replay.",
+  "loading": "Loading DLQ...",
+  "empty": "All clear — no failed deliveries in the DLQ.",
+  "replaySelected": "Replay selected",
+  "replaying": "Replaying...",
+  "discardSelected": "Discard selected",
+  "attempts": "attempts",
+  "replay": "Replay",
+  "discard": "Discard",
+  "lastHttp": "Last HTTP",
+  "replayedResult": "Replayed {{replayed}}/{{total}}",
+  "failedResult": "{{failed}} failed",
+  "confirmDiscard": "Permanently discard {{count}} DLQ entries?",
+  "confirmDiscardOne": "Delete this DLQ entry permanently?",
+  "errors": {
+    "loadFailed": "Failed to load DLQ",
+    "bulkDiscardFailed": "Bulk discard failed"
+  }
+},
+"events": {
+  "title": "Events",
+  "subtitle": "Every webhook received by Relayon, with full lifecycle.",
+  "loading": "Loading events...",
+  "empty": "No events yet. Send a webhook to see it here.",
+  "loadMore": "Load more",
+  "filter": {
+    "allStatuses": "All statuses",
+    "processed": "Processed",
+    "failed": "Failed",
+    "processing": "Processing"
+  },
+  "table": {
+    "correlationId": "Correlation ID",
+    "source": "Source",
+    "status": "Status",
+    "received": "Received"
+  },
+  "replayConfirm": "Replay this event from scratch? A new correlation ID will be created.",
+  "detail": {
+    "title": "Event detail",
+    "replay": "↻ Replay event",
+    "replaying": "Replaying...",
+    "replayQueued": "✓ Replay queued",
+    "newCorrelation": "new correlation:",
+    "correlation": "Correlation:",
+    "status": "Status:",
+    "source": "Source:",
+    "received": "Received:",
+    "enrichment": "AI Enrichment",
+    "model": "Model:",
+    "duration": "Duration:",
+    "cached": "Cached:",
+    "error": "Error:",
+    "rawPayload": "Raw payload",
+    "enriched": "Enriched",
+    "deliveries": "Deliveries",
+    "http": "HTTP"
+  },
+  "errors": {
+    "loadFailed": "Failed to load events",
+    "replayFailed": "Replay failed"
+  }
+},
+"analytics": {
+  "title": "Analytics",
+  "subtitle": "Event volume, delivery health, latency, and estimated costs.",
+  "loading": "Loading analytics...",
+  "chart": {
+    "title": "Events & deliveries",
+    "subtitle": "Hourly / daily buckets — hover any point for details"
+  },
+  "stats": {
+    "events24h": "Events (24h)",
+    "events7d": "Events (7d)",
+    "successRate": "Success rate",
+    "dlq": "DLQ"
+  },
+  "cost": {
+    "title": "Estimated costs",
+    "subtitle": "Approximation based on payload size and delivery attempts.",
+    "groq": "Groq",
+    "redis": "Redis",
+    "destination": "Destination",
+    "deliveries": "Deliveries",
+    "attempts": "Attempts",
+    "retryRate": "Retry rate",
+    "estCost": "Est. cost"
+  },
+  "usage": {
+    "title": "Usage",
+    "resets": "Resets"
+  },
+  "errors": {
+    "overviewFailed": "Failed to load overview",
+    "deliveryFailed": "Failed to load delivery stats",
+    "costFailed": "Failed to load cost analytics",
+    "timeSeriesFailed": "Failed to load time-series"
+  }
+},
+  "nav": {
+    "dashboard": "Dashboard",
+    "workflows": "Workflows",
+    "events": "Events",
+    "dlq": "Dead Letter Queue",
+    "analytics": "Analytics",
+    "settings": "Settings",
+    "signOut": "Sign out"
+  },
+  "language": {
+    "label": "Language",
+    "en": "English",
+    "ur": "اردو",
+    "ar": "العربية"
+  },
+  "auth": {
+    "login": {
+      "title": "Welcome back",
+      "subtitle": "Sign in to your Relayon dashboard",
+      "email": "Email",
+      "emailPlaceholder": "you@company.com",
+      "password": "Password",
+      "passwordPlaceholder": "••••••••",
+      "submit": "Sign in",
+      "submitting": "Signing in...",
+      "forgotPassword": "Forgot password?",
+      "noAccount": "Don't have an account?",
+      "createOne": "Create one",
+      "continueWithGoogle": "Continue with Google",
+      "continueWithGitHub": "Continue with GitHub",
+      "errors": {
+        "invalidCredentials": "Invalid email or password",
+        "emailNotVerified": "Please verify your email before logging in. Check your inbox.",
+        "resendVerification": "Resend verification email",
+        "resendSent": "Verification email sent. Check your inbox."
+      }
+    },
+    "signup": {
+      "title": "Create your account",
+      "subtitle": "Start relaying webhooks in minutes",
+      "name": "Your name",
+      "tenantName": "Company / team name",
+      "email": "Email",
+      "password": "Password",
+      "submit": "Create account",
+      "submitting": "Creating account...",
+      "hasAccount": "Already have an account?",
+      "signIn": "Sign in",
+      "continueWithGoogle": "Sign up with Google",
+      "continueWithGitHub": "Sign up with GitHub",
+      "successTitle": "Check your email",
+      "successBody": "We sent a verification link to {{email}}.",
+      "successHint": "Click the link in your inbox to activate your account.",
+      "resend": "Resend verification email",
+      "resending": "Sending...",
+      "resendSent": "Verification email resent. Check your inbox."
+    },
+    "forgotPassword": {
+      "title": "Forgot password?",
+      "subtitle": "We'll email you a reset link.",
+      "email": "Email",
+      "submit": "Send reset link",
+      "submitting": "Sending...",
+      "sentTitle": "Check your email",
+      "sentBody": "If an account exists for {{email}}, you'll receive a reset link within a minute.",
+      "backToLogin": "Back to sign in",
+      "remembered": "Remember it?",
+      "signIn": "Sign in"
+    },
+    "resetPassword": {
+      "title": "Set new password",
+      "newPassword": "New password",
+      "confirmPassword": "Confirm password",
+      "submit": "Update password",
+      "submitting": "Updating...",
+      "successTitle": "Password updated",
+      "successBody": "Sign in with your new password.",
+      "signIn": "Sign in",
+      "errors": {
+        "mismatch": "Passwords don't match",
+        "missingToken": "Missing reset token. Request a new link.",
+        "failed": "Failed to reset password"
+      }
+    },
+    "verifyEmail": {
+      "verifying": "Verifying your email...",
+      "successTitle": "Email verified",
+      "successBody": "Your account is active. You can now sign in.",
+      "signIn": "Sign in",
+      "failedTitle": "Verification failed",
+      "backToLogin": "Back to sign in",
+      "missingToken": "Missing verification token",
+      "invalidLink": "Invalid or expired verification link"
+    },
+    "oauthCallback": {
+      "loading": "Completing sign in...",
+      "errorTitle": "Sign in failed",
+      "tryAgain": "Try again",
+      "missingTicket": "Missing login ticket",
+      "failed": "Could not complete sign in"
+    },
+    "validation": {
+      "emailRequired": "Valid email is required",
+      "passwordMin8": "Password must be at least 8 characters",
+      "passwordMin12": "Password must be at least 12 characters",
+      "nameMin2": "Name required (min 2 chars)",
+      "teamMin2": "Team name required (min 2 chars)"
+    }
+  },
+  "passwordStrength": {
+    "veryWeak": "Very weak",
+    "weak": "Weak",
+    "fair": "Fair",
+    "strong": "Strong",
+    "veryStrong": "Very strong"
+  },
+  "dashboard": {
+    "welcome": "Welcome, {{name}}",
+    "subtitle": "Here's what's happening with your webhook pipelines today.",
+    "stats": {
+      "events24h": "Events (24h)",
+      "successRate": "Success rate",
+      "pendingDeliveries": "Pending deliveries",
+      "dlqEntries": "DLQ entries"
+    },
+    "quickLinks": {
+      "workflowsTitle": "Workflows",
+      "workflowsDesc": "Create and manage webhook pipelines",
+      "eventsTitle": "Event explorer",
+      "eventsDesc": "Inspect any webhook's full lifecycle"
+    },
+    "dlqAlert": "{{count}} deliveries in Dead Letter Queue — click to review and replay.",
+    "monthlyUsage": "Monthly usage",
+    "events": "Events",
+    "aiTokens": "AI tokens"
+  },
+  "footer": "Relayon · Your webhooks, relayed right."
+}

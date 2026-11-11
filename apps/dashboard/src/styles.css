@@ -32,3 +32,17 @@
     @apply rounded-xl border border-hairline bg-surface p-6;
   }
 }
+
+/* ── RTL adjustments (v2.2) ──────────────────────────── */
+[dir='rtl'] .rtl-flip {
+  transform: scaleX(-1);
+}
+
+[dir='rtl'] body {
+  font-family: 'Inter', 'Noto Nastaliq Urdu', 'Noto Sans Arabic', system-ui, sans-serif;
+  line-height: 1.7;
+}
+
+[dir='rtl'] .sidebar-translate {
+  transform: translateX(100%);
+}

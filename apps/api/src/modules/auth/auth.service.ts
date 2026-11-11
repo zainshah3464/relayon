@@ -238,8 +238,13 @@ export class AuthService {
   // ─── PASSWORD RESET ────────────────────────────────────────────────
   async resetPassword(token: string, newPassword: string): Promise<void> {
     const passwordHash = await bcrypt.hash(newPassword, 12);
-    const { email, name } = await this.passwordReset.reset(token, passwordHash);
-    this.email.sendPasswordChanged(email, name).catch(() => undefined);
+    // ⚠️ v2.2 — passwordReset.reset now returns locale so confirmation email
+    //           can be sent in the user's preferred language.
+    const { email, name, locale } = await this.passwordReset.reset(
+      token,
+      passwordHash,
+    );
+    this.email.sendPasswordChanged(email, name, locale).catch(() => undefined);
   }
 
   // ─── REFRESH / LOGOUT ──────────────────────────────────────────────

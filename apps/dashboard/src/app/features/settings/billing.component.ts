@@ -1,6 +1,7 @@
 import { Component, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
+import { TranslocoModule } from '@jsverse/transloco';
 import { environment } from '../../../environments/environment';
 
 interface BillingStatus {
@@ -14,50 +15,59 @@ interface BillingStatus {
 @Component({
   selector: 'app-billing',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, TranslocoModule],
   template: `
     <div class="space-y-6">
       <div>
-        <h1 class="text-2xl font-bold text-white">Billing</h1>
-        <p class="text-sm text-muted mt-1">Subscription and payment method.</p>
+        <h1 class="text-2xl font-bold text-white">{{ 'billing.title' | transloco }}</h1>
+        <p class="text-sm text-muted mt-1">{{ 'billing.subtitle' | transloco }}</p>
       </div>
 
       @if (status()?.testMode) {
         <div class="rounded-lg border border-signal-amber/30 bg-signal-amber/5 p-3 text-sm text-signal-amber">
-          ⚠️ <strong>TEST MODE</strong> — No real charges are processed. Use card
-          <code class="font-mono">4242 4242 4242 4242</code> for any future expiry.
+          ⚠️ <strong>{{ 'billing.testMode.label' | transloco }}</strong> —
+          {{ 'billing.testMode.body' | transloco }}
+          <code class="font-mono">4242 4242 4242 4242</code>
+          {{ 'billing.testMode.tail' | transloco }}
         </div>
       }
 
       @if (status(); as s) {
         @if (!s.billingEnabled) {
           <div class="card text-sm text-muted">
-            Billing is disabled on this instance. All features are free.
+            {{ 'billing.disabled' | transloco }}
           </div>
         } @else {
           <div class="card">
             <div class="flex justify-between items-start">
               <div>
-                <p class="text-xs uppercase text-muted">Current plan</p>
-                <p class="text-2xl font-bold text-white mt-1 capitalize">{{ s.plan }}</p>
-                <p class="text-xs text-muted mt-1">Status: {{ s.subscriptionStatus }}</p>
+                <p class="text-xs uppercase text-muted">{{ 'billing.currentPlan' | transloco }}</p>
+                <p class="text-2xl font-bold text-white mt-1">
+                  {{ 'billing.plans.' + s.plan | transloco }}
+                </p>
+                <p class="text-xs text-muted mt-1">
+                  {{ 'billing.statusLabel' | transloco }}
+                  {{ 'billing.status.' + s.subscriptionStatus | transloco }}
+                </p>
                 @if (s.currentPeriodEnd) {
-                  <p class="text-xs text-muted">Renews {{ s.currentPeriodEnd | date: 'mediumDate' }}</p>
+                  <p class="text-xs text-muted">
+                    {{ 'billing.renews' | transloco }} {{ s.currentPeriodEnd | date: 'mediumDate' }}
+                  </p>
                 }
                 @if (s.testMode) {
                   <span class="inline-block mt-2 text-xs px-2 py-0.5 rounded bg-signal-amber/20 text-signal-amber">
-                    TEST MODE
+                    {{ 'billing.testMode.badge' | transloco }}
                   </span>
                 }
               </div>
               <div class="flex gap-2">
                 @if (s.subscriptionStatus === 'active' || s.subscriptionStatus === 'trialing') {
                   <button (click)="openPortal()" [disabled]="loading()" class="btn-secondary text-xs">
-                    Manage subscription
+                    {{ 'billing.manageSubscription' | transloco }}
                   </button>
                 } @else {
                   <button (click)="upgrade()" [disabled]="loading()" class="btn-primary text-xs">
-                    {{ loading() ? 'Redirecting...' : 'Upgrade to Pro (Free)' }}
+                    {{ (loading() ? 'billing.redirecting' : 'billing.upgradeToPro') | transloco }}
                   </button>
                 }
               </div>

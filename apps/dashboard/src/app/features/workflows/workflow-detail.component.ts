@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators, FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
+import { TranslocoModule, TranslocoService } from '@jsverse/transloco';
 import {
   WorkflowsService,
   Workflow,
@@ -28,6 +29,7 @@ import type { AdapterCatalogEntry } from '../../core/api/workflows.service';
     RouterLink,
     ReactiveFormsModule,
     FormsModule,
+    TranslocoModule,
     WorkflowScheduleCardComponent,
     WorkflowVersionsDrawerComponent,
     SchemaFormComponent,
@@ -37,36 +39,36 @@ import type { AdapterCatalogEntry } from '../../core/api/workflows.service';
       <!-- Header -->
       <div class="flex items-center justify-between">
         <div>
-          <a routerLink="/workflows" class="text-xs text-muted hover:text-white">← All workflows</a>
+          <a routerLink="/workflows" class="text-xs text-muted hover:text-white">{{ 'workflows.detail.allWorkflows' | transloco }}</a>
           <h1 class="text-2xl font-bold tracking-tightest text-white mt-1">
-            {{ workflow()?.name ?? 'Loading...' }}
+            {{ workflow()?.name ?? ('common.loading' | transloco) }}
           </h1>
           @if (workflow(); as wf) {
-            <p class="text-xs text-muted font-mono mt-1">{{ wf.sourceType }} · ID {{ wf.id.slice(0, 8) }}</p>
+            <p class="text-xs text-muted font-mono mt-1">{{ wf.sourceType }} · {{ 'workflows.detail.id' | transloco }} {{ wf.id.slice(0, 8) }}</p>
           }
         </div>
         <div class="flex gap-2">
           <button (click)="copyWebhookUrl()" class="btn-secondary">
-            {{ copied() ? 'Copied!' : 'Copy webhook URL' }}
+            {{ (copied() ? 'workflows.detail.copied' : 'workflows.detail.copyWebhookUrl') | transloco }}
           </button>
           <button (click)="exportYaml()" [disabled]="exporting()" class="btn-secondary">
-            {{ exporting() ? 'Exporting...' : 'Export YAML' }}
+            {{ (exporting() ? 'workflows.detail.exporting' : 'workflows.detail.exportYaml') | transloco }}
           </button>
-          <button (click)="openTestRun()" class="btn-primary text-xs">▶ Test run</button>
+          <button (click)="openTestRun()" class="btn-primary text-xs">{{ 'workflows.detail.testRun' | transloco }}</button>
           <button (click)="showVersions.set(true)" class="btn-secondary">
-            Version history
+            {{ 'workflows.detail.versionHistory' | transloco }}
           </button>
         </div>
       </div>
 
       @if (error()) {
-        <div class="card text-sm text-signal-rose">{{ error() }}</div>
+        <div class="card text-sm text-signal-rose">{{ error() | transloco }}</div>
       }
 
       @if (workflow(); as wf) {
         <!-- Webhook URL -->
         <div class="card">
-          <h2 class="text-sm font-medium text-white mb-2">Webhook URL</h2>
+          <h2 class="text-sm font-medium text-white mb-2">{{ 'workflows.detail.webhookUrl' | transloco }}</h2>
           <code class="block text-xs font-mono text-relay-cyan bg-surface-2 p-3 rounded overflow-x-auto">
             {{ ingressUrl }}/webhook/{{ wf.tenantId }}/{{ wf.id }}
           </code>
@@ -78,9 +80,9 @@ import type { AdapterCatalogEntry } from '../../core/api/workflows.service';
         <!-- Transform editor -->
         <div class="card">
           <div class="flex justify-between items-center mb-3">
-            <h2 class="text-sm font-medium text-white">Transform expression (JSONata)</h2>
+            <h2 class="text-sm font-medium text-white">{{ 'workflows.detail.transformExpression' | transloco }}</h2>
             <button (click)="toggleTransform()" class="text-xs text-relay-cyan hover:underline">
-              {{ showTransform() ? 'Hide' : 'Edit' }}
+              {{ (showTransform() ? 'common.hide' : 'common.edit') | transloco }}
             </button>
           </div>
 
@@ -93,54 +95,54 @@ import type { AdapterCatalogEntry } from '../../core/api/workflows.service';
             ></textarea>
             <div class="flex gap-2 mt-2">
               <button (click)="previewTransform()" [disabled]="previewing()" class="btn-secondary text-xs">
-                {{ previewing() ? 'Testing...' : 'Test with sample payload' }}
+                {{ (previewing() ? 'workflows.detail.testing' : 'workflows.detail.testWithSample') | transloco }}
               </button>
               <button (click)="saveTransform()" [disabled]="savingTransform()" class="btn-primary text-xs">
-                {{ savingTransform() ? 'Saving...' : 'Save expression' }}
+                {{ (savingTransform() ? 'common.saving' : 'workflows.detail.saveExpression') | transloco }}
               </button>
             </div>
 
             @if (previewResult(); as r) {
               <div class="mt-3">
                 @if (r.ok) {
-                  <p class="text-xs text-signal-green mb-1">✓ Valid · {{ r.durationMs }}ms</p>
+                  <p class="text-xs text-signal-green mb-1">✓ {{ 'workflows.detail.valid' | transloco }} · {{ r.durationMs }}ms</p>
                   <pre class="bg-surface-2 p-3 rounded text-xs overflow-x-auto text-relay-cyan">{{ r.result | json }}</pre>
                 } @else {
-                  <p class="text-xs text-signal-rose">✗ {{ r.error }}</p>
+                  <p class="text-xs text-signal-rose">✗ {{ r.error | transloco }}</p>
                 }
               </div>
             }
           } @else {
-            <code class="text-xs text-muted font-mono">{{ workflow()?.transformExpression || 'No transform configured' }}</code>
+            <code class="text-xs text-muted font-mono">{{ workflow()?.transformExpression || ('workflows.detail.noTransform' | transloco) }}</code>
           }
         </div>
 
         <!-- Config summary -->
         <div class="card grid grid-cols-3 gap-4">
           <div>
-            <p class="text-xs text-muted uppercase tracking-wider">AI Enrichment</p>
-            <p class="text-sm text-white mt-1">{{ wf.enrichmentEnabled ? 'Enabled' : 'Disabled' }}</p>
+            <p class="text-xs text-muted uppercase tracking-wider">{{ 'workflows.detail.aiEnrichment' | transloco }}</p>
+            <p class="text-sm text-white mt-1">{{ (wf.enrichmentEnabled ? 'common.enabled' : 'common.disabled') | transloco }}</p>
           </div>
           <div>
-            <p class="text-xs text-muted uppercase tracking-wider">Status</p>
-            <p class="text-sm text-white mt-1">{{ wf.isActive ? 'Active' : 'Inactive' }}</p>
+            <p class="text-xs text-muted uppercase tracking-wider">{{ 'workflows.detail.status' | transloco }}</p>
+            <p class="text-sm text-white mt-1">{{ (wf.isActive ? 'common.active' : 'common.inactive') | transloco }}</p>
           </div>
           <div>
-            <p class="text-xs text-muted uppercase tracking-wider">Transform</p>
-            <p class="text-sm text-white mt-1 truncate">{{ wf.transformExpression ? 'Custom JSONata' : 'None' }}</p>
+            <p class="text-xs text-muted uppercase tracking-wider">{{ 'workflows.detail.transform' | transloco }}</p>
+            <p class="text-sm text-white mt-1 truncate">{{ (wf.transformExpression ? 'workflows.detail.customJsonata' : 'common.none') | transloco }}</p>
           </div>
         </div>
 
         <!-- Destinations -->
         <div>
           <div class="flex items-center justify-between mb-3">
-            <h2 class="text-lg font-semibold text-white">Destinations</h2>
-            <button (click)="openCreateDest()" class="btn-primary">+ Add destination</button>
+            <h2 class="text-lg font-semibold text-white">{{ 'workflows.detail.destinations' | transloco }}</h2>
+            <button (click)="openCreateDest()" class="btn-primary">{{ 'workflows.detail.addDestination' | transloco }}</button>
           </div>
 
           @if (destinations().length === 0) {
             <div class="card text-center py-8">
-              <p class="text-sm text-muted">No destinations yet.</p>
+              <p class="text-sm text-muted">{{ 'workflows.detail.noDestinations' | transloco }}</p>
             </div>
           } @else {
             <div class="space-y-2">
@@ -151,15 +153,15 @@ import type { AdapterCatalogEntry } from '../../core/api/workflows.service';
                       <span class="text-white font-medium">{{ d.name }}</span>
                       <span class="text-xs px-2 py-0.5 rounded bg-surface-2 text-relay-cyan font-mono">{{ d.type }}</span>
                       @if (!d.enabled) {
-                        <span class="text-xs px-2 py-0.5 rounded bg-signal-rose/20 text-signal-rose">Disabled</span>
+                        <span class="text-xs px-2 py-0.5 rounded bg-signal-rose/20 text-signal-rose">{{ 'common.disabled' | transloco }}</span>
                       }
                       @if (d.lastValidationOk === true) {
-                        <span class="text-xs px-2 py-0.5 rounded bg-signal-green/20 text-signal-green" [title]="'Last validated: ' + (d.lastValidatedAt | date: 'short')">
-                          ✓ verified
+                        <span class="text-xs px-2 py-0.5 rounded bg-signal-green/20 text-signal-green" [title]="('workflows.detail.lastValidated' | transloco) + ': ' + (d.lastValidatedAt | date: 'short')">
+                          ✓ {{ 'workflows.detail.verified' | transloco }}
                         </span>
                       } @else if (d.lastValidationOk === false) {
-                        <span class="text-xs px-2 py-0.5 rounded bg-signal-rose/20 text-signal-rose" [title]="d.lastValidationError || 'Validation failed'">
-                          ✗ failed
+                        <span class="text-xs px-2 py-0.5 rounded bg-signal-rose/20 text-signal-rose" [title]="d.lastValidationError || ('workflows.detail.validationFailed' | transloco)">
+                          ✗ {{ 'workflows.detail.failed' | transloco }}
                         </span>
                       }
                     </div>
@@ -167,9 +169,9 @@ import type { AdapterCatalogEntry } from '../../core/api/workflows.service';
                   </div>
                   <div class="flex gap-2">
                     <button (click)="toggleDestination(d)" class="text-xs text-muted hover:text-white">
-                      {{ d.enabled ? 'Disable' : 'Enable' }}
+                      {{ (d.enabled ? 'common.disable' : 'common.enable') | transloco }}
                     </button>
-                    <button (click)="deleteDestination(d)" class="text-xs text-signal-rose hover:underline">Delete</button>
+                    <button (click)="deleteDestination(d)" class="text-xs text-signal-rose hover:underline">{{ 'common.delete' | transloco }}</button>
                   </div>
                 </div>
               }
@@ -191,10 +193,10 @@ import type { AdapterCatalogEntry } from '../../core/api/workflows.service';
       @if (showCreateDest()) {
         <div class="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" (click)="closeCreateDest()">
           <div class="card w-full max-w-lg max-h-[90vh] overflow-y-auto" (click)="$event.stopPropagation()">
-            <h2 class="text-lg font-semibold text-white mb-4">Add destination</h2>
+            <h2 class="text-lg font-semibold text-white mb-4">{{ 'workflows.detail.createDestinationTitle' | transloco }}</h2>
             <form [formGroup]="destMetaForm" (ngSubmit)="submitDest()" class="space-y-4">
               <div>
-                <label class="label">Type</label>
+                <label class="label">{{ 'common.type' | transloco }}</label>
                 <select
                   formControlName="type"
                   (change)="onAdapterTypeChange(destMetaForm.controls.type.value)"
@@ -206,8 +208,8 @@ import type { AdapterCatalogEntry } from '../../core/api/workflows.service';
                 </select>
               </div>
               <div>
-                <label class="label">Name</label>
-                <input formControlName="name" class="input" placeholder="Production alerts" />
+                <label class="label">{{ 'common.name' | transloco }}</label>
+                <input formControlName="name" class="input" [placeholder]="'workflows.detail.namePlaceholder' | transloco" />
               </div>
 
               <div [formGroup]="configForm">
@@ -215,7 +217,7 @@ import type { AdapterCatalogEntry } from '../../core/api/workflows.service';
               </div>
 
               @if (destError()) {
-                <div class="text-sm text-signal-rose">{{ destError() }}</div>
+                <div class="text-sm text-signal-rose">{{ destError() | transloco }}</div>
               }
 
               <div class="flex justify-between gap-2 pt-2">
@@ -225,12 +227,12 @@ import type { AdapterCatalogEntry } from '../../core/api/workflows.service';
                   [disabled]="validating() || destMetaForm.invalid"
                   class="btn-secondary"
                 >
-                  {{ validating() ? 'Testing...' : 'Test connection' }}
+                  {{ (validating() ? 'workflows.detail.testing' : 'workflows.detail.testConnection') | transloco }}
                 </button>
                 <div class="flex gap-2">
-                  <button type="button" (click)="closeCreateDest()" class="btn-secondary">Cancel</button>
+                  <button type="button" (click)="closeCreateDest()" class="btn-secondary">{{ 'common.cancel' | transloco }}</button>
                   <button type="submit" [disabled]="destMetaForm.invalid || configForm.invalid || savingDest()" class="btn-primary">
-                    {{ savingDest() ? 'Adding...' : 'Add' }}
+                    {{ (savingDest() ? 'common.adding' : 'common.add') | transloco }}
                   </button>
                 </div>
               </div>
@@ -246,7 +248,7 @@ import type { AdapterCatalogEntry } from '../../core/api/workflows.service';
                   }"
                 >
                   <p [ngClass]="r.ok ? 'text-signal-green' : 'text-signal-rose'" class="font-medium">
-                    {{ r.ok ? '✓ Connection verified' : '✗ Validation failed' }}
+                    {{ (r.ok ? 'workflows.detail.connectionVerified' : 'workflows.detail.validationFailedTitle') | transloco }}
                   </p>
                   @if (r.dryRun) {
                     <p class="text-muted mt-1">{{ r.dryRun.detail }} · {{ r.dryRun.latencyMs }}ms</p>
@@ -270,13 +272,13 @@ import type { AdapterCatalogEntry } from '../../core/api/workflows.service';
           <div class="card w-full max-w-3xl max-h-[90vh] overflow-y-auto" (click)="$event.stopPropagation()">
             <div class="flex justify-between items-center mb-4">
               <div>
-                <h2 class="text-lg font-semibold text-white">Test run pipeline</h2>
-                <p class="text-xs text-muted mt-1">Runs enrich → transform → routing. No DB writes.</p>
+                <h2 class="text-lg font-semibold text-white">{{ 'workflows.detail.testRunPipeline' | transloco }}</h2>
+                <p class="text-xs text-muted mt-1">{{ 'workflows.detail.testRunHint' | transloco }}</p>
               </div>
               <button (click)="closeTestRun()" class="text-muted hover:text-white">✕</button>
             </div>
 
-            <label class="label">Sample payload (JSON)</label>
+            <label class="label">{{ 'workflows.detail.samplePayload' | transloco }}</label>
             <textarea
               [value]="testRunPayload()"
               (input)="testRunPayload.set($any($event.target).value)"
@@ -291,32 +293,32 @@ import type { AdapterCatalogEntry } from '../../core/api/workflows.service';
                 (change)="dryRunDestinations.set($any($event.target).checked)"
                 class="rounded border-hairline"
               />
-              <span>Also dry-run matched destinations (adds ~1–2s each)</span>
+              <span>{{ 'workflows.detail.alsoDryRun' | transloco }}</span>
             </label>
 
             <div class="flex justify-end gap-2 mt-3">
-              <button (click)="closeTestRun()" class="btn-secondary">Close</button>
+              <button (click)="closeTestRun()" class="btn-secondary">{{ 'common.close' | transloco }}</button>
               <button (click)="runTestRun()" [disabled]="testRunLoading()" class="btn-primary">
-                {{ testRunLoading() ? 'Running...' : 'Run pipeline' }}
+                {{ (testRunLoading() ? 'workflows.detail.running' : 'workflows.detail.runPipeline') | transloco }}
               </button>
             </div>
 
             @if (testRunError()) {
-              <div class="text-sm text-signal-rose mt-3">{{ testRunError() }}</div>
+              <div class="text-sm text-signal-rose mt-3">{{ testRunError() | transloco }}</div>
             }
 
             @if (testRunResult(); as r) {
               <div class="mt-6 space-y-4">
                 <div class="card bg-surface-2">
                   <div class="flex justify-between items-center mb-2">
-                    <h3 class="text-sm font-medium text-white">1. Enrichment</h3>
+                    <h3 class="text-sm font-medium text-white">{{ 'workflows.detail.stepEnrichment' | transloco }}</h3>
                     <span class="text-xs"
                       [class.text-signal-green]="r.enrichment.enabled && !r.enrichment.error"
                       [class.text-muted]="!r.enrichment.enabled"
                       [class.text-signal-rose]="r.enrichment.error">
-                      @if (!r.enrichment.enabled) { Disabled }
-                      @else if (r.enrichment.error) { Error · {{ r.enrichment.durationMs }}ms }
-                      @else { OK · {{ r.enrichment.durationMs }}ms @if (r.enrichment.cached) { · cached } }
+                      @if (!r.enrichment.enabled) { {{ 'common.disabled' | transloco }} }
+                      @else if (r.enrichment.error) { {{ 'workflows.detail.error' | transloco }} · {{ r.enrichment.durationMs }}ms }
+                      @else { {{ 'workflows.detail.ok' | transloco }} · {{ r.enrichment.durationMs }}ms @if (r.enrichment.cached) { · {{ 'workflows.detail.cached' | transloco }} } }
                     </span>
                   </div>
                   @if (r.enrichment.error) {
@@ -328,14 +330,14 @@ import type { AdapterCatalogEntry } from '../../core/api/workflows.service';
 
                 <div class="card bg-surface-2">
                   <div class="flex justify-between items-center mb-2">
-                    <h3 class="text-sm font-medium text-white">2. Transform</h3>
+                    <h3 class="text-sm font-medium text-white">{{ 'workflows.detail.stepTransform' | transloco }}</h3>
                     <span class="text-xs"
                       [class.text-signal-green]="r.transform.applied && !r.transform.error"
                       [class.text-muted]="!r.transform.applied"
                       [class.text-signal-rose]="r.transform.error">
-                      @if (!r.transform.applied) { No transform }
-                      @else if (r.transform.error) { Error · {{ r.transform.durationMs }}ms }
-                      @else { Applied · {{ r.transform.durationMs }}ms }
+                      @if (!r.transform.applied) { {{ 'workflows.detail.noTransform' | transloco }} }
+                      @else if (r.transform.error) { {{ 'workflows.detail.error' | transloco }} · {{ r.transform.durationMs }}ms }
+                      @else { {{ 'workflows.detail.applied' | transloco }} · {{ r.transform.durationMs }}ms }
                     </span>
                   </div>
                   @if (r.transform.error) {
@@ -346,14 +348,14 @@ import type { AdapterCatalogEntry } from '../../core/api/workflows.service';
 
                 <div class="card bg-surface-2">
                   <div class="flex justify-between items-center mb-2">
-                    <h3 class="text-sm font-medium text-white">3. Routing</h3>
+                    <h3 class="text-sm font-medium text-white">{{ 'workflows.detail.stepRouting' | transloco }}</h3>
                     <span class="text-xs text-muted">{{ r.routing.reason }}</span>
                   </div>
                   @if (r.routing.destinationIds.length === 0) {
-                    <p class="text-xs text-signal-amber">No destination would receive this event.</p>
+                    <p class="text-xs text-signal-amber">{{ 'workflows.detail.noDestinationReceives' | transloco }}</p>
                   } @else {
                     <p class="text-xs text-white mb-2">
-                      {{ r.routing.destinationIds.length }} destination(s) would receive:
+                      {{ r.routing.destinationIds.length }} {{ 'workflows.detail.destinationsWouldReceive' | transloco }}
                     </p>
                     <div class="flex gap-1 flex-wrap">
                       @for (d of r.destinations; track d.id) {
@@ -370,16 +372,14 @@ import type { AdapterCatalogEntry } from '../../core/api/workflows.service';
                 @if (r.dryRuns.length > 0) {
                   <div class="card bg-surface-2">
                     <div class="flex justify-between items-center mb-2">
-                      <h3 class="text-sm font-medium text-white">4. Destination dry-runs</h3>
-                      <span class="text-xs text-muted">{{ r.dryRuns.length }} checked</span>
+                      <h3 class="text-sm font-medium text-white">{{ 'workflows.detail.stepDryRuns' | transloco }}</h3>
+                      <span class="text-xs text-muted">{{ r.dryRuns.length }} {{ 'workflows.detail.checked' | transloco }}</span>
                     </div>
                     <div class="space-y-1">
                       @for (d of r.dryRuns; track d.destinationId) {
                         <div class="flex justify-between text-xs">
                           <span class="font-mono text-white">{{ d.destinationType }}</span>
-                          <span
-                            [ngClass]="d.ok ? 'text-signal-green' : 'text-signal-rose'"
-                          >
+                          <span [ngClass]="d.ok ? 'text-signal-green' : 'text-signal-rose'">
                             {{ d.ok ? '✓' : '✗' }}
                             {{ d.statusCode > 0 ? 'HTTP ' + d.statusCode : '' }}
                             · {{ d.latencyMs }}ms
@@ -403,6 +403,7 @@ export class WorkflowDetailComponent implements OnInit {
   private svc = inject(WorkflowsService);
   private fb = inject(FormBuilder);
   private http = inject(HttpClient);
+  private transloco = inject(TranslocoService);
 
   readonly ingressUrl = environment.ingressUrl;
 
@@ -425,7 +426,6 @@ export class WorkflowDetailComponent implements OnInit {
     durationMs: number;
   } | null>(null);
 
-  // Dynamic destination form
   adapterCatalog = signal<AdapterCatalogEntry[]>([]);
   selectedAdapter = signal<AdapterCatalogEntry | null>(null);
   configFields = signal<SchemaField[]>([]);
@@ -449,7 +449,6 @@ export class WorkflowDetailComponent implements OnInit {
     dryRun: { attempted: boolean; success: boolean; latencyMs: number; detail: string } | null;
   } | null>(null);
 
-  // Test run
   showTestRun = signal(false);
   testRunLoading = signal(false);
   testRunPayload = signal<string>(
@@ -481,11 +480,7 @@ export class WorkflowDetailComponent implements OnInit {
 
   private readonly samplePayload = {
     type: 'checkout.session.completed',
-    data: {
-      amount: 5000,
-      currency: 'usd',
-      customer: { email: 'test@example.com' },
-    },
+    data: { amount: 5000, currency: 'usd', customer: { email: 'test@example.com' } },
   };
 
   ngOnInit(): void {
@@ -499,14 +494,14 @@ export class WorkflowDetailComponent implements OnInit {
         this.workflow.set(wf);
         this.loadDestinations();
       },
-      error: (err) => this.error.set(err?.error?.message ?? 'Failed to load workflow'),
+      error: (err) => this.error.set(err?.error?.message ?? 'workflows.detail.errors.loadFailed'),
     });
   }
 
   loadDestinations(): void {
     this.svc.listDestinations(this.id()).subscribe({
       next: (d) => this.destinations.set(d),
-      error: (err) => this.error.set(err?.error?.message ?? 'Failed to load destinations'),
+      error: (err) => this.error.set(err?.error?.message ?? 'workflows.detail.errors.loadDestFailed'),
     });
   }
 
@@ -557,7 +552,7 @@ export class WorkflowDetailComponent implements OnInit {
         this.exporting.set(false);
       },
       error: (err) => {
-        this.error.set(err?.error?.message ?? 'Export failed');
+        this.error.set(err?.error?.message ?? 'workflows.detail.errors.exportFailed');
         this.exporting.set(false);
       },
     });
@@ -597,7 +592,7 @@ export class WorkflowDetailComponent implements OnInit {
           this.previewResult.set({
             ok: false,
             result: null,
-            error: err?.error?.message ?? 'Preview failed',
+            error: err?.error?.message ?? 'workflows.detail.errors.previewFailed',
             durationMs: 0,
           });
           this.previewing.set(false);
@@ -686,7 +681,7 @@ export class WorkflowDetailComponent implements OnInit {
           this.validationResult.set({
             ok: false,
             layer: 'schema',
-            errors: [{ field: 'request', message: err?.error?.message ?? 'Validation failed' }],
+            errors: [{ field: 'request', message: err?.error?.message ?? 'workflows.detail.validationFailed' }],
             warnings: [],
             dryRun: null,
           });
@@ -723,7 +718,7 @@ export class WorkflowDetailComponent implements OnInit {
         },
         error: (err) => {
           this.savingDest.set(false);
-          this.destError.set(err?.error?.message ?? 'Failed to add destination');
+          this.destError.set(err?.error?.message ?? 'workflows.detail.errors.addDestFailed');
         },
       });
   }
@@ -735,7 +730,8 @@ export class WorkflowDetailComponent implements OnInit {
   }
 
   deleteDestination(d: Destination): void {
-    if (!confirm(`Delete destination "${d.name}"?`)) return;
+    const msg = this.transloco.translate('workflows.detail.confirmDeleteDest', { name: d.name });
+    if (!confirm(msg)) return;
     this.svc.removeDestination(d.id).subscribe({
       next: () => this.loadDestinations(),
     });
@@ -745,8 +741,6 @@ export class WorkflowDetailComponent implements OnInit {
     this.showVersions.set(false);
     this.load();
   }
-
-  // ── Test run ──────────────────────────────────────────────
 
   openTestRun(): void {
     this.testRunResult.set(null);
@@ -766,7 +760,7 @@ export class WorkflowDetailComponent implements OnInit {
     try {
       payload = JSON.parse(this.testRunPayload()) as Record<string, unknown>;
     } catch {
-      this.testRunError.set('Payload is not valid JSON');
+      this.testRunError.set('workflows.detail.errors.invalidJson');
       return;
     }
 
@@ -780,7 +774,7 @@ export class WorkflowDetailComponent implements OnInit {
         this.testRunLoading.set(false);
       },
       error: (err) => {
-        this.testRunError.set(err?.error?.message ?? 'Test run failed');
+        this.testRunError.set(err?.error?.message ?? 'workflows.detail.errors.testRunFailed');
         this.testRunLoading.set(false);
       },
     });

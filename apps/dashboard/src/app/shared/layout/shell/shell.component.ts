@@ -1,10 +1,12 @@
 import { Component, inject, signal } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { CommonModule } from '@angular/common';
+import { TranslocoModule } from '@jsverse/transloco';
 import { AuthService } from '../../../core/auth/auth.service';
+import { LanguageService, type SupportedLang } from '../../../i18n/language.service';
 
 interface NavItem {
-  label: string;
+  labelKey: string;
   path: string;
   icon: string;
 }
@@ -12,13 +14,20 @@ interface NavItem {
 @Component({
   selector: 'app-shell',
   standalone: true,
-  imports: [CommonModule, RouterOutlet, RouterLink, RouterLinkActive],
+  imports: [
+    CommonModule,
+    RouterOutlet,
+    RouterLink,
+    RouterLinkActive,
+    TranslocoModule,
+  ],
   template: `
     <div class="flex h-screen bg-midnight">
       <!-- Sidebar -->
       <aside
-        class="fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-hairline bg-surface transition-transform lg:static lg:translate-x-0"
-        [class.-translate-x-full]="!sidebarOpen()"
+        class="fixed inset-y-0 start-0 z-40 flex w-64 flex-col border-e border-hairline bg-surface transition-transform lg:static lg:translate-x-0"
+        [class.-translate-x-full]="!sidebarOpen() && !lang.isRtl()"
+        [class.translate-x-full]="!sidebarOpen() && lang.isRtl()"
       >
         <!-- Logo -->
         <div class="flex h-16 items-center border-b border-hairline px-6">
@@ -40,10 +49,26 @@ interface NavItem {
               class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted transition hover:bg-surface-2 hover:text-white"
             >
               <span class="text-base">{{ item.icon }}</span>
-              <span>{{ item.label }}</span>
+              <span>{{ item.labelKey | transloco }}</span>
             </a>
           }
         </nav>
+
+        <!-- Language selector -->
+        <div class="border-t border-hairline p-4">
+          <label class="text-xs text-muted uppercase tracking-wider">
+            {{ 'language.label' | transloco }}
+          </label>
+          <select
+            [value]="lang.current()"
+            (change)="onLangChange($event)"
+            class="mt-1 w-full rounded-lg border border-hairline bg-surface-2 px-2 py-1.5 text-xs text-white focus:border-relay-violet focus:outline-none"
+          >
+            <option value="en">{{ 'language.en' | transloco }}</option>
+            <option value="ur">{{ 'language.ur' | transloco }}</option>
+            <option value="ar">{{ 'language.ar' | transloco }}</option>
+          </select>
+        </div>
 
         <!-- User -->
         <div class="border-t border-hairline p-4">
@@ -57,7 +82,7 @@ interface NavItem {
             </div>
           </div>
           <button (click)="logout()" class="w-full rounded-lg border border-hairline px-3 py-1.5 text-xs font-medium text-muted hover:bg-surface-2 hover:text-white">
-            Sign out
+            {{ 'nav.signOut' | transloco }}
           </button>
         </div>
       </aside>
@@ -92,21 +117,27 @@ interface NavItem {
 })
 export class ShellComponent {
   auth = inject(AuthService);
+  lang = inject(LanguageService);
   sidebarOpen = signal(false);
 
   navItems: NavItem[] = [
-    { label: 'Dashboard', path: '/dashboard', icon: '📊' },
-    { label: 'Workflows', path: '/workflows', icon: '🔄' },
-    { label: 'Events', path: '/events', icon: '📨' },
-    { label: 'Dead Letter Queue', path: '/dlq', icon: '⚠️' },
-    { label: 'Analytics', path: '/analytics', icon: '📈' },
-    { label: 'Settings', path: '/settings', icon: '⚙️' },
+    { labelKey: 'nav.dashboard', path: '/dashboard', icon: '📊' },
+    { labelKey: 'nav.workflows', path: '/workflows', icon: '🔄' },
+    { labelKey: 'nav.events', path: '/events', icon: '📨' },
+    { labelKey: 'nav.dlq', path: '/dlq', icon: '⚠️' },
+    { labelKey: 'nav.analytics', path: '/analytics', icon: '📈' },
+    { labelKey: 'nav.settings', path: '/settings', icon: '⚙️' },
   ];
 
   initial = () => {
     const name = this.auth.displayName();
-    return name ? name[0].toUpperCase() : '?';
+    return name ? name[0]!.toUpperCase() : '?';
   };
+
+  onLangChange(event: Event): void {
+    const value = (event.target as HTMLSelectElement).value as SupportedLang;
+    this.lang.setLanguage(value);
+  }
 
   logout(): void {
     this.auth.logout();

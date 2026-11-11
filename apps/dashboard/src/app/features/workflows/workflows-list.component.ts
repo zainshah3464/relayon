@@ -2,6 +2,7 @@ import { Component, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { TranslocoModule } from '@jsverse/transloco';
 import {
   WorkflowsService,
   Workflow,
@@ -11,27 +12,27 @@ import {
 @Component({
   selector: 'app-workflows-list',
   standalone: true,
-  imports: [CommonModule, RouterLink, ReactiveFormsModule],
+  imports: [CommonModule, RouterLink, ReactiveFormsModule, TranslocoModule],
   template: `
     <div class="space-y-6">
       <div class="flex items-center justify-between">
         <div>
-          <h1 class="text-2xl font-bold tracking-tightest text-white">Workflows</h1>
-          <p class="text-sm text-muted mt-1">Webhook pipelines that receive, enrich, and route events.</p>
+          <h1 class="text-2xl font-bold tracking-tightest text-white">{{ 'workflows.list.title' | transloco }}</h1>
+          <p class="text-sm text-muted mt-1">{{ 'workflows.list.subtitle' | transloco }}</p>
         </div>
-        <button (click)="openCreate()" class="btn-primary">+ New workflow</button>
+        <button (click)="openCreate()" class="btn-primary">{{ 'workflows.list.newWorkflow' | transloco }}</button>
       </div>
 
       @if (loading()) {
-        <div class="card text-sm text-muted">Loading workflows...</div>
+        <div class="card text-sm text-muted">{{ 'workflows.list.loading' | transloco }}</div>
       } @else if (error()) {
-        <div class="card text-sm text-signal-rose">{{ error() }}</div>
+        <div class="card text-sm text-signal-rose">{{ error() | transloco }}</div>
       } @else if (workflows().length === 0) {
         <div class="card text-center py-12">
           <div class="text-3xl mb-2">🔄</div>
-          <h3 class="text-lg font-semibold text-white">No workflows yet</h3>
-          <p class="text-sm text-muted mt-1">Create your first workflow to start receiving webhooks.</p>
-          <button (click)="openCreate()" class="btn-primary mt-4">Create workflow</button>
+          <h3 class="text-lg font-semibold text-white">{{ 'workflows.list.emptyTitle' | transloco }}</h3>
+          <p class="text-sm text-muted mt-1">{{ 'workflows.list.emptyBody' | transloco }}</p>
+          <button (click)="openCreate()" class="btn-primary mt-4">{{ 'workflows.list.createWorkflow' | transloco }}</button>
         </div>
       } @else {
         <div class="space-y-2">
@@ -42,13 +43,15 @@ import {
                   <div class="flex items-center gap-2">
                     <h3 class="text-white font-medium truncate">{{ wf.name }}</h3>
                     @if (!wf.isActive) {
-                      <span class="text-xs px-2 py-0.5 rounded bg-surface-2 text-muted">Inactive</span>
+                      <span class="text-xs px-2 py-0.5 rounded bg-surface-2 text-muted">{{ 'workflows.list.inactive' | transloco }}</span>
                     }
                     @if (wf.enrichmentEnabled) {
-                      <span class="text-xs px-2 py-0.5 rounded bg-relay-cyan/20 text-relay-cyan">AI</span>
+                      <span class="text-xs px-2 py-0.5 rounded bg-relay-cyan/20 text-relay-cyan">{{ 'workflows.list.ai' | transloco }}</span>
                     }
                   </div>
-                  <p class="text-xs text-muted mt-1 font-mono">{{ wf.sourceType }} · {{ wf._count?.destinations ?? 0 }} destination(s)</p>
+                  <p class="text-xs text-muted mt-1 font-mono">
+                    {{ wf.sourceType }} · {{ wf._count?.destinations ?? 0 }} {{ 'workflows.list.destinations' | transloco }}
+                  </p>
                 </div>
                 <div class="text-xs text-muted">
                   {{ wf.createdAt | date: 'short' }}
@@ -62,38 +65,38 @@ import {
       @if (showCreate()) {
         <div class="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" (click)="closeCreate()">
           <div class="card w-full max-w-lg" (click)="$event.stopPropagation()">
-            <h2 class="text-lg font-semibold text-white mb-4">New workflow</h2>
+            <h2 class="text-lg font-semibold text-white mb-4">{{ 'workflows.list.modal.title' | transloco }}</h2>
             <form [formGroup]="form" (ngSubmit)="submit()" class="space-y-4">
               <div>
-                <label class="label">Name</label>
-                <input formControlName="name" class="input" placeholder="Stripe → Slack alerts" />
+                <label class="label">{{ 'workflows.list.modal.name' | transloco }}</label>
+                <input formControlName="name" class="input" [placeholder]="'workflows.list.modal.namePlaceholder' | transloco" />
               </div>
               <div>
-                <label class="label">Source type</label>
+                <label class="label">{{ 'workflows.list.modal.sourceType' | transloco }}</label>
                 <select formControlName="sourceType" class="input">
                   <option value="stripe">Stripe</option>
                   <option value="github">GitHub</option>
                   <option value="shopify">Shopify</option>
                   <option value="slack">Slack</option>
-                  <option value="generic">Generic (HMAC)</option>
+                  <option value="generic">{{ 'workflows.list.modal.genericHmac' | transloco }}</option>
                 </select>
               </div>
               <div>
-                <label class="label">Signing secret</label>
+                <label class="label">{{ 'workflows.list.modal.signingSecret' | transloco }}</label>
                 <input formControlName="secret" class="input font-mono" placeholder="whsec_..." />
-                <p class="text-xs text-muted mt-1">Shared HMAC secret from the source platform.</p>
+                <p class="text-xs text-muted mt-1">{{ 'workflows.list.modal.signingSecretHint' | transloco }}</p>
               </div>
               <div class="flex items-center gap-2">
                 <input id="enrich" type="checkbox" formControlName="enrichmentEnabled" class="rounded border-hairline" />
-                <label for="enrich" class="text-sm text-white">Enable AI enrichment (Groq)</label>
+                <label for="enrich" class="text-sm text-white">{{ 'workflows.list.modal.enableAI' | transloco }}</label>
               </div>
               @if (createError()) {
-                <div class="text-sm text-signal-rose">{{ createError() }}</div>
+                <div class="text-sm text-signal-rose">{{ createError() | transloco }}</div>
               }
               <div class="flex justify-end gap-2 pt-2">
-                <button type="button" (click)="closeCreate()" class="btn-secondary">Cancel</button>
+                <button type="button" (click)="closeCreate()" class="btn-secondary">{{ 'common.cancel' | transloco }}</button>
                 <button type="submit" [disabled]="form.invalid || saving()" class="btn-primary">
-                  {{ saving() ? 'Creating...' : 'Create' }}
+                  {{ (saving() ? 'workflows.list.modal.creating' : 'workflows.list.modal.create') | transloco }}
                 </button>
               </div>
             </form>
@@ -133,7 +136,7 @@ export class WorkflowsListComponent implements OnInit {
         this.loading.set(false);
       },
       error: (err) => {
-        this.error.set(err?.error?.message ?? 'Failed to load workflows');
+        this.error.set(err?.error?.message ?? 'workflows.list.errors.loadFailed');
         this.loading.set(false);
       },
     });
@@ -171,7 +174,7 @@ export class WorkflowsListComponent implements OnInit {
         },
         error: (err) => {
           this.saving.set(false);
-          this.createError.set(err?.error?.message ?? 'Failed to create workflow');
+          this.createError.set(err?.error?.message ?? 'workflows.list.errors.createFailed');
         },
       });
   }

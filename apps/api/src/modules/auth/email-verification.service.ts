@@ -36,7 +36,13 @@ export class EmailVerificationService {
     );
 
     const appUrl = this.config.get<string>('APP_ORIGIN') ?? 'http://localhost:4200';
-    await this.email.sendVerification(user.email, user.name, `${appUrl}/verify-email?token=${token}`);
+    // ⚠️ v2.2 — pass user's preferred locale so email is rendered in their language
+    await this.email.sendVerification(
+      user.email,
+      user.name,
+      `${appUrl}/verify-email?token=${token}`,
+      user.locale,
+    );
   }
 
   async verify(token: string): Promise<{ userId: string; tenantId: string }> {

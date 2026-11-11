@@ -1,5 +1,5 @@
 import {
-  Body, Controller, Get, HttpCode, HttpStatus, Post, Query, Req, Res, UseGuards,
+  Body, Controller, Get, HttpCode, HttpStatus, Patch, Post, Query, Req, Res, UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import type { Request, Response } from 'express';
@@ -16,6 +16,7 @@ import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
 import { OAuthExchangeDto } from './dto/oauth-exchange.dto';
+import { UpdateLocaleDto } from './dto/update-locale.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser, type JwtUser } from '../../common/decorators/current-user.decorator';
 import { PrismaService } from '../prisma/prisma.service';
@@ -58,7 +59,18 @@ export class AuthController {
       emailVerified: dbUser.emailVerified,
       hasPassword: dbUser.passwordHash !== null,
       provider: dbUser.googleId ? 'google' : dbUser.githubId ? 'github' : 'local',
+      // ⚠️ v2.2 — expose user's preferred locale
+      locale: dbUser.locale,
     };
+  }
+
+  // ⚠️ v2.2 — update user's preferred locale
+  @Patch('me/locale') @UseGuards(JwtAuthGuard)
+  async updateLocale(@CurrentUser() user: JwtUser, @Body() dto: UpdateLocaleDto) {
+    await this.prisma.withTenant(user.tenantId, (tx) =>
+      tx.user.update({ where: { id: user.sub }, data: { locale: dto.locale } }),
+    );
+    return { locale: dto.locale };
   }
 
   // ── Google OAuth ──────────────────────────────────────────

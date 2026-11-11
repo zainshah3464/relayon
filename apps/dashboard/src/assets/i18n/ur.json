@@ -1,0 +1,535 @@
+{
+  "common": {
+    "loading": "لوڈ ہو رہا ہے...",
+    "or": "یا",
+    "save": "محفوظ کریں",
+    "cancel": "منسوخ کریں",
+    "delete": "حذف کریں",
+    "back": "واپس",
+    "refresh": "تازہ کریں",
+    "close": "بند کریں",
+"edit": "ترمیم",
+"hide": "چھپائیں",
+"enable": "فعال کریں",
+"disable": "غیر فعال کریں",
+"enabled": "فعال",
+"disabled": "غیر فعال",
+"active": "فعال",
+"inactive": "غیر فعال",
+"status": "حالت",
+"name": "نام",
+"type": "قسم",
+"add": "شامل کریں",
+"adding": "شامل ہو رہا ہے...",
+"saving": "محفوظ ہو رہا ہے...",
+"none": "کوئی نہیں",
+"selectAll": "سب منتخب کریں",
+"selected": "منتخب",
+"clear": "صاف کریں",
+"view": "دیکھیں"
+  },
+  "settings": {
+  "title": "ترتیبات",
+  "subtitle": "ورک اسپیس کی ترتیب، API رسائی، بلنگ۔",
+  "tabs": {
+    "workspace": "ورک اسپیس",
+    "apiKeys": "API کیز",
+    "billing": "بلنگ"
+  },
+  "workspace": {
+    "title": "ورک اسپیس",
+    "name": "نام",
+    "slug": "سلگ",
+    "plan": "پلان",
+    "saveChanges": "تبدیلیاں محفوظ کریں",
+    "saved": "محفوظ ہو گیا"
+  },
+  "quotaOverride": {
+    "title": "کوٹہ اوور رائیڈ",
+    "eventsPerMonth": "واقعات / ماہ",
+    "aiTokensPerMonth": "AI ٹوکنز / ماہ",
+    "enforcementMode": "نفاذ کا طریقہ",
+    "hardOption": "سخت — حد پر بلاک کریں",
+    "softOption": "نرم — 2× تک انتباہ کے ساتھ اجازت",
+    "help": "نرم موڈ 80% پر X-Quota-Warning ہیڈرز بھیجتا ہے؛ 2× پر سخت حد بے قابو اخراجات روکتی ہے۔",
+    "updateQuota": "کوٹہ اپ ڈیٹ کریں",
+    "saved": "محفوظ ہو گیا"
+  },
+  "quotas": {
+    "title": "کوٹے",
+    "eventsPerMonth": "واقعات/ماہ:",
+    "aiTokensPerMonth": "AI ٹوکنز/ماہ:",
+    "mode": "موڈ:",
+    "softNote": "(نرم — 2× سخت حد انتباہ کے ساتھ)"
+  }
+},
+"apiKeys": {
+  "title": "API کیز",
+  "subtitle": "Relayon تک پروگرامی رسائی۔ کیز ہیش کی جاتی ہیں — خام قدر ایک بار دکھائی جاتی ہے۔",
+  "newKey": "+ نئی کی",
+  "createdTitle": "✅ کی بن گئی — ابھی کاپی کریں۔ دوبارہ نہیں دکھائی جائے گی۔",
+  "copyKey": "کی کاپی کریں",
+  "copied": "کاپی ہو گئی!",
+  "dismiss": "برخاست کریں",
+  "loading": "API کیز لوڈ ہو رہی ہیں...",
+  "empty": "ابھی کوئی API کی نہیں۔ پروگرامی رسائی کے لیے ایک بنائیں۔",
+  "revoked": "منسوخ",
+  "created": "بنائی گئی",
+  "lastUsed": "آخری استعمال",
+  "expires": "میعاد ختم",
+  "revoke": "منسوخ کریں",
+  "revokeConfirm": "\"{{name}}\" منسوخ کریں؟ یہ واپس نہیں ہو سکتا۔",
+  "rotationHistory": "گردش کی تاریخ",
+  "graceUntil": "گریس تک",
+  "modal": {
+    "title": "API کی بنائیں",
+    "name": "نام",
+    "namePlaceholder": "CI پائپ لائن",
+    "environment": "ماحول",
+    "environments": {
+      "live": "لائیو",
+      "test": "ٹیسٹ"
+    },
+    "scopes": "دائرے",
+    "neverExpires": "کبھی ختم نہیں ہوتی",
+    "creating": "بنائی جا رہی ہے...",
+    "create": "بنائیں"
+  },
+  "errors": {
+    "createFailed": "کی بنانے میں ناکام"
+  }
+},
+  "schemaForm": {
+  "errors": {
+    "fieldRequired": "فیلڈ \"{{label}}\" درکار ہے",
+    "invalidJson": "فیلڈ \"{{label}}\" درست JSON نہیں ہے",
+    "notNumber": "فیلڈ \"{{label}}\" ایک عدد ہونا چاہیے"
+  }
+},
+"noData": "اس رینج میں کوئی ڈیٹا نہیں۔",
+"legend": {
+  "events": "واقعات",
+  "delivered": "پہنچائے گئے",
+  "dlq": "DLQ"
+},
+"billing": {
+  "title": "بلنگ",
+  "subtitle": "سبسکرپشن اور ادائیگی کا طریقہ۔",
+  "disabled": "اس انسٹینس پر بلنگ غیر فعال ہے۔ تمام خصوصیات مفت ہیں۔",
+  "currentPlan": "موجودہ پلان",
+  "statusLabel": "حالت:",
+  "renews": "تجدید",
+  "manageSubscription": "سبسکرپشن کا انتظام کریں",
+  "upgradeToPro": "Pro میں اپ گریڈ کریں (مفت)",
+  "redirecting": "ری ڈائریکٹ ہو رہا ہے...",
+  "testMode": {
+    "label": "ٹیسٹ موڈ",
+    "body": "کوئی حقیقی چارجز پروسیس نہیں ہوتے۔ کارڈ استعمال کریں",
+    "tail": "کسی بھی مستقبل کی میعاد کے لیے۔",
+    "badge": "ٹیسٹ موڈ"
+  },
+  "plans": {
+    "free": "مفت",
+    "pro": "Pro",
+    "enterprise": "انٹرپرائز"
+  },
+  "status": {
+    "none": "کوئی نہیں",
+    "active": "فعال",
+    "trialing": "ٹرائل میں",
+    "past_due": "واجب الادا",
+    "canceled": "منسوخ",
+    "incomplete": "نامکمل",
+    "incomplete_expired": "نامکمل (میعاد ختم)",
+    "unpaid": "غیر ادا شدہ"
+  }
+},
+  "workflows": {
+  "list": {
+    "title": "ورک فلو",
+    "subtitle": "ویب ہک پائپ لائنز جو واقعات وصول، افزودہ اور روٹ کرتی ہیں۔",
+    "newWorkflow": "+ نیا ورک فلو",
+    "loading": "ورک فلو لوڈ ہو رہے ہیں...",
+    "emptyTitle": "ابھی کوئی ورک فلو نہیں",
+    "emptyBody": "ویب ہکس وصول کرنا شروع کرنے کے لیے اپنا پہلا ورک فلو بنائیں۔",
+    "createWorkflow": "ورک فلو بنائیں",
+    "inactive": "غیر فعال",
+    "ai": "AI",
+    "destinations": "منزل(یں)",
+    "modal": {
+      "title": "نیا ورک فلو",
+      "name": "نام",
+      "namePlaceholder": "Stripe → Slack الرٹس",
+      "sourceType": "ماخذ کی قسم",
+      "signingSecret": "سائننگ سیکرٹ",
+      "signingSecretHint": "ماخذ پلیٹ فارم سے مشترکہ HMAC سیکرٹ۔",
+      "genericHmac": "عام (HMAC)",
+      "enableAI": "AI افزودگی فعال کریں (Groq)",
+      "creating": "بنایا جا رہا ہے...",
+      "create": "بنائیں"
+    },
+    "errors": {
+      "loadFailed": "ورک فلو لوڈ کرنے میں ناکام",
+      "createFailed": "ورک فلو بنانے میں ناکام"
+    }
+  },
+  "detail": {
+    "allWorkflows": "← تمام ورک فلو",
+    "id": "شناخت",
+    "copyWebhookUrl": "ویب ہک URL کاپی کریں",
+    "copied": "کاپی ہو گیا!",
+    "exportYaml": "YAML ایکسپورٹ کریں",
+    "exporting": "ایکسپورٹ ہو رہا ہے...",
+    "testRun": "▶ ٹیسٹ رن",
+    "versionHistory": "ورژن ہسٹری",
+    "webhookUrl": "ویب ہک URL",
+    "transformExpression": "ٹرانسفارم اظہار (JSONata)",
+    "testing": "ٹیسٹ ہو رہا ہے...",
+    "testWithSample": "نمونہ پے لوڈ کے ساتھ ٹیسٹ کریں",
+    "saveExpression": "اظہار محفوظ کریں",
+    "valid": "درست",
+    "noTransform": "کوئی ٹرانسفارم کنفیگر نہیں",
+    "aiEnrichment": "AI افزودگی",
+    "status": "حالت",
+    "transform": "ٹرانسفارم",
+    "customJsonata": "حسب ضرورت JSONata",
+    "destinations": "منزلیں",
+    "addDestination": "+ منزل شامل کریں",
+    "noDestinations": "ابھی کوئی منزل نہیں۔",
+    "verified": "تصدیق شدہ",
+    "failed": "ناکام",
+    "lastValidated": "آخری تصدیق",
+    "validationFailed": "تصدیق ناکام",
+    "createDestinationTitle": "منزل شامل کریں",
+    "namePlaceholder": "پروڈکشن الرٹس",
+    "testConnection": "کنکشن ٹیسٹ کریں",
+    "connectionVerified": "✓ کنکشن کی تصدیق ہو گئی",
+    "validationFailedTitle": "✗ تصدیق ناکام",
+    "testRunPipeline": "ٹیسٹ رن پائپ لائن",
+    "testRunHint": "افزودگی → ٹرانسفارم → روٹنگ چلاتا ہے۔ کوئی DB تحریر نہیں۔",
+    "samplePayload": "نمونہ پے لوڈ (JSON)",
+    "alsoDryRun": "میچ شدہ منزلوں کو بھی dry-run کریں (~1–2 سیکنڈ فی منزل)",
+    "running": "چل رہا ہے...",
+    "runPipeline": "پائپ لائن چلائیں",
+    "stepEnrichment": "1. افزودگی",
+    "stepTransform": "2. ٹرانسفارم",
+    "stepRouting": "3. روٹنگ",
+    "stepDryRuns": "4. منزل dry-runs",
+    "error": "خرابی",
+    "ok": "ٹھیک",
+    "applied": "لاگو",
+    "cached": "کیش شدہ",
+    "noDestinationReceives": "کوئی منزل یہ واقعہ وصول نہیں کرے گی۔",
+    "destinationsWouldReceive": "منزل(یں) وصول کریں گی:",
+    "checked": "جانچے گئے",
+    "confirmDeleteDest": "منزل \"{{name}}\" حذف کریں؟",
+    "errors": {
+      "loadFailed": "ورک فلو لوڈ کرنے میں ناکام",
+      "loadDestFailed": "منزلیں لوڈ کرنے میں ناکام",
+      "exportFailed": "ایکسپورٹ ناکام",
+      "invalidJson": "پے لوڈ درست JSON نہیں ہے",
+      "testRunFailed": "ٹیسٹ رن ناکام",
+      "addDestFailed": "منزل شامل کرنے میں ناکام",
+      "previewFailed": "پیش نظارہ ناکام"
+    }
+  },
+  "schedule": {
+    "title": "شیڈول ٹرگر",
+    "subtitle": "Relayon اس cron پر ایک واقعہ بناتا ہے۔ یہ کسی بھی ویب ہک کی طرح افزودگی، ٹرانسفارم اور روٹنگ سے گزرتا ہے۔",
+    "active": "فعال",
+    "paused": "موقوف",
+    "cron": "Cron",
+    "timezone": "ٹائم زون",
+    "nextRun": "اگلا رن",
+    "runNow": "ابھی چلائیں",
+    "running": "چل رہا ہے...",
+    "pause": "موقوف کریں",
+    "resume": "دوبارہ شروع کریں",
+    "addSchedule": "+ شیڈول شامل کریں",
+    "preset": "پریسیٹ",
+    "custom": "حسب ضرورت…",
+    "cronExpression": "Cron اظہار",
+    "payloadTemplate": "پے لوڈ ٹیمپلیٹ (JSON)",
+    "saveSchedule": "شیڈول محفوظ کریں",
+    "saving": "محفوظ ہو رہا ہے...",
+    "triggered": "ٹرگر ہو گیا",
+    "confirmDelete": "یہ شیڈول حذف کریں؟ واقعات بننا بند ہو جائیں گے۔",
+    "errors": {
+      "invalidJson": "پے لوڈ ٹیمپلیٹ درست JSON نہیں",
+      "saveFailed": "شیڈول محفوظ کرنے میں ناکام",
+      "runFailed": "ابھی چلانا ناکام"
+    },
+    "presets": {
+      "every15": "ہر 15 منٹ",
+      "hourly": "ہر گھنٹہ",
+      "daily9": "روزانہ 09:00 پر",
+      "weekdays9": "ہفتے کے دن 09:00 پر",
+      "weeklyMon9": "ہفتہ وار (پیر 09:00)"
+    }
+  },
+  "versions": {
+    "title": "ورژن ہسٹری",
+    "loading": "ورژن لوڈ ہو رہے ہیں...",
+    "empty": "ابھی کوئی ورژن نہیں۔",
+    "latest": "تازہ ترین",
+    "noMessage": "کوئی پیغام نہیں",
+    "compare": "موازنہ",
+    "selected": "منتخب",
+    "restore": "بحال کریں",
+    "diff": "فرق",
+    "exit": "خروج",
+    "selectHint": "فہرست سے دو ورژن منتخب کریں — پہلا کلک A، دوسرا B ہے۔",
+    "identical": "ورژن یکساں ہیں۔",
+    "split": "منقسم",
+    "unified": "یکجا",
+    "computing": "حساب ہو رہا ہے...",
+    "computeDiff": "فرق کا حساب لگائیں",
+    "snapshot": "اسنیپ شاٹ",
+    "restoreConfirm": "v{{version}} پر بحال کریں؟ موجودہ منزلیں تبدیل ہو جائیں گی۔ ایک نیا ورژن بنے گا۔",
+    "errors": {
+      "loadFailed": "ورژن لوڈ کرنے میں ناکام",
+      "loadOneFailed": "ورژن لوڈ کرنے میں ناکام",
+      "restoreFailed": "بحالی ناکام",
+      "diffFailed": "فرق ناکام"
+    }
+  }
+},
+"dlq": {
+  "title": "ڈیڈ لیٹر قطار",
+  "subtitle": "وہ ترسیلات جو دوبارہ کوششیں ختم کر چکی ہیں۔ غلطیوں کا معائنہ کریں اور دوبارہ چلائیں۔",
+  "loading": "DLQ لوڈ ہو رہا ہے...",
+  "empty": "سب صاف — DLQ میں کوئی ناکام ترسیل نہیں۔",
+  "replaySelected": "منتخب دوبارہ چلائیں",
+  "replaying": "دوبارہ چل رہا ہے...",
+  "discardSelected": "منتخب مسترد کریں",
+  "attempts": "کوششیں",
+  "replay": "دوبارہ چلائیں",
+  "discard": "مسترد کریں",
+  "lastHttp": "آخری HTTP",
+  "replayedResult": "دوبارہ چلایا {{replayed}}/{{total}}",
+  "failedResult": "{{failed}} ناکام",
+  "confirmDiscard": "مستقل طور پر {{count}} DLQ اندراجات مسترد کریں؟",
+  "confirmDiscardOne": "اس DLQ اندراج کو مستقل طور پر حذف کریں؟",
+  "errors": {
+    "loadFailed": "DLQ لوڈ کرنے میں ناکام",
+    "bulkDiscardFailed": "بلک مسترد ناکام"
+  }
+},
+"events": {
+  "title": "واقعات",
+  "subtitle": "Relayon کے وصول کردہ ہر ویب ہک، مکمل لائف سائیکل کے ساتھ۔",
+  "loading": "واقعات لوڈ ہو رہے ہیں...",
+  "empty": "ابھی کوئی واقعہ نہیں۔ یہاں دیکھنے کے لیے ایک ویب ہک بھیجیں۔",
+  "loadMore": "مزید لوڈ کریں",
+  "filter": {
+    "allStatuses": "تمام حالتیں",
+    "processed": "عمل شدہ",
+    "failed": "ناکام",
+    "processing": "عمل میں"
+  },
+  "table": {
+    "correlationId": "کوریلیشن ID",
+    "source": "ماخذ",
+    "status": "حالت",
+    "received": "موصول ہوا"
+  },
+  "replayConfirm": "اس واقعہ کو شروع سے دوبارہ چلائیں؟ نیا کوریلیشن ID بنے گا۔",
+  "detail": {
+    "title": "واقعہ تفصیل",
+    "replay": "↻ واقعہ دوبارہ چلائیں",
+    "replaying": "دوبارہ چل رہا ہے...",
+    "replayQueued": "✓ دوبارہ چلانا قطار میں",
+    "newCorrelation": "نیا کوریلیشن:",
+    "correlation": "کوریلیشن:",
+    "status": "حالت:",
+    "source": "ماخذ:",
+    "received": "موصول:",
+    "enrichment": "AI افزودگی",
+    "model": "ماڈل:",
+    "duration": "دورانیہ:",
+    "cached": "کیش شدہ:",
+    "error": "خرابی:",
+    "rawPayload": "خام پے لوڈ",
+    "enriched": "افزودہ",
+    "deliveries": "ترسیلات",
+    "http": "HTTP"
+  },
+  "errors": {
+    "loadFailed": "واقعات لوڈ کرنے میں ناکام",
+    "replayFailed": "دوبارہ چلانا ناکام"
+  }
+},
+"analytics": {
+  "title": "تجزیات",
+  "subtitle": "واقعہ حجم، ترسیل صحت، تاخیر، اور تخمینی اخراجات۔",
+  "loading": "تجزیات لوڈ ہو رہے ہیں...",
+  "chart": {
+    "title": "واقعات اور ترسیلات",
+    "subtitle": "فی گھنٹہ / روزانہ بالٹیاں — تفصیلات کے لیے کسی بھی نقطہ پر ہوور کریں"
+  },
+  "stats": {
+    "events24h": "واقعات (24 گھنٹے)",
+    "events7d": "واقعات (7 دن)",
+    "successRate": "کامیابی کی شرح",
+    "dlq": "DLQ"
+  },
+  "cost": {
+    "title": "تخمینی اخراجات",
+    "subtitle": "پے لوڈ سائز اور ترسیل کی کوششوں کی بنیاد پر تخمینہ۔",
+    "groq": "Groq",
+    "redis": "Redis",
+    "destination": "منزل",
+    "deliveries": "ترسیلات",
+    "attempts": "کوششیں",
+    "retryRate": "دوبارہ کوشش کی شرح",
+    "estCost": "تخمینی لاگت"
+  },
+  "usage": {
+    "title": "استعمال",
+    "resets": "ری سیٹ"
+  },
+  "errors": {
+    "overviewFailed": "جائزہ لوڈ کرنے میں ناکام",
+    "deliveryFailed": "ترسیل کے اعداد و شمار لوڈ کرنے میں ناکام",
+    "costFailed": "اخراجات کے تجزیات لوڈ کرنے میں ناکام",
+    "timeSeriesFailed": "ٹائم سیریز لوڈ کرنے میں ناکام"
+  }
+},
+  "nav": {
+    "dashboard": "ڈیش بورڈ",
+    "workflows": "ورک فلو",
+    "events": "واقعات",
+    "dlq": "ڈیڈ لیٹر قطار",
+    "analytics": "تجزیات",
+    "settings": "ترتیبات",
+    "signOut": "سائن آؤٹ"
+  },
+  "language": {
+    "label": "زبان",
+    "en": "English",
+    "ur": "اردو",
+    "ar": "العربية"
+  },
+  "auth": {
+    "login": {
+      "title": "خوش آمدید",
+      "subtitle": "اپنے Relayon ڈیش بورڈ میں سائن ان کریں",
+      "email": "ای میل",
+      "emailPlaceholder": "you@company.com",
+      "password": "پاس ورڈ",
+      "passwordPlaceholder": "••••••••",
+      "submit": "سائن ان کریں",
+      "submitting": "سائن ان ہو رہا ہے...",
+      "forgotPassword": "پاس ورڈ بھول گئے؟",
+      "noAccount": "اکاؤنٹ نہیں ہے؟",
+      "createOne": "ایک بنائیں",
+      "continueWithGoogle": "Google کے ساتھ جاری رکھیں",
+      "continueWithGitHub": "GitHub کے ساتھ جاری رکھیں",
+      "errors": {
+        "invalidCredentials": "غلط ای میل یا پاس ورڈ",
+        "emailNotVerified": "سائن ان سے پہلے اپنی ای میل کی تصدیق کریں۔ اپنا ان باکس چیک کریں۔",
+        "resendVerification": "تصدیقی ای میل دوبارہ بھیجیں",
+        "resendSent": "تصدیقی ای میل بھیج دی گئی۔ اپنا ان باکس چیک کریں۔"
+      }
+    },
+    "signup": {
+      "title": "اپنا اکاؤنٹ بنائیں",
+      "subtitle": "منٹوں میں ویب ہکس ریلی کرنا شروع کریں",
+      "name": "آپ کا نام",
+      "tenantName": "کمپنی / ٹیم کا نام",
+      "email": "ای میل",
+      "password": "پاس ورڈ",
+      "submit": "اکاؤنٹ بنائیں",
+      "submitting": "اکاؤنٹ بن رہا ہے...",
+      "hasAccount": "پہلے سے اکاؤنٹ ہے؟",
+      "signIn": "سائن ان کریں",
+      "continueWithGoogle": "Google کے ساتھ سائن اپ کریں",
+      "continueWithGitHub": "GitHub کے ساتھ سائن اپ کریں",
+      "successTitle": "اپنی ای میل چیک کریں",
+      "successBody": "ہم نے {{email}} پر تصدیقی لنک بھیجا ہے۔",
+      "successHint": "اپنے اکاؤنٹ کو فعال کرنے کے لیے اپنے ان باکس میں لنک پر کلک کریں۔",
+      "resend": "تصدیقی ای میل دوبارہ بھیجیں",
+      "resending": "بھیجا جا رہا ہے...",
+      "resendSent": "تصدیقی ای میل دوبارہ بھیج دی گئی۔ اپنا ان باکس چیک کریں۔"
+    },
+    "forgotPassword": {
+      "title": "پاس ورڈ بھول گئے؟",
+      "subtitle": "ہم آپ کو ری سیٹ لنک ای میل کریں گے۔",
+      "email": "ای میل",
+      "submit": "ری سیٹ لنک بھیجیں",
+      "submitting": "بھیجا جا رہا ہے...",
+      "sentTitle": "اپنی ای میل چیک کریں",
+      "sentBody": "اگر {{email}} کے لیے اکاؤنٹ موجود ہے تو ایک منٹ میں ری سیٹ لنک موصول ہوگا۔",
+      "backToLogin": "سائن ان پر واپس",
+      "remembered": "یاد ہے؟",
+      "signIn": "سائن ان کریں"
+    },
+    "resetPassword": {
+      "title": "نیا پاس ورڈ سیٹ کریں",
+      "newPassword": "نیا پاس ورڈ",
+      "confirmPassword": "پاس ورڈ کی تصدیق کریں",
+      "submit": "پاس ورڈ اپ ڈیٹ کریں",
+      "submitting": "اپ ڈیٹ ہو رہا ہے...",
+      "successTitle": "پاس ورڈ اپ ڈیٹ ہو گیا",
+      "successBody": "اپنے نئے پاس ورڈ سے سائن ان کریں۔",
+      "signIn": "سائن ان کریں",
+      "errors": {
+        "mismatch": "پاس ورڈ میچ نہیں کر رہے",
+        "missingToken": "ری سیٹ ٹوکن غائب ہے۔ نیا لنک طلب کریں۔",
+        "failed": "پاس ورڈ ری سیٹ ناکام"
+      }
+    },
+    "verifyEmail": {
+      "verifying": "آپ کی ای میل کی تصدیق ہو رہی ہے...",
+      "successTitle": "ای میل کی تصدیق ہو گئی",
+      "successBody": "آپ کا اکاؤنٹ فعال ہے۔ اب آپ سائن ان کر سکتے ہیں۔",
+      "signIn": "سائن ان کریں",
+      "failedTitle": "تصدیق ناکام",
+      "backToLogin": "سائن ان پر واپس",
+      "missingToken": "تصدیقی ٹوکن غائب ہے",
+      "invalidLink": "غلط یا میعاد ختم شدہ تصدیقی لنک"
+    },
+    "oauthCallback": {
+      "loading": "سائن ان مکمل ہو رہا ہے...",
+      "errorTitle": "سائن ان ناکام",
+      "tryAgain": "دوبارہ کوشش کریں",
+      "missingTicket": "لاگ ان ٹکٹ غائب ہے",
+      "failed": "سائن ان مکمل نہیں ہو سکا"
+    },
+    "validation": {
+      "emailRequired": "درست ای میل درکار ہے",
+      "passwordMin8": "پاس ورڈ کم از کم 8 حروف کا ہونا چاہیے",
+      "passwordMin12": "پاس ورڈ کم از کم 12 حروف کا ہونا چاہیے",
+      "nameMin2": "نام درکار ہے (کم از کم 2 حروف)",
+      "teamMin2": "ٹیم کا نام درکار ہے (کم از کم 2 حروف)"
+    }
+  },
+  "passwordStrength": {
+    "veryWeak": "بہت کمزور",
+    "weak": "کمزور",
+    "fair": "درمیانہ",
+    "strong": "مضبوط",
+    "veryStrong": "بہت مضبوط"
+  },
+  "dashboard": {
+    "welcome": "خوش آمدید، {{name}}",
+    "subtitle": "آج آپ کے ویب ہک پائپ لائنز میں کیا ہو رہا ہے۔",
+    "stats": {
+      "events24h": "واقعات (24 گھنٹے)",
+      "successRate": "کامیابی کی شرح",
+      "pendingDeliveries": "زیر التواء ترسیلات",
+      "dlqEntries": "DLQ اندراجات"
+    },
+    "quickLinks": {
+      "workflowsTitle": "ورک فلو",
+      "workflowsDesc": "ویب ہک پائپ لائنز بنائیں اور منظم کریں",
+      "eventsTitle": "واقعہ ایکسپلورر",
+      "eventsDesc": "کسی بھی ویب ہک کا مکمل لائف سائیکل دیکھیں"
+    },
+    "dlqAlert": "{{count}} ترسیلات ڈیڈ لیٹر قطار میں — جائزہ لینے کے لیے کلک کریں۔",
+    "monthlyUsage": "ماہانہ استعمال",
+    "events": "واقعات",
+    "aiTokens": "AI ٹوکنز"
+  },
+  "footer": "Relayon · آپ کے ویب ہکس، صحیح طریقے سے پہنچائے گئے۔"
+}

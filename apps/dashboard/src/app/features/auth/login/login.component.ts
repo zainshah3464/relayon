@@ -2,12 +2,13 @@ import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink, ActivatedRoute } from '@angular/router';
 import { CommonModule } from '@angular/common';
+import { TranslocoModule } from '@jsverse/transloco';
 import { AuthService } from '../../../core/auth/auth.service';
 
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink],
+  imports: [CommonModule, ReactiveFormsModule, RouterLink, TranslocoModule],
   template: `
     <div class="flex min-h-screen items-center justify-center bg-midnight p-4">
       <div class="w-full max-w-md">
@@ -16,8 +17,8 @@ import { AuthService } from '../../../core/auth/auth.service';
           <div class="mb-3 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-relay-violet to-relay-cyan text-xl font-bold text-white">
             R
           </div>
-          <h1 class="text-2xl font-bold tracking-tightest text-white">Welcome back</h1>
-          <p class="mt-1 text-sm text-muted">Sign in to your Relayon dashboard</p>
+          <h1 class="text-2xl font-bold tracking-tightest text-white">{{ 'auth.login.title' | transloco }}</h1>
+          <p class="mt-1 text-sm text-muted">{{ 'auth.login.subtitle' | transloco }}</p>
         </div>
 
         <!-- Card -->
@@ -35,7 +36,7 @@ import { AuthService } from '../../../core/auth/auth.service';
                 <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
                 <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
               </svg>
-              Continue with Google
+              {{ 'auth.login.continueWithGoogle' | transloco }}
             </button>
             <button
               type="button"
@@ -45,7 +46,7 @@ import { AuthService } from '../../../core/auth/auth.service';
               <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
               </svg>
-              Continue with GitHub
+              {{ 'auth.login.continueWithGitHub' | transloco }}
             </button>
           </div>
 
@@ -55,7 +56,7 @@ import { AuthService } from '../../../core/auth/auth.service';
               <div class="w-full border-t border-hairline"></div>
             </div>
             <div class="relative flex justify-center text-xs">
-              <span class="bg-surface px-2 text-muted">OR</span>
+              <span class="bg-surface px-2 text-muted">{{ 'common.or' | transloco }}</span>
             </div>
           </div>
 
@@ -63,53 +64,53 @@ import { AuthService } from '../../../core/auth/auth.service';
           <form [formGroup]="form" (ngSubmit)="submit()" class="space-y-4">
             @if (error()) {
               <div class="rounded-lg border border-signal-rose/30 bg-signal-rose/10 px-3 py-2 text-sm text-signal-rose">
-                {{ error() }}
+                {{ error()! | transloco }}
               </div>
             }
 
             @if (unverifiedEmail()) {
               <div class="rounded-lg border border-signal-amber/30 bg-signal-amber/10 px-3 py-2 text-xs text-signal-amber flex items-center justify-between gap-2">
-                <span>Email not verified.</span>
+                <span>{{ 'auth.login.errors.resendVerification' | transloco }}</span>
                 <button
                   type="button"
                   (click)="resendVerification()"
                   [disabled]="resending()"
                   class="font-medium underline hover:no-underline disabled:opacity-50"
                 >
-                  {{ resending() ? 'Sending...' : 'Resend link' }}
+                  {{ resending() ? '...' : '↻' }}
                 </button>
               </div>
             }
 
             @if (resendSuccess()) {
               <div class="rounded-lg border border-signal-emerald/30 bg-signal-emerald/10 px-3 py-2 text-xs text-signal-emerald">
-                Verification email sent. Check your inbox.
+                {{ 'auth.login.errors.resendSent' | transloco }}
               </div>
             }
 
             <div>
-              <label for="email" class="label">Email</label>
+              <label for="email" class="label">{{ 'auth.login.email' | transloco }}</label>
               <input
                 id="email"
                 type="email"
                 formControlName="email"
                 autocomplete="email"
                 class="input"
-                placeholder="you@company.com"
+                [placeholder]="'auth.login.emailPlaceholder' | transloco"
               />
               @if (form.controls.email.touched && form.controls.email.invalid) {
-                <p class="mt-1 text-xs text-signal-rose">Valid email is required</p>
+                <p class="mt-1 text-xs text-signal-rose">{{ 'auth.validation.emailRequired' | transloco }}</p>
               }
             </div>
 
             <div>
               <div class="flex items-center justify-between">
-                <label for="password" class="label">Password</label>
+                <label for="password" class="label">{{ 'auth.login.password' | transloco }}</label>
                 <a
                   routerLink="/forgot-password"
                   class="text-xs text-muted hover:text-white"
                 >
-                  Forgot password?
+                  {{ 'auth.login.forgotPassword' | transloco }}
                 </a>
               </div>
               <input
@@ -118,10 +119,10 @@ import { AuthService } from '../../../core/auth/auth.service';
                 formControlName="password"
                 autocomplete="current-password"
                 class="input"
-                placeholder="••••••••"
+                [placeholder]="'auth.login.passwordPlaceholder' | transloco"
               />
               @if (form.controls.password.touched && form.controls.password.invalid) {
-                <p class="mt-1 text-xs text-signal-rose">Password must be at least 8 characters</p>
+                <p class="mt-1 text-xs text-signal-rose">{{ 'auth.validation.passwordMin8' | transloco }}</p>
               }
             </div>
 
@@ -130,20 +131,20 @@ import { AuthService } from '../../../core/auth/auth.service';
               [disabled]="loading() || form.invalid"
               class="btn-primary w-full"
             >
-              {{ loading() ? 'Signing in...' : 'Sign in' }}
+              {{ (loading() ? 'auth.login.submitting' : 'auth.login.submit') | transloco }}
             </button>
           </form>
 
           <p class="mt-6 text-center text-sm text-muted">
-            Don't have an account?
+            {{ 'auth.login.noAccount' | transloco }}
             <a routerLink="/signup" class="font-medium text-relay-cyan hover:underline">
-              Create one
+              {{ 'auth.login.createOne' | transloco }}
             </a>
           </p>
         </div>
 
         <p class="mt-6 text-center text-xs text-muted">
-          Relayon · Your webhooks, relayed right.
+          {{ 'footer' | transloco }}
         </p>
       </div>
     </div>
@@ -195,10 +196,10 @@ export class LoginComponent {
         const body = err?.error;
 
         if (body?.code === 'EMAIL_NOT_VERIFIED') {
-          this.error.set(body.message);
+          this.error.set('auth.login.errors.emailNotVerified');
           this.unverifiedEmail.set(this.form.controls.email.value);
         } else {
-          this.error.set(body?.message ?? 'Login failed. Please check your credentials.');
+          this.error.set('auth.login.errors.invalidCredentials');
         }
       },
     });

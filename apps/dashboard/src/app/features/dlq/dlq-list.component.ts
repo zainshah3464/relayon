@@ -1,34 +1,35 @@
 import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { TranslocoModule, TranslocoService } from '@jsverse/transloco';
 import { EventsService, Delivery } from '../../core/api/events.service';
 
 @Component({
   selector: 'app-dlq-list',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, TranslocoModule],
   template: `
     <div class="space-y-6">
       <div class="flex items-center justify-between">
         <div>
-          <h1 class="text-2xl font-bold tracking-tightest text-white">Dead Letter Queue</h1>
-          <p class="text-sm text-muted mt-1">Deliveries that exhausted retries. Inspect errors and replay.</p>
+          <h1 class="text-2xl font-bold tracking-tightest text-white">{{ 'dlq.title' | transloco }}</h1>
+          <p class="text-sm text-muted mt-1">{{ 'dlq.subtitle' | transloco }}</p>
         </div>
-        <button (click)="load()" class="btn-secondary">Refresh</button>
+        <button (click)="load()" class="btn-secondary">{{ 'common.refresh' | transloco }}</button>
       </div>
 
       @if (selected().size > 0) {
         <div class="card flex items-center justify-between">
           <p class="text-sm text-white">
-            <strong>{{ selected().size }}</strong> selected
+            <strong>{{ selected().size }}</strong> {{ 'common.selected' | transloco }}
           </p>
           <div class="flex gap-2">
             <button (click)="bulkReplay()" [disabled]="bulkLoading()" class="btn-primary">
-              {{ bulkLoading() ? 'Replaying...' : 'Replay selected' }}
+              {{ (bulkLoading() ? 'dlq.replaying' : 'dlq.replaySelected') | transloco }}
             </button>
             <button (click)="bulkDiscard()" [disabled]="bulkLoading()" class="btn-secondary text-signal-rose">
-              Discard selected
+              {{ 'dlq.discardSelected' | transloco }}
             </button>
-            <button (click)="clearSelection()" class="btn-secondary">Clear</button>
+            <button (click)="clearSelection()" class="btn-secondary">{{ 'common.clear' | transloco }}</button>
           </div>
         </div>
       }
@@ -36,9 +37,9 @@ import { EventsService, Delivery } from '../../core/api/events.service';
       @if (bulkResult(); as r) {
         <div class="card">
           <p class="text-sm text-white">
-            Replayed {{ r.replayed }}/{{ r.total }}
+            {{ 'dlq.replayedResult' | transloco: { replayed: r.replayed, total: r.total } }}
             @if (r.failed > 0) {
-              · {{ r.failed }} failed
+              · {{ 'dlq.failedResult' | transloco: { failed: r.failed } }}
             }
           </p>
           @if (r.failures.length > 0) {
@@ -52,13 +53,13 @@ import { EventsService, Delivery } from '../../core/api/events.service';
       }
 
       @if (loading()) {
-        <div class="card text-sm text-muted">Loading DLQ...</div>
+        <div class="card text-sm text-muted">{{ 'dlq.loading' | transloco }}</div>
       } @else if (error()) {
-        <div class="card text-sm text-signal-rose">{{ error() }}</div>
+        <div class="card text-sm text-signal-rose">{{ error() | transloco }}</div>
       } @else if (items().length === 0) {
         <div class="card text-center py-12">
           <div class="text-3xl mb-2">✅</div>
-          <p class="text-sm text-muted">All clear — no failed deliveries in the DLQ.</p>
+          <p class="text-sm text-muted">{{ 'dlq.empty' | transloco }}</p>
         </div>
       } @else {
         <div class="card flex items-center gap-3">
@@ -68,7 +69,7 @@ import { EventsService, Delivery } from '../../core/api/events.service';
             (change)="toggleAll($event)"
             class="rounded border-hairline"
           />
-          <span class="text-xs text-muted">Select all ({{ items().length }})</span>
+          <span class="text-xs text-muted">{{ 'common.selectAll' | transloco }} ({{ items().length }})</span>
         </div>
 
         <div class="space-y-2">
@@ -85,13 +86,13 @@ import { EventsService, Delivery } from '../../core/api/events.service';
                   <div>
                     <p class="text-white font-mono text-xs">{{ d.correlationId }}</p>
                     <p class="text-xs text-muted mt-1">
-                      {{ d.destinationType }} · {{ d.attemptCount }} attempts · {{ d.dlqAt | date: 'short' }}
+                      {{ d.destinationType }} · {{ d.attemptCount }} {{ 'dlq.attempts' | transloco }} · {{ d.dlqAt | date: 'short' }}
                     </p>
                   </div>
                 </div>
                 <div class="flex gap-2">
-                  <button (click)="replay(d)" class="text-xs text-relay-cyan hover:underline">Replay</button>
-                  <button (click)="discard(d)" class="text-xs text-signal-rose hover:underline">Discard</button>
+                  <button (click)="replay(d)" class="text-xs text-relay-cyan hover:underline">{{ 'dlq.replay' | transloco }}</button>
+                  <button (click)="discard(d)" class="text-xs text-signal-rose hover:underline">{{ 'dlq.discard' | transloco }}</button>
                 </div>
               </div>
               @if (d.dlqReason) {
@@ -101,7 +102,7 @@ import { EventsService, Delivery } from '../../core/api/events.service';
                 <pre class="text-xs text-signal-rose bg-surface-2 p-2 rounded mt-2">{{ d.error | json }}</pre>
               }
               @if (d.lastResponse) {
-                <p class="text-xs text-muted mt-1">Last HTTP {{ d.lastResponse.statusCode }}: {{ d.lastResponse.bodySnippet.slice(0, 200) }}</p>
+                <p class="text-xs text-muted mt-1">{{ 'dlq.lastHttp' | transloco }} {{ d.lastResponse.statusCode }}: {{ d.lastResponse.bodySnippet.slice(0, 200) }}</p>
               }
             </div>
           }
@@ -112,6 +113,7 @@ import { EventsService, Delivery } from '../../core/api/events.service';
 })
 export class DlqListComponent implements OnInit {
   private svc = inject(EventsService);
+  private transloco = inject(TranslocoService);
 
   items = signal<Delivery[]>([]);
   loading = signal(true);
@@ -145,7 +147,7 @@ export class DlqListComponent implements OnInit {
         this.loading.set(false);
       },
       error: (err) => {
-        this.error.set(err?.error?.message ?? 'Failed to load DLQ');
+        this.error.set(err?.error?.message ?? 'dlq.errors.loadFailed');
         this.loading.set(false);
       },
     });
@@ -201,7 +203,8 @@ export class DlqListComponent implements OnInit {
   bulkDiscard(): void {
     const ids = Array.from(this.selected());
     if (ids.length === 0) return;
-    if (!confirm(`Permanently discard ${ids.length} DLQ entries?`)) return;
+    const msg = this.transloco.translate('dlq.confirmDiscard', { count: ids.length });
+    if (!confirm(msg)) return;
 
     this.bulkLoading.set(true);
     this.svc.bulkDiscardDlq(ids).subscribe({
@@ -217,7 +220,7 @@ export class DlqListComponent implements OnInit {
       },
       error: (err) => {
         this.bulkLoading.set(false);
-        this.error.set(err?.error?.message ?? 'Bulk discard failed');
+        this.error.set(err?.error?.message ?? 'dlq.errors.bulkDiscardFailed');
       },
     });
   }
@@ -231,7 +234,8 @@ export class DlqListComponent implements OnInit {
   }
 
   discard(d: Delivery): void {
-    if (!confirm('Delete this DLQ entry permanently?')) return;
+    const msg = this.transloco.translate('dlq.confirmDiscardOne');
+    if (!confirm(msg)) return;
     this.svc.discardDlq(d._id).subscribe({
       next: () => {
         this.items.set(this.items().filter((x) => x._id !== d._id));

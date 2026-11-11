@@ -1,5 +1,6 @@
 import { Component, inject, input, output, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { TranslocoModule, TranslocoService } from '@jsverse/transloco';
 import {
   WorkflowsService,
   WorkflowVersionSummary,
@@ -9,7 +10,7 @@ import {
 @Component({
   selector: 'app-workflow-versions-drawer',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, TranslocoModule],
   template: `
     <div class="fixed inset-0 z-50 bg-black/60 flex justify-end" (click)="close.emit()">
       <div
@@ -17,18 +18,18 @@ import {
         (click)="$event.stopPropagation()"
       >
         <div class="flex justify-between items-center mb-4">
-          <h2 class="text-lg font-semibold text-white">Version history</h2>
+          <h2 class="text-lg font-semibold text-white">{{ 'workflows.versions.title' | transloco }}</h2>
           <button (click)="close.emit()" class="text-muted hover:text-white">✕</button>
         </div>
 
         @if (error()) {
-          <div class="text-sm text-signal-rose mb-3">{{ error() }}</div>
+          <div class="text-sm text-signal-rose mb-3">{{ error() | transloco }}</div>
         }
 
         @if (loading()) {
-          <p class="text-sm text-muted">Loading versions...</p>
+          <p class="text-sm text-muted">{{ 'workflows.versions.loading' | transloco }}</p>
         } @else if (versions().length === 0) {
-          <p class="text-sm text-muted">No versions yet.</p>
+          <p class="text-sm text-muted">{{ 'workflows.versions.empty' | transloco }}</p>
         } @else {
           <div class="space-y-2">
             @for (v of versions(); track v.id) {
@@ -38,19 +39,19 @@ import {
                     <p class="text-white text-sm font-medium">
                       v{{ v.version }}
                       @if (v.version === latestVersion()) {
-                        <span class="text-xs text-relay-cyan ml-1">latest</span>
+                        <span class="text-xs text-relay-cyan ml-1">{{ 'workflows.versions.latest' | transloco }}</span>
                       }
                     </p>
-                    <p class="text-xs text-muted mt-1">{{ v.message || 'No message' }}</p>
+                    <p class="text-xs text-muted mt-1">{{ v.message || ('workflows.versions.noMessage' | transloco) }}</p>
                     <p class="text-xs text-muted mt-1">{{ v.createdAt | date: 'medium' }}</p>
                   </div>
                   <div class="flex gap-2">
-                    <button (click)="inspect(v)" class="text-xs text-relay-cyan hover:underline">View</button>
+                    <button (click)="inspect(v)" class="text-xs text-relay-cyan hover:underline">{{ 'common.view' | transloco }}</button>
                     <button (click)="toggleCompare(v)" class="text-xs text-relay-cyan hover:underline">
-                      {{ isCompareSelected(v) ? 'Selected' : 'Compare' }}
+                      {{ (isCompareSelected(v) ? 'workflows.versions.selected' : 'workflows.versions.compare') | transloco }}
                     </button>
                     @if (v.version !== latestVersion()) {
-                      <button (click)="restore(v)" class="text-xs text-signal-amber hover:underline">Restore</button>
+                      <button (click)="restore(v)" class="text-xs text-signal-amber hover:underline">{{ 'workflows.versions.restore' | transloco }}</button>
                     }
                   </div>
                 </div>
@@ -63,23 +64,23 @@ import {
           <div class="mt-6 space-y-3">
             <div class="flex justify-between items-center">
               <h3 class="text-sm font-medium text-white">
-                Diff
+                {{ 'workflows.versions.diff' | transloco }}
                 @if (compareA() && compareB()) {
                   <span class="text-xs text-muted ml-2">
                     v{{ compareA()!.version }} → v{{ compareB()!.version }}
                   </span>
                 }
               </h3>
-              <button (click)="exitCompare()" class="text-xs text-muted hover:text-white">Exit</button>
+              <button (click)="exitCompare()" class="text-xs text-muted hover:text-white">{{ 'workflows.versions.exit' | transloco }}</button>
             </div>
 
             <p class="text-xs text-muted">
-              Select two versions from the list — first click is A, second is B.
+              {{ 'workflows.versions.selectHint' | transloco }}
             </p>
 
             @if (diffResult(); as d) {
               @if (d.identical) {
-                <p class="text-sm text-muted">Versions are identical.</p>
+                <p class="text-sm text-muted">{{ 'workflows.versions.identical' | transloco }}</p>
               } @else {
                 <div class="flex items-center gap-3 text-xs">
                   <span class="text-signal-green">+{{ d.stats.added }}</span>
@@ -92,7 +93,7 @@ import {
                         'bg-relay-violet text-white': diffMode() === 'split',
                         'text-muted': diffMode() !== 'split'
                       }"
-                    >Split</button>
+                    >{{ 'workflows.versions.split' | transloco }}</button>
                     <button
                       (click)="diffMode.set('unified')"
                       class="px-2 py-0.5 rounded text-[10px]"
@@ -100,7 +101,7 @@ import {
                         'bg-relay-violet text-white': diffMode() === 'unified',
                         'text-muted': diffMode() !== 'unified'
                       }"
-                    >Unified</button>
+                    >{{ 'workflows.versions.unified' | transloco }}</button>
                   </div>
                 </div>
 
@@ -143,7 +144,7 @@ import {
               }
             } @else if (compareA() && compareB()) {
               <button (click)="runDiff()" [disabled]="diffing()" class="btn-primary text-xs">
-                {{ diffing() ? 'Computing...' : 'Compute diff' }}
+                {{ (diffing() ? 'workflows.versions.computing' : 'workflows.versions.computeDiff') | transloco }}
               </button>
             }
           </div>
@@ -151,8 +152,8 @@ import {
           @if (detail(); as d) {
             <div class="mt-6">
               <div class="flex justify-between items-center mb-2">
-                <h3 class="text-sm font-medium text-white">Snapshot v{{ d.version }}</h3>
-                <button (click)="detail.set(null)" class="text-xs text-muted hover:text-white">Close</button>
+                <h3 class="text-sm font-medium text-white">{{ 'workflows.versions.snapshot' | transloco }} v{{ d.version }}</h3>
+                <button (click)="detail.set(null)" class="text-xs text-muted hover:text-white">{{ 'common.close' | transloco }}</button>
               </div>
               <pre class="bg-surface-2 p-3 rounded text-xs overflow-x-auto text-relay-cyan">{{ d.snapshot | json }}</pre>
             </div>
@@ -168,6 +169,7 @@ export class WorkflowVersionsDrawerComponent implements OnInit {
   readonly restored = output<void>();
 
   private svc = inject(WorkflowsService);
+  private transloco = inject(TranslocoService);
 
   versions = signal<WorkflowVersionSummary[]>([]);
   detail = signal<WorkflowVersionDetail | null>(null);
@@ -212,7 +214,7 @@ export class WorkflowVersionsDrawerComponent implements OnInit {
         this.loading.set(false);
       },
       error: (err) => {
-        this.error.set(err?.error?.message ?? 'Failed to load versions');
+        this.error.set(err?.error?.message ?? 'workflows.versions.errors.loadFailed');
         this.loading.set(false);
       },
     });
@@ -221,16 +223,13 @@ export class WorkflowVersionsDrawerComponent implements OnInit {
   inspect(v: WorkflowVersionSummary): void {
     this.svc.getVersion(this.workflowId(), v.version).subscribe({
       next: (d) => this.detail.set(d),
-      error: (err) => this.error.set(err?.error?.message ?? 'Failed to load version'),
+      error: (err) => this.error.set(err?.error?.message ?? 'workflows.versions.errors.loadOneFailed'),
     });
   }
 
   restore(v: WorkflowVersionSummary): void {
-    if (
-      !confirm(
-        `Restore to v${v.version}? Current destinations will be replaced. A new version will be created.`,
-      )
-    ) {
+    const msg = this.transloco.translate('workflows.versions.restoreConfirm', { version: v.version });
+    if (!confirm(msg)) {
       return;
     }
 
@@ -240,7 +239,7 @@ export class WorkflowVersionsDrawerComponent implements OnInit {
         this.load();
         this.restored.emit();
       },
-      error: (err) => this.error.set(err?.error?.message ?? 'Restore failed'),
+      error: (err) => this.error.set(err?.error?.message ?? 'workflows.versions.errors.restoreFailed'),
     });
   }
 
@@ -259,7 +258,7 @@ export class WorkflowVersionsDrawerComponent implements OnInit {
           this.compareA.set(detail);
         }
       },
-      error: (err) => this.error.set(err?.error?.message ?? 'Failed to load version'),
+      error: (err) => this.error.set(err?.error?.message ?? 'workflows.versions.errors.loadOneFailed'),
     });
   }
 
@@ -287,7 +286,7 @@ export class WorkflowVersionsDrawerComponent implements OnInit {
         this.diffing.set(false);
       },
       error: (err) => {
-        this.error.set(err?.error?.message ?? 'Diff failed');
+        this.error.set(err?.error?.message ?? 'workflows.versions.errors.diffFailed');
         this.diffing.set(false);
       },
     });

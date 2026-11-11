@@ -1,0 +1,534 @@
+{
+  "common": {
+    "loading": "جارٍ التحميل...",
+    "or": "أو",
+    "save": "حفظ",
+    "cancel": "إلغاء",
+    "delete": "حذف",
+    "back": "رجوع",
+    "refresh": "تحديث",
+    "close": "إغلاق",
+"edit": "تعديل",
+"hide": "إخفاء",
+"enable": "تفعيل",
+"disable": "تعطيل",
+"enabled": "مُفعّل",
+"disabled": "مُعطّل",
+"active": "نشط",
+"inactive": "غير نشط",
+"status": "الحالة",
+"name": "الاسم",
+"type": "النوع",
+"add": "إضافة",
+"adding": "جارٍ الإضافة...",
+"saving": "جارٍ الحفظ...",
+"none": "لا شيء",
+"selectAll": "تحديد الكل",
+"selected": "محدد",
+"clear": "مسح",
+"view": "عرض"
+  },
+  "settings": {
+  "title": "الإعدادات",
+  "subtitle": "تكوين مساحة العمل، وصول API، الفوترة.",
+  "tabs": {
+    "workspace": "مساحة العمل",
+    "apiKeys": "مفاتيح API",
+    "billing": "الفوترة"
+  },
+  "workspace": {
+    "title": "مساحة العمل",
+    "name": "الاسم",
+    "slug": "المعرّف",
+    "plan": "الخطة",
+    "saveChanges": "حفظ التغييرات",
+    "saved": "تم الحفظ"
+  },
+  "quotaOverride": {
+    "title": "تجاوز الحصة",
+    "eventsPerMonth": "الأحداث / شهر",
+    "aiTokensPerMonth": "رموز AI / شهر",
+    "enforcementMode": "وضع التنفيذ",
+    "hardOption": "صارم — الحظر عند الحد",
+    "softOption": "مرن — السماح حتى 2× مع تحذيرات",
+    "help": "يرسل الوضع المرن رؤوس X-Quota-Warning عند 80%؛ الحد الصارم عند 2× يمنع التكاليف الجامحة.",
+    "updateQuota": "تحديث الحصة",
+    "saved": "تم الحفظ"
+  },
+  "quotas": {
+    "title": "الحصص",
+    "eventsPerMonth": "الأحداث/شهر:",
+    "aiTokensPerMonth": "رموز AI/شهر:",
+    "mode": "الوضع:",
+    "softNote": "(مرن — حد صارم 2× مع تحذيرات)"
+  }
+},
+"apiKeys": {
+  "title": "مفاتيح API",
+  "subtitle": "وصول برمجي إلى Relayon. يتم تجزئة المفاتيح — تُعرض القيمة الأصلية مرة واحدة.",
+  "newKey": "+ مفتاح جديد",
+  "createdTitle": "✅ تم إنشاء المفتاح — انسخه الآن. لن يُعرض مرة أخرى.",
+  "copyKey": "نسخ المفتاح",
+  "copied": "تم النسخ!",
+  "dismiss": "تجاهل",
+  "loading": "جارٍ تحميل مفاتيح API...",
+  "empty": "لا توجد مفاتيح API بعد. أنشئ مفتاحاً لتمكين الوصول البرمجي.",
+  "revoked": "ملغى",
+  "created": "أُنشئ",
+  "lastUsed": "آخر استخدام",
+  "expires": "ينتهي",
+  "revoke": "إلغاء",
+  "revokeConfirm": "إلغاء \"{{name}}\"؟ لا يمكن التراجع عن هذا.",
+  "rotationHistory": "سجل التدوير",
+  "graceUntil": "فترة سماح حتى",
+  "modal": {
+    "title": "إنشاء مفتاح API",
+    "name": "الاسم",
+    "namePlaceholder": "خط أنابيب CI",
+    "environment": "البيئة",
+    "environments": {
+      "live": "حي",
+      "test": "اختبار"
+    },
+    "scopes": "النطاقات",
+    "neverExpires": "لا ينتهي أبداً",
+    "creating": "جارٍ الإنشاء...",
+    "create": "إنشاء"
+  },
+  "errors": {
+    "createFailed": "فشل إنشاء المفتاح"
+  }
+},
+  "schemaForm": {
+  "errors": {
+    "fieldRequired": "الحقل \"{{label}}\" مطلوب",
+    "invalidJson": "الحقل \"{{label}}\" ليس JSON صالحاً",
+    "notNumber": "الحقل \"{{label}}\" يجب أن يكون رقماً"
+  }
+},
+"noData": "لا توجد بيانات في هذا النطاق.",
+"legend": {
+  "events": "الأحداث",
+  "delivered": "تم التسليم",
+  "dlq": "DLQ"
+},"billing": {
+  "title": "الفوترة",
+  "subtitle": "الاشتراك وطريقة الدفع.",
+  "disabled": "الفوترة معطّلة على هذا المثيل. جميع الميزات مجانية.",
+  "currentPlan": "الخطة الحالية",
+  "statusLabel": "الحالة:",
+  "renews": "يتجدد",
+  "manageSubscription": "إدارة الاشتراك",
+  "upgradeToPro": "الترقية إلى Pro (مجاناً)",
+  "redirecting": "جارٍ إعادة التوجيه...",
+  "testMode": {
+    "label": "وضع الاختبار",
+    "body": "لا تُعالج رسوم حقيقية. استخدم البطاقة",
+    "tail": "لأي تاريخ انتهاء مستقبلي.",
+    "badge": "وضع الاختبار"
+  },
+  "plans": {
+    "free": "مجاني",
+    "pro": "Pro",
+    "enterprise": "المؤسسات"
+  },
+  "status": {
+    "none": "لا يوجد",
+    "active": "نشط",
+    "trialing": "تجريبي",
+    "past_due": "متأخر السداد",
+    "canceled": "ملغى",
+    "incomplete": "غير مكتمل",
+    "incomplete_expired": "غير مكتمل (منتهي)",
+    "unpaid": "غير مدفوع"
+  }
+},
+  "workflows": {
+  "list": {
+    "title": "سير العمل",
+    "subtitle": "خطوط أنابيب الـ webhooks التي تستقبل الأحداث وتُثريها وتوجّهها.",
+    "newWorkflow": "+ سير عمل جديد",
+    "loading": "جارٍ تحميل سير العمل...",
+    "emptyTitle": "لا يوجد سير عمل بعد",
+    "emptyBody": "أنشئ أول سير عمل لبدء استقبال الـ webhooks.",
+    "createWorkflow": "إنشاء سير عمل",
+    "inactive": "غير نشط",
+    "ai": "AI",
+    "destinations": "وجهة",
+    "modal": {
+      "title": "سير عمل جديد",
+      "name": "الاسم",
+      "namePlaceholder": "Stripe → تنبيهات Slack",
+      "sourceType": "نوع المصدر",
+      "signingSecret": "سر التوقيع",
+      "signingSecretHint": "سر HMAC مشترك من منصة المصدر.",
+      "genericHmac": "عام (HMAC)",
+      "enableAI": "تفعيل الإثراء بالذكاء الاصطناعي (Groq)",
+      "creating": "جارٍ الإنشاء...",
+      "create": "إنشاء"
+    },
+    "errors": {
+      "loadFailed": "فشل تحميل سير العمل",
+      "createFailed": "فشل إنشاء سير العمل"
+    }
+  },
+  "detail": {
+    "allWorkflows": "← كل سير العمل",
+    "id": "المعرف",
+    "copyWebhookUrl": "نسخ رابط الـ webhook",
+    "copied": "تم النسخ!",
+    "exportYaml": "تصدير YAML",
+    "exporting": "جارٍ التصدير...",
+    "testRun": "▶ اختبار التشغيل",
+    "versionHistory": "سجل الإصدارات",
+    "webhookUrl": "رابط الـ webhook",
+    "transformExpression": "تعبير التحويل (JSONata)",
+    "testing": "جارٍ الاختبار...",
+    "testWithSample": "اختبار بحمولة نموذجية",
+    "saveExpression": "حفظ التعبير",
+    "valid": "صالح",
+    "noTransform": "لا يوجد تحويل مُعد",
+    "aiEnrichment": "الإثراء بالذكاء الاصطناعي",
+    "status": "الحالة",
+    "transform": "التحويل",
+    "customJsonata": "JSONata مخصص",
+    "destinations": "الوجهات",
+    "addDestination": "+ إضافة وجهة",
+    "noDestinations": "لا توجد وجهات بعد.",
+    "verified": "مُتحقق",
+    "failed": "فشل",
+    "lastValidated": "آخر تحقق",
+    "validationFailed": "فشل التحقق",
+    "createDestinationTitle": "إضافة وجهة",
+    "namePlaceholder": "تنبيهات الإنتاج",
+    "testConnection": "اختبار الاتصال",
+    "connectionVerified": "✓ تم التحقق من الاتصال",
+    "validationFailedTitle": "✗ فشل التحقق",
+    "testRunPipeline": "اختبار تشغيل خط الأنابيب",
+    "testRunHint": "يشغّل الإثراء → التحويل → التوجيه. لا كتابات في DB.",
+    "samplePayload": "حمولة نموذجية (JSON)",
+    "alsoDryRun": "أيضاً تجربة الوجهات المطابقة (~1–2s لكل واحدة)",
+    "running": "جارٍ التشغيل...",
+    "runPipeline": "تشغيل خط الأنابيب",
+    "stepEnrichment": "1. الإثراء",
+    "stepTransform": "2. التحويل",
+    "stepRouting": "3. التوجيه",
+    "stepDryRuns": "4. تجربة الوجهات",
+    "error": "خطأ",
+    "ok": "حسن",
+    "applied": "مُطبّق",
+    "cached": "مخزّن",
+    "noDestinationReceives": "لن تستقبل أي وجهة هذا الحدث.",
+    "destinationsWouldReceive": "وجهة (وجهات) ستستقبل:",
+    "checked": "مُتحقق منها",
+    "confirmDeleteDest": "حذف الوجهة \"{{name}}\"؟",
+    "errors": {
+      "loadFailed": "فشل تحميل سير العمل",
+      "loadDestFailed": "فشل تحميل الوجهات",
+      "exportFailed": "فشل التصدير",
+      "invalidJson": "الحمولة ليست JSON صالحة",
+      "testRunFailed": "فشل اختبار التشغيل",
+      "addDestFailed": "فشل إضافة الوجهة",
+      "previewFailed": "فشل المعاينة"
+    }
+  },
+  "schedule": {
+    "title": "المشغّل المجدول",
+    "subtitle": "يولّد Relayon حدثاً على هذا الـ cron. يمر عبر الإثراء والتحويل والتوجيه كأي webhook.",
+    "active": "نشط",
+    "paused": "موقوف",
+    "cron": "Cron",
+    "timezone": "المنطقة الزمنية",
+    "nextRun": "التشغيل التالي",
+    "runNow": "تشغيل الآن",
+    "running": "جارٍ التشغيل...",
+    "pause": "إيقاف",
+    "resume": "استئناف",
+    "addSchedule": "+ إضافة جدولة",
+    "preset": "إعداد مسبق",
+    "custom": "مخصص…",
+    "cronExpression": "تعبير الـ Cron",
+    "payloadTemplate": "قالب الحمولة (JSON)",
+    "saveSchedule": "حفظ الجدولة",
+    "saving": "جارٍ الحفظ...",
+    "triggered": "تم التشغيل",
+    "confirmDelete": "حذف هذه الجدولة؟ ستتوقف الأحداث عن التوليد.",
+    "errors": {
+      "invalidJson": "قالب الحمولة ليس JSON صالحاً",
+      "saveFailed": "فشل حفظ الجدولة",
+      "runFailed": "فشل التشغيل الفوري"
+    },
+    "presets": {
+      "every15": "كل 15 دقيقة",
+      "hourly": "كل ساعة",
+      "daily9": "يومياً الساعة 09:00",
+      "weekdays9": "أيام الأسبوع الساعة 09:00",
+      "weeklyMon9": "أسبوعياً (الاثنين 09:00)"
+    }
+  },
+  "versions": {
+    "title": "سجل الإصدارات",
+    "loading": "جارٍ تحميل الإصدارات...",
+    "empty": "لا توجد إصدارات بعد.",
+    "latest": "الأحدث",
+    "noMessage": "لا رسالة",
+    "compare": "مقارنة",
+    "selected": "محدد",
+    "restore": "استعادة",
+    "diff": "الفرق",
+    "exit": "خروج",
+    "selectHint": "اختر إصدارين من القائمة — النقرة الأولى هي A، والثانية B.",
+    "identical": "الإصدارات متطابقة.",
+    "split": "منقسم",
+    "unified": "موحد",
+    "computing": "جارٍ الحساب...",
+    "computeDiff": "حساب الفرق",
+    "snapshot": "لقطة",
+    "restoreConfirm": "استعادة إلى v{{version}}؟ ستُستبدل الوجهات الحالية. سيُنشأ إصدار جديد.",
+    "errors": {
+      "loadFailed": "فشل تحميل الإصدارات",
+      "loadOneFailed": "فشل تحميل الإصدار",
+      "restoreFailed": "فشل الاستعادة",
+      "diffFailed": "فشل الفرق"
+    }
+  }
+},
+"dlq": {
+  "title": "قائمة الرسائل الميتة",
+  "subtitle": "التسليمات التي استنفدت المحاولات. افحص الأخطاء وأعد التشغيل.",
+  "loading": "جارٍ تحميل DLQ...",
+  "empty": "كل شيء سليم — لا تسليمات فاشلة في DLQ.",
+  "replaySelected": "إعادة تشغيل المحدد",
+  "replaying": "جارٍ الإعادة...",
+  "discardSelected": "تجاهل المحدد",
+  "attempts": "محاولات",
+  "replay": "إعادة",
+  "discard": "تجاهل",
+  "lastHttp": "آخر HTTP",
+  "replayedResult": "أُعيد {{replayed}}/{{total}}",
+  "failedResult": "فشل {{failed}}",
+  "confirmDiscard": "تجاهل {{count}} إدخالاً في DLQ نهائياً؟",
+  "confirmDiscardOne": "حذف هذا الإدخال من DLQ نهائياً؟",
+  "errors": {
+    "loadFailed": "فشل تحميل DLQ",
+    "bulkDiscardFailed": "فشل التجاهل الجماعي"
+  }
+},
+"events": {
+  "title": "الأحداث",
+  "subtitle": "كل webhook تم استقباله بواسطة Relayon، بدورة حياة كاملة.",
+  "loading": "جارٍ تحميل الأحداث...",
+  "empty": "لا توجد أحداث بعد. أرسل webhook لرؤيته هنا.",
+  "loadMore": "تحميل المزيد",
+  "filter": {
+    "allStatuses": "كل الحالات",
+    "processed": "مُعالج",
+    "failed": "فشل",
+    "processing": "قيد المعالجة"
+  },
+  "table": {
+    "correlationId": "معرف الارتباط",
+    "source": "المصدر",
+    "status": "الحالة",
+    "received": "استُلم"
+  },
+  "replayConfirm": "إعادة تشغيل هذا الحدث من الصفر؟ سيُنشأ معرف ارتباط جديد.",
+  "detail": {
+    "title": "تفاصيل الحدث",
+    "replay": "↻ إعادة تشغيل الحدث",
+    "replaying": "جارٍ الإعادة...",
+    "replayQueued": "✓ الإعادة في قائمة الانتظار",
+    "newCorrelation": "ارتباط جديد:",
+    "correlation": "الارتباط:",
+    "status": "الحالة:",
+    "source": "المصدر:",
+    "received": "استُلم:",
+    "enrichment": "الإثراء بالذكاء الاصطناعي",
+    "model": "النموذج:",
+    "duration": "المدة:",
+    "cached": "مخزّن:",
+    "error": "خطأ:",
+    "rawPayload": "الحمولة الخام",
+    "enriched": "مُثراة",
+    "deliveries": "التسليمات",
+    "http": "HTTP"
+  },
+  "errors": {
+    "loadFailed": "فشل تحميل الأحداث",
+    "replayFailed": "فشلت الإعادة"
+  }
+},
+"analytics": {
+  "title": "التحليلات",
+  "subtitle": "حجم الأحداث، صحة التسليم، زمن الاستجابة، والتكاليف المقدّرة.",
+  "loading": "جارٍ تحميل التحليلات...",
+  "chart": {
+    "title": "الأحداث والتسليمات",
+    "subtitle": "حزم كل ساعة / يومياً — مرّر على أي نقطة للتفاصيل"
+  },
+  "stats": {
+    "events24h": "الأحداث (24 ساعة)",
+    "events7d": "الأحداث (7 أيام)",
+    "successRate": "نسبة النجاح",
+    "dlq": "DLQ"
+  },
+  "cost": {
+    "title": "التكاليف المقدّرة",
+    "subtitle": "تقدير بناءً على حجم الحمولة ومحاولات التسليم.",
+    "groq": "Groq",
+    "redis": "Redis",
+    "destination": "الوجهة",
+    "deliveries": "التسليمات",
+    "attempts": "المحاولات",
+    "retryRate": "معدل إعادة المحاولة",
+    "estCost": "التكلفة المقدّرة"
+  },
+  "usage": {
+    "title": "الاستخدام",
+    "resets": "يُعاد ضبطه في"
+  },
+  "errors": {
+    "overviewFailed": "فشل تحميل النظرة العامة",
+    "deliveryFailed": "فشل تحميل إحصائيات التسليم",
+    "costFailed": "فشل تحميل تحليلات التكلفة",
+    "timeSeriesFailed": "فشل تحميل السلسلة الزمنية"
+  }
+},
+  "nav": {
+    "dashboard": "لوحة التحكم",
+    "workflows": "سير العمل",
+    "events": "الأحداث",
+    "dlq": "قائمة الرسائل الميتة",
+    "analytics": "التحليلات",
+    "settings": "الإعدادات",
+    "signOut": "تسجيل الخروج"
+  },
+  "language": {
+    "label": "اللغة",
+    "en": "English",
+    "ur": "اردو",
+    "ar": "العربية"
+  },
+  "auth": {
+    "login": {
+      "title": "أهلاً بعودتك",
+      "subtitle": "سجّل الدخول إلى لوحة تحكم Relayon",
+      "email": "البريد الإلكتروني",
+      "emailPlaceholder": "you@company.com",
+      "password": "كلمة المرور",
+      "passwordPlaceholder": "••••••••",
+      "submit": "تسجيل الدخول",
+      "submitting": "جارٍ تسجيل الدخول...",
+      "forgotPassword": "نسيت كلمة المرور؟",
+      "noAccount": "ليس لديك حساب؟",
+      "createOne": "أنشئ واحداً",
+      "continueWithGoogle": "المتابعة باستخدام Google",
+      "continueWithGitHub": "المتابعة باستخدام GitHub",
+      "errors": {
+        "invalidCredentials": "بريد إلكتروني أو كلمة مرور غير صحيحة",
+        "emailNotVerified": "يرجى التحقق من بريدك الإلكتروني قبل تسجيل الدخول.",
+        "resendVerification": "إعادة إرسال البريد التحققي",
+        "resendSent": "تم إرسال البريد التحققي. تحقق من صندوق الوارد."
+      }
+    },
+    "signup": {
+      "title": "أنشئ حسابك",
+      "subtitle": "ابدأ بتوجيه الـ webhooks في دقائق",
+      "name": "اسمك",
+      "tenantName": "اسم الشركة / الفريق",
+      "email": "البريد الإلكتروني",
+      "password": "كلمة المرور",
+      "submit": "إنشاء الحساب",
+      "submitting": "جارٍ الإنشاء...",
+      "hasAccount": "لديك حساب بالفعل؟",
+      "signIn": "تسجيل الدخول",
+      "continueWithGoogle": "سجّل باستخدام Google",
+      "continueWithGitHub": "سجّل باستخدام GitHub",
+      "successTitle": "تحقق من بريدك الإلكتروني",
+      "successBody": "أرسلنا رابط التحقق إلى {{email}}.",
+      "successHint": "انقر على الرابط في صندوق الوارد لتنشيط حسابك.",
+      "resend": "إعادة إرسال البريد التحققي",
+      "resending": "جارٍ الإرسال...",
+      "resendSent": "تم إعادة إرسال البريد التحققي. تحقق من صندوق الوارد."
+    },
+    "forgotPassword": {
+      "title": "نسيت كلمة المرور؟",
+      "subtitle": "سنرسل لك رابط إعادة التعيين.",
+      "email": "البريد الإلكتروني",
+      "submit": "إرسال رابط الإعادة",
+      "submitting": "جارٍ الإرسال...",
+      "sentTitle": "تحقق من بريدك الإلكتروني",
+      "sentBody": "إذا كان هناك حساب لـ {{email}}، ستتلقى رابط إعادة التعيين خلال دقيقة.",
+      "backToLogin": "العودة لتسجيل الدخول",
+      "remembered": "تتذكرها؟",
+      "signIn": "تسجيل الدخول"
+    },
+    "resetPassword": {
+      "title": "تعيين كلمة مرور جديدة",
+      "newPassword": "كلمة المرور الجديدة",
+      "confirmPassword": "تأكيد كلمة المرور",
+      "submit": "تحديث كلمة المرور",
+      "submitting": "جارٍ التحديث...",
+      "successTitle": "تم تحديث كلمة المرور",
+      "successBody": "سجّل الدخول بكلمة المرور الجديدة.",
+      "signIn": "تسجيل الدخول",
+      "errors": {
+        "mismatch": "كلمتا المرور غير متطابقتين",
+        "missingToken": "رمز إعادة التعيين مفقود. اطلب رابطاً جديداً.",
+        "failed": "فشل إعادة تعيين كلمة المرور"
+      }
+    },
+    "verifyEmail": {
+      "verifying": "جارٍ التحقق من بريدك الإلكتروني...",
+      "successTitle": "تم التحقق من البريد الإلكتروني",
+      "successBody": "حسابك نشط. يمكنك الآن تسجيل الدخول.",
+      "signIn": "تسجيل الدخول",
+      "failedTitle": "فشل التحقق",
+      "backToLogin": "العودة لتسجيل الدخول",
+      "missingToken": "رمز التحقق مفقود",
+      "invalidLink": "رابط تحقق غير صالح أو منتهي الصلاحية"
+    },
+    "oauthCallback": {
+      "loading": "جارٍ إكمال تسجيل الدخول...",
+      "errorTitle": "فشل تسجيل الدخول",
+      "tryAgain": "حاول مرة أخرى",
+      "missingTicket": "تذكرة الدخول مفقودة",
+      "failed": "لم يكتمل تسجيل الدخول"
+    },
+    "validation": {
+      "emailRequired": "البريد الإلكتروني الصالح مطلوب",
+      "passwordMin8": "يجب أن تكون كلمة المرور 8 أحرف على الأقل",
+      "passwordMin12": "يجب أن تكون كلمة المرور 12 حرفاً على الأقل",
+      "nameMin2": "الاسم مطلوب (حرفان على الأقل)",
+      "teamMin2": "اسم الفريق مطلوب (حرفان على الأقل)"
+    }
+  },
+  "passwordStrength": {
+    "veryWeak": "ضعيفة جداً",
+    "weak": "ضعيفة",
+    "fair": "متوسطة",
+    "strong": "قوية",
+    "veryStrong": "قوية جداً"
+  },
+  "dashboard": {
+    "welcome": "مرحباً، {{name}}",
+    "subtitle": "إليك ما يحدث في خطوط أنابيب الـ webhooks الخاصة بك اليوم.",
+    "stats": {
+      "events24h": "الأحداث (24 ساعة)",
+      "successRate": "نسبة النجاح",
+      "pendingDeliveries": "التسليمات المعلقة",
+      "dlqEntries": "إدخالات DLQ"
+    },
+    "quickLinks": {
+      "workflowsTitle": "سير العمل",
+      "workflowsDesc": "أنشئ وأدر خطوط أنابيب الـ webhooks",
+      "eventsTitle": "مستكشف الأحداث",
+      "eventsDesc": "افحص دورة الحياة الكاملة لأي webhook"
+    },
+    "dlqAlert": "{{count}} تسليمات في قائمة الرسائل الميتة — انقر للمراجعة والإعادة.",
+    "monthlyUsage": "الاستخدام الشهري",
+    "events": "الأحداث",
+    "aiTokens": "رموز الذكاء الاصطناعي"
+  },
+  "footer": "Relayon · webhooks الخاصة بك، تُسلّم بشكل صحيح."
+}

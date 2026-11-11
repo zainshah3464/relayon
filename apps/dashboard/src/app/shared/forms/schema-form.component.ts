@@ -1,16 +1,17 @@
-import { Component, input } from '@angular/core';
+import { Component, inject, input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
   FormControl,
   FormGroup,
   ReactiveFormsModule,
 } from '@angular/forms';
+import { TranslocoModule } from '@jsverse/transloco';
 import type { SchemaField } from './schema-form.types';
 
 @Component({
   selector: 'app-schema-form',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, TranslocoModule],
   template: `
     <div class="space-y-4">
       @for (field of fields(); track field.key) {
@@ -49,7 +50,7 @@ import type { SchemaField } from './schema-form.types';
                   [formControl]="control(field.key)"
                   class="rounded border-hairline"
                 />
-                <span>{{ field.help ?? 'Enable' }}</span>
+                <span>{{ field.help || ('common.enable' | transloco) }}</span>
               </label>
             }
             @case ('select') {
@@ -93,7 +94,9 @@ import type { SchemaField } from './schema-form.types';
           }
 
           @if (field.required && controlInvalid(field.key)) {
-            <p class="text-xs text-signal-rose mt-1">{{ field.label }} is required</p>
+            <p class="text-xs text-signal-rose mt-1">
+              {{ 'schemaForm.errors.fieldRequired' | transloco: { label: field.label } }}
+            </p>
           }
         </div>
       }
@@ -104,15 +107,6 @@ export class SchemaFormComponent {
   readonly fields = input.required<SchemaField[]>();
   readonly form = input.required<FormGroup>();
 
-  /**
-   * Returns the FormControl instance for a field key.
-   *
-   * - [formControl] requires a FormControl (not AbstractControl)
-   * - buildSchemaForm() always creates FormControls, so the cast is safe
-   * - Angular's [formGroup] does NOT cross component boundaries, which is
-   *   why we bind [formControl] here instead of [formControlName] in the
-   *   parent template
-   */
   control(key: string): FormControl {
     const c = this.form().get(key);
     if (!c) {

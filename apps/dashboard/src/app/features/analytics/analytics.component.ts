@@ -1,5 +1,6 @@
 import { Component, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { TranslocoModule } from '@jsverse/transloco';
 import {
   AnalyticsService,
   Overview,
@@ -15,13 +16,13 @@ type Range = '24h' | '7d' | '30d';
 @Component({
   selector: 'app-analytics',
   standalone: true,
-  imports: [CommonModule, TimeSeriesChartComponent],
+  imports: [CommonModule, TranslocoModule, TimeSeriesChartComponent],
   template: `
     <div class="space-y-6">
       <div class="flex items-center justify-between">
         <div>
-          <h1 class="text-2xl font-bold tracking-tightest text-white">Analytics</h1>
-          <p class="text-sm text-muted mt-1">Event volume, delivery health, latency, and estimated costs.</p>
+          <h1 class="text-2xl font-bold tracking-tightest text-white">{{ 'analytics.title' | transloco }}</h1>
+          <p class="text-sm text-muted mt-1">{{ 'analytics.subtitle' | transloco }}</p>
         </div>
         <div class="flex gap-1">
           @for (r of ranges; track r) {
@@ -38,14 +39,14 @@ type Range = '24h' | '7d' | '30d';
       </div>
 
       @if (loading()) {
-        <div class="card text-sm text-muted">Loading analytics...</div>
+        <div class="card text-sm text-muted">{{ 'analytics.loading' | transloco }}</div>
       } @else if (error()) {
-        <div class="card text-sm text-signal-rose">{{ error() }}</div>
+        <div class="card text-sm text-signal-rose">{{ error() | transloco }}</div>
       } @else {
         @if (series(); as s) {
           <app-time-series-chart
-            title="Events & deliveries"
-            subtitle="Hourly / daily buckets — hover any point for details"
+            [title]="'analytics.chart.title' | transloco"
+            [subtitle]="'analytics.chart.subtitle' | transloco"
             [data]="s.buckets"
           />
         }
@@ -53,21 +54,21 @@ type Range = '24h' | '7d' | '30d';
         @if (overview(); as o) {
           <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div class="card">
-              <p class="text-xs uppercase text-muted">Events (24h)</p>
+              <p class="text-xs uppercase text-muted">{{ 'analytics.stats.events24h' | transloco }}</p>
               <p class="text-2xl font-bold text-white mt-1">{{ o.events24h }}</p>
             </div>
             <div class="card">
-              <p class="text-xs uppercase text-muted">Events (7d)</p>
+              <p class="text-xs uppercase text-muted">{{ 'analytics.stats.events7d' | transloco }}</p>
               <p class="text-2xl font-bold text-white mt-1">{{ o.events7d }}</p>
             </div>
             <div class="card">
-              <p class="text-xs uppercase text-muted">Success rate</p>
+              <p class="text-xs uppercase text-muted">{{ 'analytics.stats.successRate' | transloco }}</p>
               <p class="text-2xl font-bold text-signal-green mt-1">
                 {{ o.deliveries.successRate !== null ? o.deliveries.successRate + '%' : '—' }}
               </p>
             </div>
             <div class="card">
-              <p class="text-xs uppercase text-muted">DLQ</p>
+              <p class="text-xs uppercase text-muted">{{ 'analytics.stats.dlq' | transloco }}</p>
               <p class="text-2xl font-bold mt-1" [class.text-signal-rose]="o.deliveries.dlq > 0" [class.text-white]="o.deliveries.dlq === 0">
                 {{ o.deliveries.dlq }}
               </p>
@@ -79,23 +80,23 @@ type Range = '24h' | '7d' | '30d';
           <div class="card">
             <div class="flex justify-between items-start mb-4">
               <div>
-                <h2 class="text-lg font-semibold text-white">Estimated costs ({{ c.windowDays }}d)</h2>
-                <p class="text-xs text-muted mt-1">Approximation based on payload size and delivery attempts.</p>
+                <h2 class="text-lg font-semibold text-white">{{ 'analytics.cost.title' | transloco }} ({{ c.windowDays }}d)</h2>
+                <p class="text-xs text-muted mt-1">{{ 'analytics.cost.subtitle' | transloco }}</p>
               </div>
               <div class="text-right">
                 <p class="text-2xl font-bold text-signal-green">&#36;{{ c.cost.totalUsd }}</p>
-                <p class="text-xs text-muted">Groq &#36;{{ c.cost.groqUsd }} · Redis &#36;{{ c.cost.redisUsd }}</p>
+                <p class="text-xs text-muted">{{ 'analytics.cost.groq' | transloco }} &#36;{{ c.cost.groqUsd }} · {{ 'analytics.cost.redis' | transloco }} &#36;{{ c.cost.redisUsd }}</p>
               </div>
             </div>
             @if (c.perDestination.length > 0) {
               <table class="w-full text-sm">
                 <thead class="text-xs uppercase text-muted">
                   <tr>
-                    <th class="text-left pb-2">Destination</th>
-                    <th class="text-right pb-2">Deliveries</th>
-                    <th class="text-right pb-2">Attempts</th>
-                    <th class="text-right pb-2">Retry rate</th>
-                    <th class="text-right pb-2">Est. cost</th>
+                    <th class="text-left pb-2">{{ 'analytics.cost.destination' | transloco }}</th>
+                    <th class="text-right pb-2">{{ 'analytics.cost.deliveries' | transloco }}</th>
+                    <th class="text-right pb-2">{{ 'analytics.cost.attempts' | transloco }}</th>
+                    <th class="text-right pb-2">{{ 'analytics.cost.retryRate' | transloco }}</th>
+                    <th class="text-right pb-2">{{ 'analytics.cost.estCost' | transloco }}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -116,7 +117,7 @@ type Range = '24h' | '7d' | '30d';
 
         @if (quota(); as q) {
           <div class="card">
-            <h2 class="text-lg font-semibold text-white mb-4">Usage — {{ q.period }}</h2>
+            <h2 class="text-lg font-semibold text-white mb-4">{{ 'analytics.usage.title' | transloco }} — {{ q.period }}</h2>
             <div class="space-y-3">
               @for (key of quotaKeys; track key) {
                 @if (q.metrics[key]; as m) {
@@ -134,7 +135,7 @@ type Range = '24h' | '7d' | '30d';
                         [style.width.%]="Math.min(100, (m.used / Math.max(m.limit, 1)) * 100)"
                       ></div>
                     </div>
-                    <p class="text-xs text-muted mt-1">Resets {{ m.resetAt | date: 'mediumDate' }}</p>
+                    <p class="text-xs text-muted mt-1">{{ 'analytics.usage.resets' | transloco }} {{ m.resetAt | date: 'mediumDate' }}</p>
                   </div>
                 }
               }
@@ -192,19 +193,19 @@ export class AnalyticsComponent implements OnInit {
                 this.loadQuotaAndSeries();
               },
               error: (err) => {
-                this.error.set(err?.error?.message ?? 'Failed to load cost analytics');
+                this.error.set(err?.error?.message ?? 'analytics.errors.costFailed');
                 this.loading.set(false);
               },
             });
           },
           error: (err) => {
-            this.error.set(err?.error?.message ?? 'Failed to load delivery stats');
+            this.error.set(err?.error?.message ?? 'analytics.errors.deliveryFailed');
             this.loading.set(false);
           },
         });
       },
       error: (err) => {
-        this.error.set(err?.error?.message ?? 'Failed to load overview');
+        this.error.set(err?.error?.message ?? 'analytics.errors.overviewFailed');
         this.loading.set(false);
       },
     });
@@ -230,7 +231,7 @@ export class AnalyticsComponent implements OnInit {
         this.loading.set(false);
       },
       error: (err) => {
-        this.error.set(err?.error?.message ?? 'Failed to load time-series');
+        this.error.set(err?.error?.message ?? 'analytics.errors.timeSeriesFailed');
         this.loading.set(false);
       },
     });
