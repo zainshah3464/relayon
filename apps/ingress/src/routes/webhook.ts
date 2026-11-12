@@ -2,14 +2,21 @@ import { Router, type Request, type Response } from 'express';
 import { randomUUID } from 'crypto';
 import { resolveWorkflow } from '../middleware/resolveWorkflow';
 import { enforceSignature } from '../middleware/signature';
-import { enforceIdempotency } from '../middleware/idempotency';
-import { enforceRateLimit } from '../middleware/rateLimit';
-import { enqueueEvent, type QueuedEvent } from '../lib/queue';
+import { atomicIngest } from '../lib/redis-batch';
+import type { QueuedEvent } from '../lib/queue';
 import { hashIp } from '../lib/hash';
 import { config } from '../config';
 import { BadRequestError, QuotaExceededError } from '../lib/errors';
 import { checkEventQuota } from '../lib/quota';
 import { logger } from '../lib/logger';
+
+// ⚠️ v2.3 — queue key (must match workers' INCOMING_QUEUE)
+const INCOMING_QUEUE = 'queue:events:incoming';
+
+// ⚠️ v2.3 — per-tenant per-minute rate limit
+const RATE_LIMIT_PER_MINUTE = Number(
+  process.env.RATE_LIMIT_PER_MINUTE ?? 1000,
+);
 
 export const webhookRouter = Router();
 
@@ -22,12 +29,12 @@ webhookRouter.use((req, _res, next) => {
   next();
 });
 
+// ⚠️ v2.3 — idempotency + rate limit middleware ab yahan nahi
+// (atomic Lua script handle karega)
 webhookRouter.post(
   '/:tenantId/:workflowId',
   resolveWorkflow,
   enforceSignature,
-  enforceIdempotency,
-  enforceRateLimit,
   handleWebhook,
 );
 
@@ -71,10 +78,25 @@ async function handleWebhook(req: Request, res: Response): Promise<void> {
         ? `Monthly event quota exceeded in soft mode (hard cap at ${
             quota.limit * 2
           }). Resets ${quota.resetAt.slice(0, 10)}.`
-        : `Monthly event quota exceeded (${quota.limit}). Resets ${quota.resetAt.slice(0, 10)}.`;
+        : `Monthly event quota exceeded (${
+            quota.limit
+          }). Resets ${quota.resetAt.slice(0, 10)}.`;
 
     throw new QuotaExceededError(message, quota.resetAt);
   }
+
+  // ⚠️ v2.3 — derive idempotency key from header OR correlationId
+  const headerIdem =
+    typeof req.headers['x-idempotency-key'] === 'string'
+      ? req.headers['x-idempotency-key']
+      : null;
+  const idempotencyKey = `idem:${workflow.tenantId}:${workflow.id}:${
+    headerIdem ?? req.correlationId
+  }`;
+
+  // ⚠️ v2.3 — per-tenant per-minute rate limit bucket
+  const minuteBucket = Math.floor(Date.now() / 60_000);
+  const rateLimitKey = `rl:${workflow.tenantId}:${minuteBucket}`;
 
   const event: QueuedEvent = {
     correlationId: req.correlationId,
@@ -89,10 +111,51 @@ async function handleWebhook(req: Request, res: Response): Promise<void> {
       typeof req.headers['user-agent'] === 'string'
         ? req.headers['user-agent']
         : null,
-    idempotencyKey: req.idempotencyKey ?? null,
+    idempotencyKey: headerIdem,
   };
 
-  await enqueueEvent(event);
+  // ⚠️ v2.3 — atomic: idempotency + rate limit + queue push (1 Lua script)
+  const ingest = await atomicIngest({
+    idempotencyKey,
+    rateLimitKey,
+    queueKey: INCOMING_QUEUE,
+    eventJson: JSON.stringify(event),
+    rateLimit: RATE_LIMIT_PER_MINUTE,
+    windowSeconds: 60,
+  });
+
+  if (ingest.status === 'duplicate') {
+    logger.info('webhook.duplicate_skip', {
+      correlationId: event.correlationId,
+      tenantId: event.tenantId,
+      workflowId: event.workflowId,
+    });
+    res.status(200).json({
+      status: 'duplicate',
+      correlationId: req.correlationId,
+      message: 'Duplicate event (idempotency key reused)',
+    });
+    return;
+  }
+
+  if (ingest.status === 'rate_limited') {
+    logger.warn('webhook.rate_limited', {
+      correlationId: event.correlationId,
+      tenantId: event.tenantId,
+      workflowId: event.workflowId,
+      limit: RATE_LIMIT_PER_MINUTE,
+    });
+    res.setHeader('Retry-After', '60');
+    res.setHeader('X-RateLimit-Limit', String(RATE_LIMIT_PER_MINUTE));
+    res.status(429).json({
+      status: 'rate_limited',
+      correlationId: req.correlationId,
+      message: `Rate limit exceeded (${RATE_LIMIT_PER_MINUTE}/min). Retry in a minute.`,
+    });
+    return;
+  }
+
+  res.setHeader('X-Queue-Depth', String(ingest.queueDepth));
 
   logger.info('webhook.accepted', {
     correlationId: event.correlationId,
@@ -100,12 +163,14 @@ async function handleWebhook(req: Request, res: Response): Promise<void> {
     workflowId: event.workflowId,
     sourceType: event.sourceType,
     payloadBytes: req.rawBody?.length ?? 0,
+    queueDepth: ingest.queueDepth,
   });
 
   res.status(202).json({
     status: 'accepted',
     correlationId: req.correlationId,
     message: 'Event queued for processing',
+    queueDepth: ingest.queueDepth,
   });
 }
 

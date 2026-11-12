@@ -6,6 +6,7 @@ import { RedisService } from '../redis/redis.service';
 import { GroqService, EnrichmentResult } from './groq.service';
 import { TransformService } from './transform.service';
 import { RoutingService } from './routing.service';
+import { AiRateLimiterService } from './ai-rate-limiter.service';
 import { AdapterRegistry } from '../egress/adapters/registry';
 import { decryptConfig } from '../../lib/crypto-box';
 import { logger } from '../../lib/logger';
@@ -53,6 +54,8 @@ export class ProcessingService {
     private readonly transform: TransformService,
     private readonly routing: RoutingService,
     private readonly adapters: AdapterRegistry,
+    // ⚠️ v2.4 — AI RPM/TPM rate limiter
+    private readonly aiLimiter: AiRateLimiterService,
   ) {}
 
   async processBatch(): Promise<BatchResult> {
@@ -416,20 +419,16 @@ export class ProcessingService {
 
     if (workflow.enrichmentEnabled) {
       try {
-        // ── AI token quota check (before Groq call) ─────────────
-        const { checkQuota } = await import('../../lib/quota');
-        const estimatedTokens =
-          Math.ceil(JSON.stringify(event.rawPayload).length / 4) + 1024;
-
-        const quota = await checkQuota(
-          event.tenantId,
-          'ai_tokens',
-          estimatedTokens,
+        // ⚠️ v2.4 — AI RPM/TPM rate limit (fast, Redis Lua check) BEFORE quota
+        const estimatedTokens = AiRateLimiterService.estimateTokens(
+          event.rawPayload,
         );
+        const { allowed: rpmAllowed, reason: rpmReason } =
+          await this.aiLimiter.tryAcquire(estimatedTokens);
 
-        if (!quota.allowed) {
+        if (!rpmAllowed) {
           this.logger.warn(
-            `ai_quota_exceeded tenant=${event.tenantId} used=${quota.used}/${quota.limit}`,
+            `ai_rate_limited tenant=${event.tenantId} reason=${rpmReason}`,
           );
           result.breakdown.enrichmentFailures++;
           enrichmentMeta = {
@@ -437,25 +436,48 @@ export class ProcessingService {
             cached: false,
             model: null,
             durationMs: 0,
-            error: `Monthly AI token quota exceeded (${quota.limit})`,
+            error: `AI rate limited (${rpmReason}) — enrichment skipped, event will still route`,
           };
           // Skip Groq call — event still routes without enrichment
         } else {
-          const enrich: EnrichmentResult = await this.groq.enrich({
-            workflowId: workflow.id,
-            prompt: workflow.enrichmentPrompt,
-            payload: event.rawPayload,
-          });
-          enrichedPayload = enrich.enrichedPayload;
-          enrichmentMeta = {
-            enabled: true,
-            cached: enrich.cached,
-            model: enrich.model,
-            durationMs: enrich.durationMs,
-            error: null,
-          };
-          if (enrich.cached) result.breakdown.enrichmentCacheHits++;
-          else result.breakdown.enriched++;
+          // ── AI token quota check (before Groq call) ─────────────
+          const { checkQuota } = await import('../../lib/quota');
+          const quota = await checkQuota(
+            event.tenantId,
+            'ai_tokens',
+            estimatedTokens,
+          );
+
+          if (!quota.allowed) {
+            this.logger.warn(
+              `ai_quota_exceeded tenant=${event.tenantId} used=${quota.used}/${quota.limit}`,
+            );
+            result.breakdown.enrichmentFailures++;
+            enrichmentMeta = {
+              enabled: true,
+              cached: false,
+              model: null,
+              durationMs: 0,
+              error: `Monthly AI token quota exceeded (${quota.limit})`,
+            };
+            // Skip Groq call — event still routes without enrichment
+          } else {
+            const enrich: EnrichmentResult = await this.groq.enrich({
+              workflowId: workflow.id,
+              prompt: workflow.enrichmentPrompt,
+              payload: event.rawPayload,
+            });
+            enrichedPayload = enrich.enrichedPayload;
+            enrichmentMeta = {
+              enabled: true,
+              cached: enrich.cached,
+              model: enrich.model,
+              durationMs: enrich.durationMs,
+              error: null,
+            };
+            if (enrich.cached) result.breakdown.enrichmentCacheHits++;
+            else result.breakdown.enriched++;
+          }
         }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);

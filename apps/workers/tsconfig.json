@@ -22,6 +22,6 @@
     "noFallthroughCasesInSwitch": true,
     "resolveJsonModule": true
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "../ingress/src/lib/redis-batch.ts"],
   "exclude": ["node_modules", "dist"]
 }
