@@ -4,6 +4,7 @@ import { CommonModule } from '@angular/common';
 import { TranslocoModule } from '@jsverse/transloco';
 import { AuthService } from '../../../core/auth/auth.service';
 import { LanguageService, type SupportedLang } from '../../../i18n/language.service';
+import { ChatWidgetComponent } from '../../../features/ai/chat-widget.component';
 
 interface NavItem {
   labelKey: string;
@@ -20,6 +21,7 @@ interface NavItem {
     RouterLink,
     RouterLinkActive,
     TranslocoModule,
+    ChatWidgetComponent,
   ],
   template: `
     <div class="flex h-screen bg-midnight">
@@ -112,6 +114,9 @@ interface NavItem {
           </div>
         </main>
       </div>
+
+      <!-- ⚠️ v2.3 — floating AI chat widget -->
+      <app-chat-widget />
     </div>
   `,
 })

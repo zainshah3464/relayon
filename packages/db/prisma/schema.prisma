@@ -67,6 +67,9 @@ model Tenant {
   apiKeys         ApiKey[]
   apiKeyRotations ApiKeyRotation[]
   usageCounters   UsageCounter[]
+  // ⚠️ v2.3 — chat + knowledge base
+  chatSessions    ChatSession[]
+  knowledgeChunks KnowledgeChunk[]
 
   @@map("tenants")
 }
@@ -94,6 +97,8 @@ model User {
   refreshTokens      RefreshToken[]
   emailVerifications EmailVerification[]
   passwordResets     PasswordReset[]
+  // ⚠️ v2.3 — chat sessions
+  chatSessions       ChatSession[]
 
   @@index([tenantId])
   @@map("users")
@@ -278,4 +283,57 @@ model UsageCounter {
   @@id([tenantId, period, metric])
   @@index([tenantId, period])
   @@map("usage_counters")
+}
+
+// ─────────────────────────────────────────────────────────────
+// ⚠️ v2.3 — AI chat + knowledge base
+// ─────────────────────────────────────────────────────────────
+
+model ChatSession {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  userId    String   @map("user_id")
+  title     String   @default("New chat")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant   Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages ChatMessage[]
+
+  @@index([tenantId, userId, updatedAt])
+  @@map("chat_sessions")
+}
+
+model ChatMessage {
+  id        String   @id @default(uuid())
+  sessionId String   @map("session_id")
+  role      String
+  content   String
+  toolCalls Json?    @map("tool_calls")
+  toolName  String?  @map("tool_name")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  session ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt])
+  @@map("chat_messages")
+}
+
+// ⚠️ NO vector column — using Postgres full-text search instead
+model KnowledgeChunk {
+  id         String   @id @default(uuid())
+  tenantId   String?  @map("tenant_id")
+  sourceType String   @map("source_type")
+  sourceId   String   @map("source_id")
+  title      String
+  content    String
+  metadata   Json     @default("{}")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, sourceType])
+  @@index([sourceId])
+  @@map("knowledge_chunks")
 }
