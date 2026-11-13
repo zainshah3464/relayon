@@ -7,6 +7,18 @@
     "apps/*",
     "packages/*"
   ],
+  "overrides": {
+    "rxjs": "7.8.1",
+    "@angular/core": "19.2.25",
+    "@angular/common": "19.2.25",
+    "@angular/compiler": "19.2.25",
+    "@angular/forms": "19.2.25",
+    "@angular/platform-browser": "19.2.25",
+    "@angular/platform-browser-dynamic": "19.2.25",
+    "@angular/router": "19.2.25",
+    "@angular/animations": "19.2.25",
+    "@angular/service-worker": "19.2.25"
+  },
   "scripts": {
     "postinstall": "node -e \"const fs=require('fs');const p='./node_modules/prisma/build/index.js';if(fs.existsSync(p)){require('child_process').execSync('node '+p+' generate --schema=./packages/db/prisma/schema.prisma',{stdio:'inherit'})}else{console.log('[postinstall] Prisma not installed here — skipping generate')}\"",
     "dev:dashboard": "npm run start --workspace=dashboard",
@@ -49,7 +61,8 @@
   "dependencies": {
     "@prisma/client": "6.19.3",
     "diff": "^9.0.0",
-    "prisma": "6.19.3"
+    "prisma": "6.19.3",
+    "rxjs": "7.8.1"
   },
   "allowScripts": {
     "@prisma/client@6.19.3": true,

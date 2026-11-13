@@ -1,0 +1,45 @@
+{
+  "name": "Relayon — Webhook Relay Platform",
+  "short_name": "Relayon",
+  "description": "Serverless-native webhook relay platform. Receive, enrich, and route events reliably.",
+  "id": "/",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "theme_color": "#7C3AED",
+  "background_color": "#0A0A0A",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["developer", "productivity", "utilities"],
+  "icons": [
+    { "src": "assets/icons/icon-72x72.png", "sizes": "72x72", "type": "image/png", "purpose": "any" },
+    { "src": "assets/icons/icon-96x96.png", "sizes": "96x96", "type": "image/png", "purpose": "any" },
+    { "src": "assets/icons/icon-128x128.png", "sizes": "128x128", "type": "image/png", "purpose": "any" },
+    { "src": "assets/icons/icon-144x144.png", "sizes": "144x144", "type": "image/png", "purpose": "any" },
+    { "src": "assets/icons/icon-152x152.png", "sizes": "152x152", "type": "image/png", "purpose": "any" },
+    { "src": "assets/icons/icon-192x192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "assets/icons/icon-384x384.png", "sizes": "384x384", "type": "image/png", "purpose": "any" },
+    { "src": "assets/icons/icon-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "short_name": "Dashboard",
+      "url": "/dashboard",
+      "icons": [{ "src": "assets/icons/icon-96x96.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Workflows",
+      "short_name": "Workflows",
+      "url": "/workflows",
+      "icons": [{ "src": "assets/icons/icon-96x96.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Events",
+      "short_name": "Events",
+      "url": "/events",
+      "icons": [{ "src": "assets/icons/icon-96x96.png", "sizes": "96x96" }]
+    }
+  ]
+}

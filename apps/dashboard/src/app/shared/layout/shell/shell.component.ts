@@ -5,6 +5,10 @@ import { TranslocoModule } from '@jsverse/transloco';
 import { AuthService } from '../../../core/auth/auth.service';
 import { LanguageService, type SupportedLang } from '../../../i18n/language.service';
 import { ChatWidgetComponent } from '../../../features/ai/chat-widget.component';
+import { OfflineBannerComponent } from '../../pwa/offline-banner.component';
+import { UpdatePromptComponent } from '../../pwa/update-prompt.component';
+import { InstallPromptComponent } from '../../pwa/install-prompt.component';
+import { AppUpdateService } from '../../../core/pwa/app-update.service';
 
 interface NavItem {
   labelKey: string;
@@ -22,6 +26,9 @@ interface NavItem {
     RouterLinkActive,
     TranslocoModule,
     ChatWidgetComponent,
+    OfflineBannerComponent,
+    UpdatePromptComponent,
+    InstallPromptComponent,
   ],
   template: `
     <div class="flex h-screen bg-midnight">
@@ -117,12 +124,18 @@ interface NavItem {
 
       <!-- ⚠️ v2.3 — floating AI chat widget -->
       <app-chat-widget />
+
+      <!-- ⚠️ v2.4 — PWA: offline + update + install prompts -->
+      <app-offline-banner />
+      <app-update-prompt />
+      <app-install-prompt />
     </div>
   `,
 })
 export class ShellComponent {
   auth = inject(AuthService);
   lang = inject(LanguageService);
+  private readonly appUpdate = inject(AppUpdateService);
   sidebarOpen = signal(false);
 
   navItems: NavItem[] = [
@@ -133,6 +146,14 @@ export class ShellComponent {
     { labelKey: 'nav.analytics', path: '/analytics', icon: '📈' },
     { labelKey: 'nav.settings', path: '/settings', icon: '⚙️' },
   ];
+
+  constructor() {
+    try {
+      this.appUpdate.init();
+    } catch (err) {
+      console.warn('[Shell] PWA init failed (non-fatal):', err);
+    }
+  }
 
   initial = () => {
     const name = this.auth.displayName();

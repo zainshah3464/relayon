@@ -1,8 +1,9 @@
 import { Injectable, signal, computed, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
-import { Observable, tap, catchError, throwError } from 'rxjs';
+import { Observable, tap } from 'rxjs';
 import { environment } from '../../../environments/environment';
+import { SwCacheService } from '../pwa/sw-cache.service';
 
 export type UserRole = 'owner' | 'admin' | 'viewer';
 
@@ -44,6 +45,8 @@ interface SignupPayload {
 export class AuthService {
   private http = inject(HttpClient);
   private router = inject(Router);
+  // ⚠️ v2.5 — clear SW API caches on logout (cross-user leak prevention)
+  private swCache = inject(SwCacheService);
 
   private readonly ACCESS_KEY = 'relayon_access_token';
   private readonly REFRESH_KEY = 'relayon_refresh_token';
@@ -175,22 +178,26 @@ export class AuthService {
     this._user.set(res.user);
   }
 
-  private clearSession(): void {
+  private async clearSession(): Promise<void> {
     localStorage.removeItem(this.ACCESS_KEY);
     localStorage.removeItem(this.REFRESH_KEY);
     localStorage.removeItem(this.USER_KEY);
     this._token.set(null);
     this._user.set(null);
+
+    // ⚠️ v2.5 — clear cached API data to prevent cross-user leaks
+    await this.swCache.clearApiCaches().catch(() => undefined);
+
     this.router.navigate(['/login']);
   }
 
   private loadUser(): User | null {
-    const raw = localStorage.getItem(this.USER_KEY);
-    if (!raw) return null;
-    try {
-      return JSON.parse(raw) as User;
-    } catch {
-      return null;
-    }
+  const raw = localStorage.getItem(this.USER_KEY);  
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as User;
+  } catch {
+    return null;
   }
+}
 }

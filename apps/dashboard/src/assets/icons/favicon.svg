@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512"><metadata><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:dc="http://purl.org/dc/elements/1.1/"><rdf:Description><dc:creator>RealFaviconGenerator</dc:creator><dc:source>https://realfavicongenerator.net</dc:source></rdf:Description></rdf:RDF></metadata><defs>
+    <linearGradient id="relayonGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7C3AED"></stop>
+      <stop offset="100%" stop-color="#06B6D4"></stop>
+    </linearGradient>
+  </defs><rect x="0" y="0" width="512" height="512" rx="112" ry="112" fill="url(#relayonGradient)"></rect><path fill="#FFFFFF" fill-rule="evenodd" d="
+    M 168 132
+    L 168 385
+    L 220 385
+    L 220 320
+    L 280 320
+    L 340 385
+    L 395 385
+    L 325 312
+    C 360 295 380 265 380 218
+    C 380 165 340 120 280 120
+    L 168 132
+    Z
+    M 220 170
+    L 280 170
+    C 320 170 330 190 330 218
+    C 330 245 320 270 280 270
+    L 220 270
+    Z
+  "></path></svg>

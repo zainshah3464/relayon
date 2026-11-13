@@ -21,13 +21,18 @@
             "browser": "src/main.ts",
             "polyfills": ["zone.js"],
             "tsConfig": "tsconfig.app.json",
-           "assets": [
-     {
+            "assets": [
+  {
     "glob": "**/*",
     "input": "src/assets",
     "output": "assets"
+  },
+  {
+    "glob": "manifest.webmanifest",
+    "input": "src",
+    "output": "/"
   }
-  ],
+],
             "styles": ["src/styles.css"],
             "scripts": []
           },
@@ -38,6 +43,7 @@
                 { "type": "anyComponentStyle", "maximumWarning": "4kB", "maximumError": "8kB" }
               ],
               "outputHashing": "all",
+              "serviceWorker": "ngsw-config.json",
               "fileReplacements": [
                 {
                   "replace": "src/environments/environment.ts",

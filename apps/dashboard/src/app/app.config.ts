@@ -2,7 +2,10 @@ import {
   ApplicationConfig,
   provideZoneChangeDetection,
   isDevMode,
-  APP_INITIALIZER,
+  provideAppInitializer,
+  inject,
+  Injector,
+  runInInjectionContext,
 } from '@angular/core';
 import {
   provideRouter,
@@ -10,6 +13,7 @@ import {
   withViewTransitions,
 } from '@angular/router';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
+import { provideServiceWorker } from '@angular/service-worker';
 import { provideTransloco, TranslocoService } from '@jsverse/transloco';
 import { routes } from './app.routes';
 import { authInterceptor } from './core/auth/auth.interceptor';
@@ -22,6 +26,7 @@ export const appConfig: ApplicationConfig = {
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(routes, withComponentInputBinding(), withViewTransitions()),
     provideHttpClient(withInterceptors([authInterceptor, errorInterceptor])),
+
     provideTransloco({
       config: {
         availableLangs: ['en', 'ur', 'ar'],
@@ -33,33 +38,26 @@ export const appConfig: ApplicationConfig = {
           useFallbackTranslation: true,
           logMissingKey: false,
         },
-        // ⚠️ flatten REMOVED — v7 deprecates it
       },
       loader: TranslocoHttpLoader,
     }),
-    // ⚠️ THE FIX: Pre-load all translations BEFORE app boots
-    {
-      provide: APP_INITIALIZER,
-      multi: true,
-      deps: [TranslocoService],
-      useFactory: (transloco: TranslocoService) => () => {
-        console.log('[i18n] Boot preload starting...');
 
-        // Direct setTranslation — bypasses loader entirely
+    // ⚠️ v2.5 — safer: explicit injection context via Injector
+    provideAppInitializer(() => {
+      const injector = inject(Injector);
+      return runInInjectionContext(injector, () => {
+        const transloco = inject(TranslocoService);
         for (const [lang, data] of Object.entries(TRANSLATIONS)) {
           transloco.setTranslation(data as Record<string, unknown>, lang);
-          console.log(`[i18n] Set ${lang} — keys:`, Object.keys(data).length);
         }
-
-        // Activate English
         transloco.setActiveLang('en');
-
-        // Verify
-        const test = transloco.translate('nav.dashboard');
-        console.log('[i18n] Test translate nav.dashboard =', test);
-
         return Promise.resolve();
-      },
-    },
+      });
+    }),
+
+    provideServiceWorker('ngsw-worker.js', {
+      enabled: !isDevMode(),
+      registrationStrategy: 'registerWhenStable:30000',
+    }),
   ],
 };

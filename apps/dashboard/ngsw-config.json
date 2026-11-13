@@ -1,0 +1,116 @@
+{
+  "$schema": "./node_modules/@angular/service-worker/config/schema.json",
+  "index": "/index.html",
+  "assetGroups": [
+    {
+      "name": "app-shell",
+      "installMode": "prefetch",
+      "updateMode": "prefetch",
+      "resources": {
+        "files": [
+          "/favicon.ico",
+          "/index.html",
+          "/manifest.webmanifest",
+          "/*.css",
+          "/*.js"
+        ]
+      }
+    },
+    {
+      "name": "assets",
+      "installMode": "lazy",
+      "updateMode": "prefetch",
+      "resources": {
+        "files": [
+          "/assets/**",
+          "/*.(svg|cur|jpg|jpeg|png|apng|webp|avif|gif|otf|ttf|woff|woff2)"
+        ]
+      }
+    },
+    {
+      "name": "i18n",
+      "installMode": "prefetch",
+      "updateMode": "prefetch",
+      "resources": {
+        "files": [
+          "/assets/i18n/en.json",
+          "/assets/i18n/ur.json",
+          "/assets/i18n/ar.json"
+        ]
+      }
+    }
+  ],
+  "dataGroups": [
+    {
+      "name": "api-auth-me",
+      "urls": ["**/api/auth/me"],
+      "cacheConfig": {
+        "strategy": "freshness",
+        "maxSize": 5,
+        "maxAge": "1h",
+        "timeout": "3s"
+      }
+    },
+    {
+      "name": "api-quota",
+      "urls": ["**/api/quota"],
+      "cacheConfig": {
+        "strategy": "freshness",
+        "maxSize": 5,
+        "maxAge": "30m",
+        "timeout": "3s"
+      }
+    },
+    {
+      "name": "api-workflows",
+      "urls": ["**/api/workflows**"],
+      "cacheConfig": {
+        "strategy": "performance",
+        "maxSize": 100,
+        "maxAge": "15m"
+      }
+    },
+    {
+      "name": "api-events",
+      "urls": ["**/api/events**"],
+      "cacheConfig": {
+        "strategy": "performance",
+        "maxSize": 200,
+        "maxAge": "5m"
+      }
+    },
+    {
+      "name": "api-dlq",
+      "urls": ["**/api/dlq**"],
+      "cacheConfig": {
+        "strategy": "performance",
+        "maxSize": 100,
+        "maxAge": "5m"
+      }
+    },
+    {
+      "name": "api-analytics",
+      "urls": ["**/api/analytics**"],
+      "cacheConfig": {
+        "strategy": "performance",
+        "maxSize": 50,
+        "maxAge": "10m"
+      }
+    },
+    {
+      "name": "api-tenants",
+      "urls": ["**/api/tenants**"],
+      "cacheConfig": {
+        "strategy": "performance",
+        "maxSize": 20,
+        "maxAge": "1h"
+      }
+    }
+  ],
+  "navigationUrls": [
+    "/**",
+    "!/**/*.*",
+    "!/**/*__*",
+    "!/**/*__*/**"
+  ]
+}
