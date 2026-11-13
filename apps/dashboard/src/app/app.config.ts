@@ -20,6 +20,8 @@ import { authInterceptor } from './core/auth/auth.interceptor';
 import { errorInterceptor } from './core/http/error.interceptor';
 import { TRANSLATIONS } from './i18n/translations';
 import { TranslocoHttpLoader } from './i18n/transloco-loader';
+import { TrackerService } from './core/tracking/tracker.service';
+import { PresenceHeartbeatService } from './core/presence/presence-heartbeat.service';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -42,15 +44,24 @@ export const appConfig: ApplicationConfig = {
       loader: TranslocoHttpLoader,
     }),
 
-    // ⚠️ v2.5 — safer: explicit injection context via Injector
+    // ⚠️ v2.6 — Angular 19 native (replaces APP_INITIALIZER, avoids NG0203)
     provideAppInitializer(() => {
       const injector = inject(Injector);
       return runInInjectionContext(injector, () => {
         const transloco = inject(TranslocoService);
+        const tracker = inject(TrackerService);
+        const presence = inject(PresenceHeartbeatService);
+
+        // i18n
         for (const [lang, data] of Object.entries(TRANSLATIONS)) {
           transloco.setTranslation(data as Record<string, unknown>, lang);
         }
         transloco.setActiveLang('en');
+
+        // analytics + presence
+        tracker.init();
+        setTimeout(() => presence.init(), 500);
+
         return Promise.resolve();
       });
     }),

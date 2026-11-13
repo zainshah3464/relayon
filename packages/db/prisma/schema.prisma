@@ -89,6 +89,8 @@ model User {
   githubId      String?   @unique @map("github_id")
   // ⚠️ v2.2 — user's preferred UI + email language
   locale        String    @default("en")
+  // ⚠️ v2.4 — super admin flag (platform-wide admin access)
+  isSuperAdmin  Boolean   @default(false) @map("is_super_admin")
   lastLoginAt   DateTime? @map("last_login_at")
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
@@ -336,4 +338,46 @@ model KnowledgeChunk {
   @@index([tenantId, sourceType])
   @@index([sourceId])
   @@map("knowledge_chunks")
+}
+
+// ─────────────────────────────────────────────────────────────
+// ⚠️ v2.4 — Phase A: analytics tracking + admin audit
+// ─────────────────────────────────────────────────────────────
+
+model PageEvent {
+  id         BigInt   @id @default(autoincrement())
+  tenantId   String?  @map("tenant_id")
+  path       String
+  referrer   String?
+  ipHash     String?  @map("ip_hash")
+  browser    String?
+  os         String?
+  device     String?
+  country    String?
+  sessionId  String   @map("session_id")
+  eventType  String   @map("event_type")
+  eventName  String?  @map("event_name")
+  properties Json     @default("{}")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@index([path, createdAt])
+  @@index([sessionId, createdAt])
+  @@index([tenantId, createdAt])
+  @@map("page_events")
+}
+
+model AdminAuditLog {
+  id         String   @id @default(uuid())
+  adminId    String   @map("admin_id")
+  action     String
+  targetType String?  @map("target_type")
+  targetId   String?  @map("target_id")
+  metadata   Json     @default("{}")
+  ipHash     String?  @map("ip_hash")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([adminId, createdAt])
+  @@index([action, createdAt])
+  @@map("admin_audit_logs")
 }

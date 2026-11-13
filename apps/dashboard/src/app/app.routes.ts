@@ -115,5 +115,38 @@ export const routes: Routes = [
     ],
   },
 
+  // ── Admin routes (⚠️ v2.4 — Phase A: platform admin panel) ─
+  {
+    path: 'admin',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/admin/admin-layout.component').then(
+        (m) => m.AdminLayoutComponent,
+      ),
+    children: [
+      {
+        path: '',
+        loadComponent: () =>
+          import('./features/admin/admin-overview.component').then(
+            (m) => m.AdminOverviewComponent,
+          ),
+      },
+      {
+        path: 'tenants',
+        loadComponent: () =>
+          import('./features/admin/admin-tenants.component').then(
+            (m) => m.AdminTenantsComponent,
+          ),
+      },
+      {
+        path: 'health',
+        loadComponent: () =>
+          import('./features/admin/admin-health.component').then(
+            (m) => m.AdminHealthComponent,
+          ),
+      },
+    ],
+  },
+
   { path: '**', redirectTo: '/dashboard' },
 ];

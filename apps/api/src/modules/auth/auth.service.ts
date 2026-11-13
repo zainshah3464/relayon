@@ -24,6 +24,8 @@ export interface AuthResultUser {
   tenantId: string;
   tenantName: string;
   tenantSlug: string;
+  // ⚠️ v2.6 — expose platform-wide admin flag
+  isSuperAdmin: boolean;
 }
 
 export interface AuthResult {
@@ -96,6 +98,7 @@ export class AuthService {
       tenantId: tenant.id,
       tenantName: tenant.name,
       tenantSlug: tenant.slug,
+      isSuperAdmin: false, // ⚠️ NEW — new signups never super admin
     });
   }
 
@@ -138,6 +141,7 @@ export class AuthService {
       tenantId: user.tenantId,
       tenantName: user.tenant.name,
       tenantSlug: user.tenant.slug,
+      isSuperAdmin: user.isSuperAdmin, // ⚠️ NEW
     });
   }
 
@@ -212,6 +216,7 @@ export class AuthService {
       tenantId: tenant.id,
       tenantName: tenant.name,
       tenantSlug: tenant.slug,
+      isSuperAdmin: false, // ⚠️ NEW — new OAuth user never super admin
     });
   }
 
@@ -223,6 +228,7 @@ export class AuthService {
     role: string;
     tenantId: string;
     tenant: { name: string; slug: string };
+    isSuperAdmin?: boolean;
   }): Promise<AuthResult> {
     return this.issueTokens({
       id: user.id,
@@ -232,6 +238,7 @@ export class AuthService {
       tenantId: user.tenantId,
       tenantName: user.tenant.name,
       tenantSlug: user.tenant.slug,
+      isSuperAdmin: user.isSuperAdmin ?? false, // ⚠️ NEW
     });
   }
 
@@ -278,6 +285,7 @@ export class AuthService {
       tenantId: stored.user.tenantId,
       tenantName: stored.user.tenant.name,
       tenantSlug: stored.user.tenant.slug,
+      isSuperAdmin: stored.user.isSuperAdmin, // ⚠️ NEW
     });
   }
 
@@ -299,6 +307,7 @@ export class AuthService {
     role: string;
     tenantId: string;
     tenant: { name: string; slug: string };
+    isSuperAdmin?: boolean;
   }): Promise<AuthResult> {
     await this.prisma.withTenant(user.tenantId, (tx) =>
       tx.user.update({
@@ -314,6 +323,7 @@ export class AuthService {
       tenantId: user.tenantId,
       tenantName: user.tenant.name,
       tenantSlug: user.tenant.slug,
+      isSuperAdmin: user.isSuperAdmin ?? false, // ⚠️ NEW
     });
   }
 

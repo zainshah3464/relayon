@@ -18,6 +18,9 @@ import { BillingModule } from './modules/billing/billing.module';
 import { WorkflowTestModule } from './modules/workflows/testing/workflow-test.module';
 import { RedisModule } from './modules/redis/redis.module';
 import { AiModule } from './modules/ai/ai.module';
+import { TrackingModule } from './modules/tracking/tracking.module';
+import { PresenceModule } from './modules/presence/presence.module';
+import { AdminModule } from './modules/admin/admin.module';
 
 @Module({
   imports: [
@@ -41,6 +44,9 @@ import { AiModule } from './modules/ai/ai.module';
     BillingModule,
     WorkflowTestModule,
     AiModule,
+    TrackingModule,
+    PresenceModule,
+    AdminModule,
     RedisModule,
   ],
   providers: [JwtOrApiKeyGuard],

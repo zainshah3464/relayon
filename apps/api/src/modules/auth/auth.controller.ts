@@ -61,6 +61,8 @@ export class AuthController {
       provider: dbUser.googleId ? 'google' : dbUser.githubId ? 'github' : 'local',
       // ⚠️ v2.2 — expose user's preferred locale
       locale: dbUser.locale,
+      // ⚠️ v2.4 — expose super admin flag
+      isSuperAdmin: dbUser.isSuperAdmin,
     };
   }
 

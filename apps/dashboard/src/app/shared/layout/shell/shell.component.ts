@@ -61,6 +61,18 @@ interface NavItem {
               <span>{{ item.labelKey | transloco }}</span>
             </a>
           }
+
+          <!-- ⚠️ v2.4 — super admin only link -->
+          @if (auth.user()?.isSuperAdmin) {
+            <a
+              routerLink="/admin"
+              routerLinkActive="bg-signal-rose/10 text-signal-rose"
+              class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted transition hover:bg-signal-rose/10 hover:text-signal-rose"
+            >
+              <span class="text-base">👑</span>
+              <span>Admin</span>
+            </a>
+          }
         </nav>
 
         <!-- Language selector -->

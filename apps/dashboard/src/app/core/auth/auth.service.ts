@@ -21,6 +21,8 @@ export interface User {
   provider: 'local' | 'google' | 'github';
   // ⚠️ v2.2 — user's preferred UI + email language
   locale: 'en' | 'ur' | 'ar';
+  // ⚠️ v2.4 — platform-wide super admin flag
+  isSuperAdmin: boolean;
 }
 
 export interface AuthResponse {
