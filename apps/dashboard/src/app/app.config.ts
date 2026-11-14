@@ -6,6 +6,7 @@ import {
   inject,
   Injector,
   runInInjectionContext,
+  SecurityContext,
 } from '@angular/core';
 import {
   provideRouter,
@@ -14,6 +15,7 @@ import {
 } from '@angular/router';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideServiceWorker } from '@angular/service-worker';
+import { provideMarkdown } from 'ngx-markdown';
 import { provideTransloco, TranslocoService } from '@jsverse/transloco';
 import { routes } from './app.routes';
 import { authInterceptor } from './core/auth/auth.interceptor';
@@ -28,6 +30,11 @@ export const appConfig: ApplicationConfig = {
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(routes, withComponentInputBinding(), withViewTransitions()),
     provideHttpClient(withInterceptors([authInterceptor, errorInterceptor])),
+
+    // ⚠️ v2.7 — ngx-markdown (community posts render)
+    provideMarkdown({
+      sanitize: SecurityContext.HTML, // XSS protection for user-generated markdown
+    }),
 
     provideTransloco({
       config: {

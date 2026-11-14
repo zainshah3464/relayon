@@ -154,6 +154,7 @@ export class ShellComponent {
     { labelKey: 'nav.dashboard', path: '/dashboard', icon: '📊' },
     { labelKey: 'nav.workflows', path: '/workflows', icon: '🔄' },
     { labelKey: 'nav.events', path: '/events', icon: '📨' },
+    { labelKey: 'nav.community', path: '/community', icon: '💬' },
     { labelKey: 'nav.dlq', path: '/dlq', icon: '⚠️' },
     { labelKey: 'nav.analytics', path: '/analytics', icon: '📈' },
     { labelKey: 'nav.settings', path: '/settings', icon: '⚙️' },

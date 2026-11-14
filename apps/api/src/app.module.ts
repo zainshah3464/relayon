@@ -21,6 +21,7 @@ import { AiModule } from './modules/ai/ai.module';
 import { TrackingModule } from './modules/tracking/tracking.module';
 import { PresenceModule } from './modules/presence/presence.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { CommunityModule } from './modules/community/community.module';
 
 @Module({
   imports: [
@@ -47,6 +48,7 @@ import { AdminModule } from './modules/admin/admin.module';
     TrackingModule,
     PresenceModule,
     AdminModule,
+    CommunityModule,
     RedisModule,
   ],
   providers: [JwtOrApiKeyGuard],

@@ -5,11 +5,17 @@ import { TranslocoModule } from '@jsverse/transloco';
 import { AuthService } from '../../core/auth/auth.service';
 import { AnalyticsService, Overview } from '../../core/api/analytics.service';
 import { QuotaService, QuotaSnapshot } from '../../core/api/quota.service';
+import { AnnouncementsWidgetComponent } from '../community/announcements-widget.component';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, RouterLink, TranslocoModule],
+  imports: [
+    CommonModule,
+    RouterLink,
+    TranslocoModule,
+    AnnouncementsWidgetComponent,
+  ],
   template: `
     <div class="space-y-8">
       <div>
@@ -23,6 +29,9 @@ import { QuotaService, QuotaSnapshot } from '../../core/api/quota.service';
           {{ 'dashboard.subtitle' | transloco }}
         </p>
       </div>
+
+      <!-- ⚠️ v2.5 — community announcements widget -->
+      <app-announcements-widget />
 
       <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div class="card">

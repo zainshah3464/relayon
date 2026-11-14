@@ -112,6 +112,29 @@ export const routes: Routes = [
             (m) => m.SettingsComponent,
           ),
       },
+
+      // ── ⚠️ v2.5 — Community marketplace ────────────────────
+      {
+        path: 'community',
+        loadComponent: () =>
+          import('./features/community/community-list.component').then(
+            (m) => m.CommunityListComponent,
+          ),
+      },
+      {
+        path: 'community/new',
+        loadComponent: () =>
+          import('./features/community/create-post.component').then(
+            (m) => m.CreatePostComponent,
+          ),
+      },
+      {
+        path: 'community/:slug',
+        loadComponent: () =>
+          import('./features/community/post-detail.component').then(
+            (m) => m.PostDetailComponent,
+          ),
+      },
     ],
   },
 

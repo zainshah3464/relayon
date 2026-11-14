@@ -399,6 +399,7 @@
     "dashboard": "Dashboard",
     "workflows": "Workflows",
     "events": "Events",
+    "community": "Community",
     "dlq": "Dead Letter Queue",
     "analytics": "Analytics",
     "settings": "Settings",

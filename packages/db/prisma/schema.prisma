@@ -70,6 +70,8 @@ model Tenant {
   // ⚠️ v2.3 — chat + knowledge base
   chatSessions    ChatSession[]
   knowledgeChunks KnowledgeChunk[]
+  // ⚠️ v2.5 — community marketplace
+  communityPosts  CommunityPost[]
 
   @@map("tenants")
 }
@@ -101,6 +103,10 @@ model User {
   passwordResets     PasswordReset[]
   // ⚠️ v2.3 — chat sessions
   chatSessions       ChatSession[]
+  // ⚠️ v2.5 — community marketplace
+  communityPosts     CommunityPost[]
+  communityReplies   CommunityReply[]
+  communityLikes     CommunityLike[]
 
   @@index([tenantId])
   @@map("users")
@@ -380,4 +386,99 @@ model AdminAuditLog {
   @@index([adminId, createdAt])
   @@index([action, createdAt])
   @@map("admin_audit_logs")
+}
+
+// ─────────────────────────────────────────────────────────────
+// ⚠️ v2.5 — Community marketplace (posts, replies, likes, flags)
+// ─────────────────────────────────────────────────────────────
+
+model CommunityPost {
+  id          String    @id @default(uuid())
+  tenantId    String?   @map("tenant_id")
+  authorId    String?   @map("author_id")
+  type        String
+  title       String
+  slug        String    @unique
+  content     String
+  tags        String[]  @default([])
+  status      String    @default("published")
+  likeCount   Int       @default(0) @map("like_count")
+  replyCount  Int       @default(0) @map("reply_count")
+  viewCount   Int       @default(0) @map("view_count")
+  metadata    Json      @default("{}")
+  pinnedUntil DateTime? @map("pinned_until")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  author  User?            @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  tenant  Tenant?          @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  replies CommunityReply[]
+  likes   CommunityLike[]  @relation("PostLikes")
+  flags   CommunityFlag[]  @relation("PostFlags")
+
+  @@index([type, status, createdAt])
+  @@index([authorId, createdAt])
+  @@index([tenantId])
+  @@index([tags], type: Gin)
+  @@map("community_posts")
+}
+
+model CommunityReply {
+  id         String   @id @default(uuid())
+  postId     String   @map("post_id")
+  authorId   String   @map("author_id")
+  parentId   String?  @map("parent_id")
+  content    String
+  status     String   @default("published")
+  isSolution Boolean  @default(false) @map("is_solution")
+  likeCount  Int      @default(0) @map("like_count")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  post     CommunityPost    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author   User             @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  parent   CommunityReply?  @relation("ReplyParent", fields: [parentId], references: [id], onDelete: Cascade)
+  children CommunityReply[] @relation("ReplyParent")
+  likes    CommunityLike[]  @relation("ReplyLikes")
+  flags    CommunityFlag[]  @relation("ReplyFlags")
+
+  @@index([postId, createdAt])
+  @@index([parentId])
+  @@map("community_replies")
+}
+
+model CommunityLike {
+  id        String   @id @default(uuid())
+  postId    String?  @map("post_id")
+  replyId   String?  @map("reply_id")
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user  User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post  CommunityPost?  @relation("PostLikes", fields: [postId], references: [id], onDelete: Cascade)
+  reply CommunityReply? @relation("ReplyLikes", fields: [replyId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+  @@unique([replyId, userId])
+  @@index([userId])
+  @@map("community_likes")
+}
+
+model CommunityFlag {
+  id         String    @id @default(uuid())
+  postId     String?   @map("post_id")
+  replyId    String?   @map("reply_id")
+  reporterId String    @map("reporter_id")
+  reason     String
+  detail     String?
+  status     String    @default("pending")
+  resolvedBy String?   @map("resolved_by")
+  resolvedAt DateTime? @map("resolved_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  post  CommunityPost?  @relation("PostFlags", fields: [postId], references: [id], onDelete: Cascade)
+  reply CommunityReply? @relation("ReplyFlags", fields: [replyId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])
+  @@map("community_flags")
 }

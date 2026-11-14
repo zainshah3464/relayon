@@ -19,6 +19,7 @@
     "@angular/router": "^19.2.25",
     "@angular/service-worker": "^19.2.25",
     "@jsverse/transloco": "^7.5.0",
+    "ngx-markdown": "^19.0.0",
     "rxjs": "~7.8.0",
     "tslib": "^2.6.0",
     "zone.js": "~0.15.0"
