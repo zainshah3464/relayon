@@ -26,7 +26,10 @@ export class CommunityService {
 
   async listPosts(query: ListPostsQuery) {
     const limit = Math.min(query.limit ?? 25, 50);
-    const where: Record<string, unknown> = { status: 'published' };
+    const where: Record<string, unknown> = {
+      status: 'published',
+      autoHidden: false, // ⚠️ v2.8
+    };
 
     if (query.type) where['type'] = query.type;
     if (query.tag) where['tags'] = { has: query.tag };
@@ -85,13 +88,13 @@ export class CommunityService {
     const post = await this.prisma.withoutTenant((c) =>
       c.communityPost.findFirst({
         where: isUuid
-          ? { id: idOrSlug, status: 'published' }
-          : { slug: idOrSlug, status: 'published' },
+          ? { id: idOrSlug, status: 'published', autoHidden: false }
+          : { slug: idOrSlug, status: 'published', autoHidden: false },
         include: {
           author: { select: { id: true, name: true } },
           tenant: { select: { name: true, slug: true } },
           replies: {
-            where: { status: 'published' },
+            where: { status: 'published', autoHidden: false }, // ⚠️ v2.8
             orderBy: [{ isSolution: 'desc' }, { createdAt: 'asc' }],
             include: {
               author: { select: { id: true, name: true } },
@@ -354,7 +357,8 @@ export class CommunityService {
     if (!opts.postId && !opts.replyId) {
       throw new BadRequestException('postId or replyId required');
     }
-    return this.prisma.withoutTenant((c) =>
+
+    const created = await this.prisma.withoutTenant((c) =>
       c.communityFlag.create({
         data: {
           reporterId: userId,
@@ -365,6 +369,67 @@ export class CommunityService {
         },
       }),
     );
+
+    // ⚠️ v2.8 — auto-hide after 3 pending flags
+    const AUTO_HIDE_THRESHOLD = 3;
+
+    if (opts.postId) {
+      const pendingFlags = await this.prisma.withoutTenant((c) =>
+        c.communityFlag.count({
+          where: { postId: opts.postId!, status: 'pending' },
+        }),
+      );
+
+      if (pendingFlags >= AUTO_HIDE_THRESHOLD) {
+        await this.prisma.withoutTenant(async (c) => {
+          await c.communityPost.updateMany({
+            where: {
+              id: opts.postId!,
+              status: 'published',
+              autoHidden: false,
+            },
+            data: { autoHidden: true, autoHiddenAt: new Date() },
+          });
+          await c.moderationAction.create({
+            data: {
+              adminId: '00000000-0000-0000-0000-000000000000',
+              action: 'auto_hide',
+              postId: opts.postId!,
+              reason: `Auto-hidden after ${pendingFlags} flags`,
+            },
+          });
+        });
+      }
+    } else if (opts.replyId) {
+      const pendingFlags = await this.prisma.withoutTenant((c) =>
+        c.communityFlag.count({
+          where: { replyId: opts.replyId!, status: 'pending' },
+        }),
+      );
+
+      if (pendingFlags >= AUTO_HIDE_THRESHOLD) {
+        await this.prisma.withoutTenant(async (c) => {
+          await c.communityReply.updateMany({
+            where: {
+              id: opts.replyId!,
+              status: 'published',
+              autoHidden: false,
+            },
+            data: { autoHidden: true, autoHiddenAt: new Date() },
+          });
+          await c.moderationAction.create({
+            data: {
+              adminId: '00000000-0000-0000-0000-000000000000',
+              action: 'auto_hide',
+              replyId: opts.replyId!,
+              reason: `Auto-hidden after ${pendingFlags} flags`,
+            },
+          });
+        });
+      }
+    }
+
+    return created;
   }
 
   // ── Announcements feed ──────────────────────────────────────

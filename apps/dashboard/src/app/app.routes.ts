@@ -113,7 +113,7 @@ export const routes: Routes = [
           ),
       },
 
-      // ── ⚠️ v2.5 — Community marketplace ────────────────────
+      // ──  v2.5 — Community marketplace ────────────────────
       {
         path: 'community',
         loadComponent: () =>
@@ -138,7 +138,7 @@ export const routes: Routes = [
     ],
   },
 
-  // ── Admin routes (⚠️ v2.4 — Phase A: platform admin panel) ─
+  // ── Admin routes ( v2.4 — Phase A: platform admin panel) ─
   {
     path: 'admin',
     canActivate: [authGuard],
@@ -166,6 +166,21 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/admin/admin-health.component').then(
             (m) => m.AdminHealthComponent,
+          ),
+      },
+      // ──  v2.8 — moderation + announcements ──────────────
+      {
+        path: 'moderation',
+        loadComponent: () =>
+          import('./features/admin/admin-moderation.component').then(
+            (m) => m.AdminModerationComponent,
+          ),
+      },
+      {
+        path: 'announcements',
+        loadComponent: () =>
+          import('./features/admin/admin-announcements.component').then(
+            (m) => m.AdminAnnouncementsComponent,
           ),
       },
     ],

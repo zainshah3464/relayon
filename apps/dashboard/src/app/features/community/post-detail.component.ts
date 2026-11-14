@@ -16,114 +16,116 @@ import { AuthService } from '../../core/auth/auth.service';
   template: `
     @if (loading()) {
       <div class="card text-sm text-muted">Loading post...</div>
-    } @else if (post(); as p) {
-      <div class="space-y-6 max-w-4xl">
-        <a routerLink="/community" class="text-xs text-muted hover:text-white">← Back to community</a>
+    } @else {
+      @if (post(); as p) {
+        <div class="space-y-6 max-w-4xl">
+          <a routerLink="/community" class="text-xs text-muted hover:text-white">← Back to community</a>
 
-        <div class="card">
-          <div class="flex items-center gap-2 mb-3">
-            <span class="text-xs px-2 py-0.5 rounded bg-surface-2 font-mono text-relay-cyan">{{ p.type }}</span>
-            @if (p.isOfficial) {
-              <span class="text-xs px-2 py-0.5 rounded bg-signal-amber/20 text-signal-amber">Official</span>
-            }
-          </div>
-          <h1 class="text-2xl font-bold text-white">{{ p.title }}</h1>
-          <p class="text-sm text-muted mt-2">
-            by {{ p.author?.name || 'Relayon' }}
-            @if (p.tenant) { · {{ p.tenant.name }} }
-            · {{ p.createdAt | date: 'medium' }}
-            · {{ p.viewCount }} views
-          </p>
-
-          <div class="flex gap-2 mt-4">
-            <button
-              (click)="like()"
-              class="btn-secondary text-xs"
-              [class.border-relay-violet]="p.hasLiked"
-              [class.text-relay-violet]="p.hasLiked"
-            >
-              ♥ {{ p.likeCount }}
-            </button>
-            @if (p.type === 'template') {
-              <button (click)="openImport(p.id)" class="btn-primary text-xs">Use this template</button>
-            }
-            <button (click)="flag()" class="btn-secondary text-xs text-signal-rose">Report</button>
-          </div>
-        </div>
-
-        <div class="card prose prose-invert max-w-none">
-          <markdown [data]="p.content"></markdown>
-        </div>
-
-        <div>
-          <h2 class="text-lg font-semibold text-white mb-3">Replies ({{ p.replies.length }})</h2>
-
-          @if (p.replies.length === 0) {
-            <div class="card text-sm text-muted">No replies yet. Be the first!</div>
-          } @else {
-            <div class="space-y-2">
-              @for (r of p.replies; track r.id) {
-                <div
-                  class="card"
-                  [ngClass]="{
-                    'ms-8': r.parentId,
-                    'border-signal-green/30': r.isSolution
-                  }"
-                >
-                  <div class="flex justify-between items-start">
-                    <p class="text-sm font-medium text-white">
-                      {{ r.author.name }}
-                      @if (r.isSolution) {
-                        <span class="text-xs ms-2 text-signal-green">✓ Solution</span>
-                      }
-                    </p>
-                    <p class="text-xs text-muted">{{ r.createdAt | date: 'short' }}</p>
-                  </div>
-                  <div class="prose prose-invert max-w-none text-sm mt-2">
-                    <markdown [data]="r.content"></markdown>
-                  </div>
-                  <div class="flex gap-2 mt-3">
-                    <button
-                      (click)="likeReply(r.id)"
-                      class="text-xs"
-                      [class.text-relay-violet]="r.hasLiked"
-                      [class.text-muted]="!r.hasLiked"
-                    >♥ {{ r.likeCount }}</button>
-                    <button (click)="replyTo(r.id)" class="text-xs text-muted hover:text-white">Reply</button>
-                    @if (canMarkSolution() && !r.isSolution) {
-                      <button (click)="markSolution(r.id)" class="text-xs text-signal-green hover:underline">Mark as solution</button>
-                    }
-                  </div>
-                </div>
+          <div class="card">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="text-xs px-2 py-0.5 rounded bg-surface-2 font-mono text-relay-cyan">{{ p.type }}</span>
+              @if (p.isOfficial) {
+                <span class="text-xs px-2 py-0.5 rounded bg-signal-amber/20 text-signal-amber">Official</span>
               }
             </div>
-          }
+            <h1 class="text-2xl font-bold text-white">{{ p.title }}</h1>
+            <p class="text-sm text-muted mt-2">
+              by {{ p.author?.name || 'Relayon' }}
+              @if (p.tenant) { · {{ p.tenant.name }} }
+              · {{ p.createdAt | date: 'medium' }}
+              · {{ p.viewCount }} views
+            </p>
 
-          <div class="card mt-4">
-            @if (replyToId()) {
-              <p class="text-xs text-muted mb-1">
-                Replying to a comment ·
-                <button (click)="cancelReply()" class="text-relay-cyan hover:underline">Cancel</button>
-              </p>
-            }
-            <textarea
-              [(ngModel)]="replyContent"
-              rows="3"
-              class="input font-mono text-sm"
-              placeholder="Write a reply (Markdown supported)..."
-            ></textarea>
-            <div class="flex justify-end mt-2">
+            <div class="flex gap-2 mt-4">
               <button
-                (click)="submitReply()"
-                [disabled]="!replyContent.trim() || submitting()"
-                class="btn-primary text-xs"
+                (click)="like()"
+                class="btn-secondary text-xs"
+                [class.border-relay-violet]="p.hasLiked"
+                [class.text-relay-violet]="p.hasLiked"
               >
-                {{ submitting() ? 'Posting...' : 'Post reply' }}
+                ♥ {{ p.likeCount }}
               </button>
+              @if (p.type === 'template') {
+                <button (click)="openImport(p.id)" class="btn-primary text-xs">Use this template</button>
+              }
+              <button (click)="flag()" class="btn-secondary text-xs text-signal-rose">Report</button>
+            </div>
+          </div>
+
+          <div class="card prose prose-invert max-w-none">
+            <markdown [data]="p.content"></markdown>
+          </div>
+
+          <div>
+            <h2 class="text-lg font-semibold text-white mb-3">Replies ({{ p.replies.length }})</h2>
+
+            @if (p.replies.length === 0) {
+              <div class="card text-sm text-muted">No replies yet. Be the first!</div>
+            } @else {
+              <div class="space-y-2">
+                @for (r of p.replies; track r.id) {
+                  <div
+                    class="card"
+                    [ngClass]="{
+                      'ms-8': r.parentId,
+                      'border-signal-green/30': r.isSolution
+                    }"
+                  >
+                    <div class="flex justify-between items-start">
+                      <p class="text-sm font-medium text-white">
+                        {{ r.author.name }}
+                        @if (r.isSolution) {
+                          <span class="text-xs ms-2 text-signal-green">✓ Solution</span>
+                        }
+                      </p>
+                      <p class="text-xs text-muted">{{ r.createdAt | date: 'short' }}</p>
+                    </div>
+                    <div class="prose prose-invert max-w-none text-sm mt-2">
+                      <markdown [data]="r.content"></markdown>
+                    </div>
+                    <div class="flex gap-2 mt-3">
+                      <button
+                        (click)="likeReply(r.id)"
+                        class="text-xs"
+                        [class.text-relay-violet]="r.hasLiked"
+                        [class.text-muted]="!r.hasLiked"
+                      >♥ {{ r.likeCount }}</button>
+                      <button (click)="replyTo(r.id)" class="text-xs text-muted hover:text-white">Reply</button>
+                      @if (canMarkSolution() && !r.isSolution) {
+                        <button (click)="markSolution(r.id)" class="text-xs text-signal-green hover:underline">Mark as solution</button>
+                      }
+                    </div>
+                  </div>
+                }
+              </div>
+            }
+
+            <div class="card mt-4">
+              @if (replyToId()) {
+                <p class="text-xs text-muted mb-1">
+                  Replying to a comment ·
+                  <button (click)="cancelReply()" class="text-relay-cyan hover:underline">Cancel</button>
+                </p>
+              }
+              <textarea
+                [(ngModel)]="replyContent"
+                rows="3"
+                class="input font-mono text-sm"
+                placeholder="Write a reply (Markdown supported)..."
+              ></textarea>
+              <div class="flex justify-end mt-2">
+                <button
+                  (click)="submitReply()"
+                  [disabled]="!replyContent.trim() || submitting()"
+                  class="btn-primary text-xs"
+                >
+                  {{ submitting() ? 'Posting...' : 'Post reply' }}
+                </button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      }
     }
 
     @if (importPreview(); as imp) {

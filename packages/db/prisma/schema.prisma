@@ -406,6 +406,9 @@ model CommunityPost {
   replyCount  Int       @default(0) @map("reply_count")
   viewCount   Int       @default(0) @map("view_count")
   metadata    Json      @default("{}")
+  // ⚠️ v2.8 — moderation
+  autoHidden    Boolean   @default(false) @map("auto_hidden")
+  autoHiddenAt  DateTime? @map("auto_hidden_at")
   pinnedUntil DateTime? @map("pinned_until")
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
@@ -431,6 +434,9 @@ model CommunityReply {
   content    String
   status     String   @default("published")
   isSolution Boolean  @default(false) @map("is_solution")
+  // ⚠️ v2.8 — moderation
+  autoHidden    Boolean   @default(false) @map("auto_hidden")
+  autoHiddenAt  DateTime? @map("auto_hidden_at")
   likeCount  Int      @default(0) @map("like_count")
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
@@ -481,4 +487,37 @@ model CommunityFlag {
 
   @@index([status, createdAt])
   @@map("community_flags")
+}
+
+// ─────────────────────────────────────────────────────────────
+// ⚠️ v2.8 — Moderation actions + announcement sharing
+// ─────────────────────────────────────────────────────────────
+
+model ModerationAction {
+  id         String   @id @default(uuid())
+  adminId    String   @map("admin_id")
+  action     String
+  postId     String?  @map("post_id")
+  replyId    String?  @map("reply_id")
+  flagId     String?  @map("flag_id")
+  reason     String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([adminId, createdAt])
+  @@index([postId])
+  @@index([replyId])
+  @@map("moderation_actions")
+}
+
+model AnnouncementShare {
+  id             String   @id @default(uuid())
+  announcementId String   @map("announcement_id")
+  platform       String
+  status         String
+  externalId     String?  @map("external_id")
+  error          String?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([announcementId, platform])
+  @@map("announcement_shares")
 }
