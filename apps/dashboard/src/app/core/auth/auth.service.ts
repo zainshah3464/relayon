@@ -193,6 +193,20 @@ export class AuthService {
     this.router.navigate(['/login']);
   }
 
+  /**
+   * ⚠️ v2.9 — used by impersonation; replaces both token + user in one call.
+   * Does NOT set refresh token (impersonation is short-lived).
+   */
+  setSessionFromImpersonation(payload: {
+    accessToken: string;
+    user: User;
+  }): void {
+    localStorage.setItem(this.ACCESS_KEY, payload.accessToken);
+    localStorage.setItem(this.USER_KEY, JSON.stringify(payload.user));
+    this._token.set(payload.accessToken);
+    this._user.set(payload.user);
+  }
+
   private loadUser(): User | null {
   const raw = localStorage.getItem(this.USER_KEY);  
   if (!raw) return null;

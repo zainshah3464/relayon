@@ -1,12 +1,13 @@
 import { Component, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { AdminApiService, type AdminTenant } from '../../core/admin/admin.service';
 
 @Component({
   selector: 'app-admin-tenants',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, RouterLink],
   template: `
     <div class="space-y-6">
       <div>
@@ -37,7 +38,8 @@ import { AdminApiService, type AdminTenant } from '../../core/admin/admin.servic
             </thead>
             <tbody>
               @for (t of items(); track t.id) {
-                <tr class="border-t border-hairline hover:bg-surface-2">
+                <tr class="border-t border-hairline hover:bg-surface-2 cursor-pointer"
+                    [routerLink]="['/admin/tenants', t.id]">
                   <td class="p-3">
                     <p class="text-white">{{ t.name }}</p>
                     <p class="text-xs text-muted font-mono">{{ t.slug }}</p>

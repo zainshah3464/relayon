@@ -381,10 +381,15 @@ model AdminAuditLog {
   targetId   String?  @map("target_id")
   metadata   Json     @default("{}")
   ipHash     String?  @map("ip_hash")
+  // ⚠️ v2.9 — impersonation tracking
+  impersonatedTenantId String?   @map("impersonated_tenant_id")
+  sessionToken         String?   @map("session_token")
+  expiresAt            DateTime? @map("expires_at")
   createdAt  DateTime @default(now()) @map("created_at")
 
   @@index([adminId, createdAt])
   @@index([action, createdAt])
+  @@index([impersonatedTenantId])
   @@map("admin_audit_logs")
 }
 

@@ -113,7 +113,7 @@ export const routes: Routes = [
           ),
       },
 
-      // ──  v2.5 — Community marketplace ────────────────────
+      // ── ⚠️ v2.5 — Community marketplace ────────────────────
       {
         path: 'community',
         loadComponent: () =>
@@ -138,7 +138,7 @@ export const routes: Routes = [
     ],
   },
 
-  // ── Admin routes ( v2.4 — Phase A: platform admin panel) ─
+  // ── Admin routes (⚠️ v2.4 — Phase A: platform admin panel) ─
   {
     path: 'admin',
     canActivate: [authGuard],
@@ -168,7 +168,29 @@ export const routes: Routes = [
             (m) => m.AdminHealthComponent,
           ),
       },
-      // ──  v2.8 — moderation + announcements ──────────────
+      // ── ⚠️ v2.9 — tenant detail + users + audit ────────────
+      {
+        path: 'tenants/:id',
+        loadComponent: () =>
+          import('./features/admin/admin-tenant-detail.component').then(
+            (m) => m.AdminTenantDetailComponent,
+          ),
+      },
+      {
+        path: 'users',
+        loadComponent: () =>
+          import('./features/admin/admin-users.component').then(
+            (m) => m.AdminUsersComponent,
+          ),
+      },
+      {
+        path: 'audit',
+        loadComponent: () =>
+          import('./features/admin/admin-audit.component').then(
+            (m) => m.AdminAuditComponent,
+          ),
+      },
+      // ── ⚠️ v2.8 — moderation + announcements ──────────────
       {
         path: 'moderation',
         loadComponent: () =>

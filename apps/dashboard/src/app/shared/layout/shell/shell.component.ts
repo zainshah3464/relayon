@@ -8,6 +8,7 @@ import { ChatWidgetComponent } from '../../../features/ai/chat-widget.component'
 import { OfflineBannerComponent } from '../../pwa/offline-banner.component';
 import { UpdatePromptComponent } from '../../pwa/update-prompt.component';
 import { InstallPromptComponent } from '../../pwa/install-prompt.component';
+import { ImpersonationBannerComponent } from '../impersonation-banner.component';
 import { AppUpdateService } from '../../../core/pwa/app-update.service';
 
 interface NavItem {
@@ -29,6 +30,7 @@ interface NavItem {
     OfflineBannerComponent,
     UpdatePromptComponent,
     InstallPromptComponent,
+    ImpersonationBannerComponent,
   ],
   template: `
     <div class="flex h-screen bg-midnight">
@@ -141,6 +143,9 @@ interface NavItem {
       <app-offline-banner />
       <app-update-prompt />
       <app-install-prompt />
+
+      <!-- ⚠️ v2.9 — impersonation banner -->
+      <app-impersonation-banner />
     </div>
   `,
 })

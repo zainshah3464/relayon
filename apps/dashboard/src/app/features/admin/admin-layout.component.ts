@@ -23,10 +23,14 @@ import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
         <nav class="w-56 shrink-0 space-y-1">
           <a routerLink="/admin" [routerLinkActiveOptions]="{ exact: true }" routerLinkActive="bg-surface-2 text-white" class="block rounded-lg px-3 py-2 text-sm text-muted hover:bg-surface-2 hover:text-white">📊 Overview</a>
           <a routerLink="/admin/tenants" routerLinkActive="bg-surface-2 text-white" class="block rounded-lg px-3 py-2 text-sm text-muted hover:bg-surface-2 hover:text-white">🏢 Tenants</a>
+          <!-- ⚠️ v2.9 -->
+          <a routerLink="/admin/users" routerLinkActive="bg-surface-2 text-white" class="block rounded-lg px-3 py-2 text-sm text-muted hover:bg-surface-2 hover:text-white">👥 Users</a>
           <a routerLink="/admin/health" routerLinkActive="bg-surface-2 text-white" class="block rounded-lg px-3 py-2 text-sm text-muted hover:bg-surface-2 hover:text-white">💚 System health</a>
           <!-- ⚠️ v2.8 -->
           <a routerLink="/admin/moderation" routerLinkActive="bg-surface-2 text-white" class="block rounded-lg px-3 py-2 text-sm text-muted hover:bg-surface-2 hover:text-white">🛡️ Moderation</a>
           <a routerLink="/admin/announcements" routerLinkActive="bg-surface-2 text-white" class="block rounded-lg px-3 py-2 text-sm text-muted hover:bg-surface-2 hover:text-white">📢 Announcements</a>
+          <!-- ⚠️ v2.9 -->
+          <a routerLink="/admin/audit" routerLinkActive="bg-surface-2 text-white" class="block rounded-lg px-3 py-2 text-sm text-muted hover:bg-surface-2 hover:text-white">📜 Audit log</a>
         </nav>
         <main class="flex-1 min-w-0">
           <router-outlet />

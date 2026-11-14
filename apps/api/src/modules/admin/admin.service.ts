@@ -98,6 +98,7 @@ export class AdminService {
     };
   }
 
+  // ⚠️ v2.9 — enhanced tenant detail with usage + chart
   async tenantDetail(tenantId: string) {
     const tenant = await this.prisma.withoutTenant((c) =>
       c.tenant.findUnique({
@@ -110,27 +111,131 @@ export class AdminService {
               name: true,
               role: true,
               emailVerified: true,
+              isSuperAdmin: true,
               lastLoginAt: true,
               createdAt: true,
             },
           },
-          _count: { select: { workflows: true, apiKeys: true } },
+          workflows: {
+            select: {
+              id: true,
+              name: true,
+              sourceType: true,
+              isActive: true,
+              createdAt: true,
+              _count: { select: { destinations: true } },
+            },
+            take: 20,
+            orderBy: { createdAt: 'desc' },
+          },
+          apiKeys: {
+            select: {
+              id: true,
+              name: true,
+              prefix: true,
+              environment: true,
+              lastUsedAt: true,
+              revokedAt: true,
+              createdAt: true,
+            },
+            take: 10,
+            orderBy: { createdAt: 'desc' },
+          },
+          _count: {
+            select: { workflows: true, apiKeys: true, users: true },
+          },
         },
       }),
     );
 
     if (!tenant) return null;
 
-    const liveCount = await this.presence.countLiveForTenant(tenantId);
-    const [events24h, dlqCount] = await Promise.all([
-      this.mongo.eventModel.countDocuments({
-        tenantId,
-        receivedAt: { $gte: new Date(Date.now() - 24 * 3600_000) },
-      }),
-      this.mongo.deliveryModel.countDocuments({ tenantId, status: 'dlq' }),
+    const since30d = new Date(Date.now() - 30 * 24 * 3600_000);
+    const now = new Date();
+    const currentPeriod = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
+
+    const [usageRows, events24h, events7d, dlqCount, deliveries7d, liveCount] =
+      await Promise.all([
+        this.prisma.withoutTenant((c) =>
+          c.usageCounter.findMany({
+            where: { tenantId, period: currentPeriod },
+          }),
+        ),
+        this.mongo.eventModel.countDocuments({
+          tenantId,
+          receivedAt: { $gte: new Date(Date.now() - 24 * 3600_000) },
+        }),
+        this.mongo.eventModel.countDocuments({
+          tenantId,
+          receivedAt: { $gte: new Date(Date.now() - 7 * 24 * 3600_000) },
+        }),
+        this.mongo.deliveryModel.countDocuments({ tenantId, status: 'dlq' }),
+        this.mongo.deliveryModel.countDocuments({
+          tenantId,
+          createdAt: { $gte: new Date(Date.now() - 7 * 24 * 3600_000) },
+        }),
+        this.presence.countLiveForTenant(tenantId),
+      ]);
+
+    const usage = {
+      events: {
+        used: Number(
+          usageRows.find((r) => r.metric === 'events')?.count ?? 0n,
+        ),
+        limit: tenant.quotaEventsPerMonth,
+      },
+      aiTokens: {
+        used: Number(
+          usageRows.find((r) => r.metric === 'ai_tokens')?.count ?? 0n,
+        ),
+        limit: tenant.quotaAiTokensPerMonth,
+      },
+    };
+
+    const dailyEvents = await this.mongo.eventModel.aggregate<{
+      _id: string;
+      count: number;
+    }>([
+      { $match: { tenantId, receivedAt: { $gte: since30d } } },
+      {
+        $group: {
+          _id: { $dateToString: { format: '%Y-%m-%d', date: '$receivedAt' } },
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { _id: 1 } },
     ]);
 
-    return { ...tenant, liveUsers: liveCount, events24h, dlqCount };
+    const chart: Array<{ day: string; count: number }> = [];
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(Date.now() - i * 24 * 3600_000);
+      const key = d.toISOString().slice(0, 10);
+      const found = dailyEvents.find((r) => r._id === key);
+      chart.push({ day: key, count: found?.count ?? 0 });
+    }
+
+    return {
+      id: tenant.id,
+      name: tenant.name,
+      slug: tenant.slug,
+      plan: tenant.plan,
+      subscriptionStatus: tenant.subscriptionStatus,
+      stripeCustomerId: tenant.stripeCustomerId,
+      quotaMode: tenant.quotaMode,
+      currentPeriodEnd: tenant.currentPeriodEnd,
+      createdAt: tenant.createdAt,
+      counts: tenant._count,
+      users: tenant.users,
+      recentWorkflows: tenant.workflows,
+      recentApiKeys: tenant.apiKeys,
+      usage,
+      events24h,
+      events7d,
+      deliveries7d,
+      dlqCount,
+      liveUsers: liveCount,
+      dailyEventChart: chart,
+    };
   }
 
   async listUsers(opts: { limit?: number; cursor?: string; search?: string }) {

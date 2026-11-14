@@ -30,6 +30,65 @@ export interface AdminHealth {
   timestamp: string;
 }
 
+// ⚠️ v2.9 — detailed tenant
+export interface AdminTenantDetail {
+  id: string;
+  name: string;
+  slug: string;
+  plan: string;
+  subscriptionStatus: string;
+  stripeCustomerId: string | null;
+  quotaMode: string;
+  currentPeriodEnd: string | null;
+  createdAt: string;
+  counts: { users: number; workflows: number; apiKeys: number };
+  users: Array<{
+    id: string;
+    email: string;
+    name: string;
+    role: string;
+    emailVerified: boolean;
+    isSuperAdmin: boolean;
+    lastLoginAt: string | null;
+    createdAt: string;
+  }>;
+  recentWorkflows: Array<{
+    id: string;
+    name: string;
+    sourceType: string;
+    isActive: boolean;
+    createdAt: string;
+    _count: { destinations: number };
+  }>;
+  recentApiKeys: Array<{
+    id: string;
+    name: string;
+    prefix: string;
+    environment: string;
+    lastUsedAt: string | null;
+    revokedAt: string | null;
+    createdAt: string;
+  }>;
+  usage: {
+    events: { used: number; limit: number };
+    aiTokens: { used: number; limit: number };
+  };
+  events24h: number;
+  events7d: number;
+  deliveries7d: number;
+  dlqCount: number;
+  liveUsers: number;
+  dailyEventChart: Array<{ day: string; count: number }>;
+}
+
+export interface ImpersonationSession {
+  accessToken: string;
+  expiresAt: string;
+  tenant: { id: string; name: string; slug: string };
+  admin: { id: string; email: string; name: string };
+  auditLogId: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class AdminApiService {
   private http = inject(HttpClient);
@@ -50,6 +109,13 @@ export class AdminApiService {
     return this.http.get<{ items: AdminTenant[]; nextCursor: string | null }>(
       `${this.base}/api/admin/tenants`,
       { params: p },
+    );
+  }
+
+  // ⚠️ v2.9 — detailed tenant view
+  tenantDetail(id: string): Observable<AdminTenantDetail> {
+    return this.http.get<AdminTenantDetail>(
+      `${this.base}/api/admin/tenants/${id}`,
     );
   }
 
@@ -89,5 +155,40 @@ export class AdminApiService {
       daily: Array<{ day: string; sessions: number; pageviews: number }>;
       topPages: Array<{ path: string; views: number; visitors: number }>;
     }>(`${this.base}/api/admin/analytics/traffic?days=${days}`);
+  }
+
+  // ⚠️ v2.9 — impersonation
+  startImpersonation(tenantId: string): Observable<ImpersonationSession> {
+    return this.http.post<ImpersonationSession>(
+      `${this.base}/api/admin/impersonate`,
+      { tenantId },
+    );
+  }
+
+  endImpersonation(auditLogId: string): Observable<{ ended: boolean }> {
+    return this.http.post<{ ended: boolean }>(
+      `${this.base}/api/admin/impersonate/end`,
+      { auditLogId },
+    );
+  }
+
+  listActiveImpersonations(): Observable<
+    Array<{
+      auditLogId: string;
+      adminEmail: string;
+      tenantName: string;
+      startedAt: string;
+      expiresAt: string;
+    }>
+  > {
+    return this.http.get<
+      Array<{
+        auditLogId: string;
+        adminEmail: string;
+        tenantName: string;
+        startedAt: string;
+        expiresAt: string;
+      }>
+    >(`${this.base}/api/admin/impersonate/active`);
   }
 }
