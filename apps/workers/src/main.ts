@@ -1,3 +1,6 @@
+// ⚠️ MUST be the very first import
+import './tracing';
+
 import { NestFactory, NestApplication } from '@nestjs/core';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';

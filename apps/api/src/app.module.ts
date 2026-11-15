@@ -22,6 +22,7 @@ import { TrackingModule } from './modules/tracking/tracking.module';
 import { PresenceModule } from './modules/presence/presence.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { CommunityModule } from './modules/community/community.module';
+import { CronModule } from './modules/cron/cron.module';
 
 @Module({
   imports: [
@@ -49,6 +50,7 @@ import { CommunityModule } from './modules/community/community.module';
     PresenceModule,
     AdminModule,
     CommunityModule,
+    CronModule,
     RedisModule,
   ],
   providers: [JwtOrApiKeyGuard],

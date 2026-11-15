@@ -1,3 +1,6 @@
+// ⚠️ MUST be the very first import — OTel auto-instrumentation
+import './tracing';
+
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { AppModule } from './app.module';

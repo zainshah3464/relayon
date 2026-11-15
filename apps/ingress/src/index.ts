@@ -1,3 +1,6 @@
+// ⚠️ MUST be the very first import
+import './tracing';
+
 import { createApp } from './app';
 import { config } from './config';
 import { logger } from './lib/logger';
