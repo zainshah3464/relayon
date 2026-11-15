@@ -1,0 +1,7 @@
+src/
+scripts/
+openapi-ts.config.ts
+openapi.json
+tsconfig*.json
+.gitignore
+.npmignore

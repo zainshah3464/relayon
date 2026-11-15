@@ -56,7 +56,11 @@
     "test:load:delivery": "k6 run test/load/delivery-throughput.js",
     "test:all": "npm run test && npm run test:integration && npm run test:e2e",
     "smoke": "node scripts/smoke-test.mjs",
-    "deploy:db": "npm run db:deploy"
+    "deploy:db": "npm run db:deploy",
+    "sdk:sync": "npm run sync-all --workspace=@relayon/sdk",
+    "sdk:generate": "npm run generate --workspace=@relayon/sdk",
+    "sdk:build": "npm run build --workspace=@relayon/sdk",
+    "sdk:publish": "npm publish --workspace=@relayon/sdk --access public"
   },
   "dependencies": {
     "@prisma/client": "6.19.3",
