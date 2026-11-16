@@ -398,6 +398,7 @@
   "nav": {
     "dashboard": "Dashboard",
     "workflows": "Workflows",
+    "playground": "Playground",
     "events": "Events",
     "community": "Community",
     "dlq": "Dead Letter Queue",

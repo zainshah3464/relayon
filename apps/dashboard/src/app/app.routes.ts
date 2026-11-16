@@ -135,6 +135,15 @@ export const routes: Routes = [
             (m) => m.PostDetailComponent,
           ),
       },
+
+      // ── ⚠️ v3.0 Wave 4 — webhook playground ────────────────
+      {
+        path: 'playground',
+        loadComponent: () =>
+          import('./features/playground/playground.component').then(
+            (m) => m.PlaygroundComponent,
+          ),
+      },
     ],
   },
 
@@ -203,6 +212,14 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/admin/admin-announcements.component').then(
             (m) => m.AdminAnnouncementsComponent,
+          ),
+      },
+      // ── ⚠️ v3.0 Wave 4 — feature flags admin ───────────────
+      {
+        path: 'feature-flags',
+        loadComponent: () =>
+          import('./features/admin/admin-feature-flags.component').then(
+            (m) => m.AdminFeatureFlagsComponent,
           ),
       },
     ],

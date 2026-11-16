@@ -1,6 +1,7 @@
 import express, { type Express } from 'express';
 import { webhookRouter } from './routes/webhook';
 import { healthRouter } from './routes/health';
+import { playRouter } from './routes/play';
 import { errorHandler } from './middleware/errorHandler';
 import { config } from './config';
 import { logger } from './lib/logger';
@@ -11,7 +12,6 @@ export function createApp(): Express {
   app.disable('x-powered-by');
   app.set('trust proxy', 1);
 
-  // CORS — ingress is public, but admin tools may call from dashboard
   app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', config.CORS_ORIGIN);
     res.header('Access-Control-Allow-Credentials', 'true');
@@ -27,8 +27,6 @@ export function createApp(): Express {
     next();
   });
 
-  // Body parsing — capture raw bytes for signature verification.
-  // 5 MB limit per README spec.
   app.use(
     express.json({
       limit: '5mb',
@@ -38,7 +36,6 @@ export function createApp(): Express {
     }),
   );
 
-  // Baseline request logging
   app.use((req, _res, next) => {
     logger.info('request.in', {
       correlationId: (req as any).correlationId,
@@ -49,9 +46,10 @@ export function createApp(): Express {
   });
 
   app.use('/health', healthRouter);
+  // ⚠️ v3.0 Wave 4 — playground capture (any method, any path after /play)
+  app.use('/play', playRouter);
   app.use('/webhook', webhookRouter);
 
-  // 404 fallback
   app.use((_req, res) => {
     res.status(404).json({
       error: 'not_found',
@@ -59,7 +57,6 @@ export function createApp(): Express {
     });
   });
 
-  // Global error handler — MUST be last
   app.use(errorHandler);
 
   return app;

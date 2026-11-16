@@ -24,6 +24,8 @@ import { AdminModule } from './modules/admin/admin.module';
 import { CommunityModule } from './modules/community/community.module';
 import { CronModule } from './modules/cron/cron.module';
 import { WebhooksModule } from './modules/webhooks/webhooks.module';
+import { FeatureFlagModule } from './common/feature-flags/feature-flag.module';
+import { PlaygroundModule } from './modules/playground/playground.module';
 
 @Module({
   imports: [
@@ -53,6 +55,8 @@ import { WebhooksModule } from './modules/webhooks/webhooks.module';
     CommunityModule,
     CronModule,
     WebhooksModule,
+    FeatureFlagModule,
+    PlaygroundModule,
     RedisModule,
   ],
   providers: [JwtOrApiKeyGuard],

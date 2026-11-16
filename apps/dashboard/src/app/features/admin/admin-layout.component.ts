@@ -31,6 +31,8 @@ import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
           <a routerLink="/admin/announcements" routerLinkActive="bg-surface-2 text-white" class="block rounded-lg px-3 py-2 text-sm text-muted hover:bg-surface-2 hover:text-white">📢 Announcements</a>
           <!-- ⚠️ v2.9 -->
           <a routerLink="/admin/audit" routerLinkActive="bg-surface-2 text-white" class="block rounded-lg px-3 py-2 text-sm text-muted hover:bg-surface-2 hover:text-white">📜 Audit log</a>
+          <!-- ⚠️ v3.0 Wave 4 -->
+          <a routerLink="/admin/feature-flags" routerLinkActive="bg-surface-2 text-white" class="block rounded-lg px-3 py-2 text-sm text-muted hover:bg-surface-2 hover:text-white">🚩 Feature flags</a>
         </nav>
         <main class="flex-1 min-w-0">
           <router-outlet />

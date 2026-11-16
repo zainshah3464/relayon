@@ -572,3 +572,19 @@ model OutboxEvent {
   @@index([expiresAt])
   @@map("outbox_events")
 }
+
+// ═══════════════════════════════════════════════════════════════
+// v3.0 Wave 3 — DB-backed feature flags
+// ═══════════════════════════════════════════════════════════════
+
+model FeatureFlag {
+  key             String   @id
+  description     String?
+  isEnabled       Boolean  @default(false) @map("is_enabled")
+  rolloutPct      Int      @default(0) @map("rollout_pct") // 0-100
+  tenantOverrides Json     @default("{}") @map("tenant_overrides") // { "tenant-uuid": true|false }
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("feature_flags")
+}

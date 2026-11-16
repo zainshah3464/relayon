@@ -158,6 +158,7 @@ export class ShellComponent {
   navItems: NavItem[] = [
     { labelKey: 'nav.dashboard', path: '/dashboard', icon: '📊' },
     { labelKey: 'nav.workflows', path: '/workflows', icon: '🔄' },
+    { labelKey: 'nav.playground', path: '/playground', icon: '🧪' },
     { labelKey: 'nav.events', path: '/events', icon: '📨' },
     { labelKey: 'nav.community', path: '/community', icon: '💬' },
     { labelKey: 'nav.dlq', path: '/dlq', icon: '⚠️' },

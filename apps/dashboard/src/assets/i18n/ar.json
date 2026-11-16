@@ -397,6 +397,7 @@
   "nav": {
     "dashboard": "لوحة التحكم",
     "workflows": "سير العمل",
+    "playground": "الملعب",
     "events": "الأحداث",
     "community": "المجتمع",
     "dlq": "قائمة الرسائل الميتة",

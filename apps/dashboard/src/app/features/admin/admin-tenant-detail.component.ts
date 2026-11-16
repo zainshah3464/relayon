@@ -6,11 +6,12 @@ import {
   type AdminTenantDetail,
 } from '../../core/admin/admin.service';
 import { ImpersonationClientService } from '../../core/admin/impersonation.service';
+import { TimeTravelPanelComponent } from './time-travel-panel.component';
 
 @Component({
   selector: 'app-admin-tenant-detail',
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, RouterLink, TimeTravelPanelComponent],
   template: `
     <div class="space-y-6">
       <a routerLink="/admin/tenants" class="text-xs text-muted hover:text-white">← All tenants</a>
@@ -168,6 +169,9 @@ import { ImpersonationClientService } from '../../core/admin/impersonation.servi
               </div>
             </div>
           }
+
+          <!-- ⚠️ v3.0 Wave 4 — time travel panel -->
+          <app-time-travel-panel [tenantId]="id()" />
         }
       }
     </div>
