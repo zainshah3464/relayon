@@ -46,6 +46,9 @@ coverage/
 .cache/
 .eslintcache
 
+# v3.1 CLI build
+packages/cli/dist/
+
 # Personal info and data
 bin_staf
 bin_staf/

@@ -2,6 +2,7 @@ import express, { type Express } from 'express';
 import { webhookRouter } from './routes/webhook';
 import { healthRouter } from './routes/health';
 import { playRouter } from './routes/play';
+import { tunnelRouter } from './routes/tunnel';
 import { errorHandler } from './middleware/errorHandler';
 import { config } from './config';
 import { logger } from './lib/logger';
@@ -48,6 +49,8 @@ export function createApp(): Express {
   app.use('/health', healthRouter);
   // ⚠️ v3.0 Wave 4 — playground capture (any method, any path after /play)
   app.use('/play', playRouter);
+  // ⚠️ v3.1 — CLI tunnel capture (any method, any path after /t)
+  app.use('/t', tunnelRouter);
   app.use('/webhook', webhookRouter);
 
   app.use((_req, res) => {

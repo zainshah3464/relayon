@@ -74,6 +74,8 @@ model Tenant {
   communityPosts  CommunityPost[]
   // ⚠️ v3.0 — outbound webhooks (Standard Webhooks 1.0.0)
   webhookEndpoints WebhookEndpoint[]
+  // ⚠️ v3.1 — CLI tunnel sessions
+  tunnelSessions   TunnelSession[]
 
   @@map("tenants")
 }
@@ -587,4 +589,26 @@ model FeatureFlag {
   updatedAt       DateTime @updatedAt @map("updated_at")
 
   @@map("feature_flags")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// v3.1 — CLI Tunnel sessions
+// ═══════════════════════════════════════════════════════════════
+
+model TunnelSession {
+  id         String   @id @default(uuid())
+  tenantId   String   @map("tenant_id")
+  sessionId  String   @unique @map("session_id")
+  targetPort Int      @map("target_port")
+  label      String?
+  isActive   Boolean  @default(true) @map("is_active")
+  lastSeenAt DateTime @default(now()) @map("last_seen_at")
+  expiresAt  DateTime @map("expires_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, isActive])
+  @@index([expiresAt])
+  @@map("tunnel_sessions")
 }

@@ -26,6 +26,7 @@ import { CronModule } from './modules/cron/cron.module';
 import { WebhooksModule } from './modules/webhooks/webhooks.module';
 import { FeatureFlagModule } from './common/feature-flags/feature-flag.module';
 import { PlaygroundModule } from './modules/playground/playground.module';
+import { TunnelModule } from './modules/tunnel/tunnel.module';
 
 @Module({
   imports: [
@@ -57,6 +58,7 @@ import { PlaygroundModule } from './modules/playground/playground.module';
     WebhooksModule,
     FeatureFlagModule,
     PlaygroundModule,
+    TunnelModule,
     RedisModule,
   ],
   providers: [JwtOrApiKeyGuard],

@@ -1,0 +1,44 @@
+{
+  "name": "@relayon/cli",
+  "version": "3.1.0",
+  "description": "Forward Relayon webhooks to your localhost — ngrok alternative",
+  "keywords": ["relayon", "webhooks", "tunnel", "ngrok", "cli"],
+  "homepage": "https://relayon.vercel.app",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zainshah3464/relayon.git",
+    "directory": "packages/cli"
+  },
+  "license": "MIT",
+  "author": "Zain Shah <zainshahzs110@gmail.com>",
+  "type": "module",
+  "bin": {
+    "relayon": "./dist/index.js"
+  },
+  "main": "./dist/index.js",
+  "files": ["dist", "README.md", "LICENSE"],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsx src/index.ts",
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
+    "prebuild": "npm run clean",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "commander": "^12.1.0",
+    "ora": "^8.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsup": "^8.3.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
