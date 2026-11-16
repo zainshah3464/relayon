@@ -1,6 +1,7 @@
 import { Component, inject, signal } from '@angular/core';
-import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { RouterLink, RouterLinkActive, RouterOutlet, Router, NavigationEnd } from '@angular/router';
 import { CommonModule } from '@angular/common';
+import { filter } from 'rxjs';
 import { TranslocoModule } from '@jsverse/transloco';
 import { AuthService } from '../../../core/auth/auth.service';
 import { LanguageService, type SupportedLang } from '../../../i18n/language.service';
@@ -9,6 +10,8 @@ import { OfflineBannerComponent } from '../../pwa/offline-banner.component';
 import { UpdatePromptComponent } from '../../pwa/update-prompt.component';
 import { InstallPromptComponent } from '../../pwa/install-prompt.component';
 import { ImpersonationBannerComponent } from '../impersonation-banner.component';
+import { OnboardingWizardComponent } from '../../../features/onboarding/onboarding-wizard.component';
+import { OnboardingService } from '../../../core/onboarding/onboarding.service';
 import { AppUpdateService } from '../../../core/pwa/app-update.service';
 
 interface NavItem {
@@ -31,8 +34,14 @@ interface NavItem {
     UpdatePromptComponent,
     InstallPromptComponent,
     ImpersonationBannerComponent,
+    OnboardingWizardComponent,
   ],
   template: `
+    <!-- ⚠️ v3.2 — onboarding wizard (one-time modal) -->
+    @if (showWizard()) {
+      <app-onboarding-wizard (closed)="showWizard.set(false)" />
+    }
+
     <div class="flex h-screen bg-midnight">
       <!-- Sidebar -->
       <aside
@@ -51,7 +60,7 @@ interface NavItem {
         </div>
 
         <!-- Nav -->
-        <nav class="flex-1 space-y-1 p-4">
+        <nav class="flex-1 space-y-1 p-4 overflow-y-auto">
           @for (item of navItems; track item.path) {
             <a
               [routerLink]="item.path"
@@ -91,6 +100,17 @@ interface NavItem {
             <option value="ur">{{ 'language.ur' | transloco }}</option>
             <option value="ar">{{ 'language.ar' | transloco }}</option>
           </select>
+        </div>
+
+        <!-- ⚠️ v3.2 — Help menu -->
+        <div class="border-t border-hairline p-4">
+          <p class="text-xs uppercase text-muted mb-2">Help</p>
+          <div class="space-y-1">
+            <a routerLink="/guide" class="block text-xs text-muted hover:text-white py-1">📖 Complete Guide</a>
+            <a routerLink="/privacy" class="block text-xs text-muted hover:text-white py-1">🔒 Privacy Policy</a>
+            <a routerLink="/terms" class="block text-xs text-muted hover:text-white py-1">📜 Terms of Service</a>
+            <a href="mailto:hello@relayon.dev" class="block text-xs text-muted hover:text-white py-1">✉️ Contact Support</a>
+          </div>
         </div>
 
         <!-- User -->
@@ -153,7 +173,10 @@ export class ShellComponent {
   auth = inject(AuthService);
   lang = inject(LanguageService);
   private readonly appUpdate = inject(AppUpdateService);
+  private readonly onboarding = inject(OnboardingService);
+  private readonly router = inject(Router);
   sidebarOpen = signal(false);
+  showWizard = signal(false);
 
   navItems: NavItem[] = [
     { labelKey: 'nav.dashboard', path: '/dashboard', icon: '📊' },
@@ -172,6 +195,16 @@ export class ShellComponent {
     } catch (err) {
       console.warn('[Shell] PWA init failed (non-fatal):', err);
     }
+
+    // ⚠️ v3.2 — trigger onboarding wizard on first dashboard visit
+    this.router.events
+      .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd))
+      .subscribe((e) => {
+        if (e.url.includes('/dashboard')) {
+          const shouldShow = this.onboarding.check();
+          this.showWizard.set(shouldShow);
+        }
+      });
   }
 
   initial = () => {

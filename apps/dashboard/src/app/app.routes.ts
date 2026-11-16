@@ -38,6 +38,29 @@ export const routes: Routes = [
       ),
   },
 
+  // ── Public legal + guide pages (no auth, no guard) ─────────
+  {
+    path: 'privacy',
+    loadComponent: () =>
+      import('./features/legal/privacy.component').then(
+        (m) => m.PrivacyComponent,
+      ),
+  },
+  {
+    path: 'terms',
+    loadComponent: () =>
+      import('./features/legal/terms.component').then(
+        (m) => m.TermsComponent,
+      ),
+  },
+  {
+    path: 'guide',
+    loadComponent: () =>
+      import('./features/guide/guide.component').then(
+        (m) => m.GuideComponent,
+      ),
+  },
+
   // ── Public utility pages (no guard) ────────────────────────
   {
     path: 'verify-email',

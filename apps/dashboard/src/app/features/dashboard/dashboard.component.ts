@@ -30,6 +30,27 @@ import { AnnouncementsWidgetComponent } from '../community/announcements-widget.
         </p>
       </div>
 
+      <!-- ⚠️ v3.2 — welcome banner for new users -->
+      @if (isNewUser) {
+        <div class="card bg-gradient-to-br from-relay-violet/10 to-relay-cyan/10 border-relay-violet/30">
+          <div class="flex items-start gap-4">
+            <div class="text-4xl">🚀</div>
+            <div class="flex-1">
+              <h3 class="text-lg font-semibold text-white mb-1">Welcome to Relayon, {{ auth.displayName() }}!</h3>
+              <p class="text-sm text-muted mb-4">
+                You're all set up. Here's how to get your first webhook flowing:
+              </p>
+              <div class="flex flex-wrap gap-2">
+                <a routerLink="/workflows" class="btn-primary text-xs">
+                  Create first workflow
+                </a>
+                <a routerLink="/guide" class="btn-secondary text-xs">Read the guide</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      }
+
       <!-- ⚠️ v2.5 — community announcements widget -->
       <app-announcements-widget />
 
@@ -128,6 +149,12 @@ export class DashboardComponent implements OnInit {
   quota = signal<QuotaSnapshot | null>(null);
 
   readonly hasData = computed(() => (this.stats()?.events24h ?? 0) > 0);
+
+  // ⚠️ v3.2 — new user banner: no events yet, but stats already loaded
+  get isNewUser(): boolean {
+    const s = this.stats();
+    return s !== null && s.events24h === 0;
+  }
 
   ngOnInit(): void {
     this.analytics.overview().subscribe({
