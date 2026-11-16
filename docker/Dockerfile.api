@@ -1,0 +1,55 @@
+# syntax=docker/dockerfile:1.7
+# ═══════════════════════════════════════════════════════════════
+# Relayon API — multi-stage (ARM64 + x86_64 compatible)
+# ═══════════════════════════════════════════════════════════════
+
+FROM node:20-alpine AS base
+RUN apk add --no-cache libc6-compat openssl
+WORKDIR /app
+
+# ─── Stage 1: builder ────────────────────────────────────────
+FROM base AS builder
+COPY package.json package-lock.json ./
+COPY packages/db/package.json ./packages/db/
+COPY apps/api/package.json ./apps/api/
+RUN npm ci --workspace=api --include-workspace-root --ignore-scripts
+
+# Prisma schema + generate (with ARM64 targets from schema)
+COPY packages/db/prisma ./packages/db/prisma
+RUN npx prisma generate --schema packages/db/prisma/schema.prisma
+
+COPY tsconfig.base.json ./
+COPY apps/api ./apps/api
+RUN npm run build --workspace=api
+
+# ─── Stage 2: migration (one-shot) ───────────────────────────
+FROM builder AS migration
+# Full deps + prisma CLI available — used only for `prisma migrate deploy`
+CMD ["npx", "prisma", "migrate", "deploy", "--schema", "packages/db/prisma/schema.prisma"]
+
+# ─── Stage 3: production ─────────────────────────────────────
+FROM base AS production
+ENV NODE_ENV=production
+RUN apk add --no-cache curl
+
+COPY package.json package-lock.json ./
+COPY packages/db/package.json ./packages/db/
+COPY apps/api/package.json ./apps/api/
+RUN npm ci --workspace=api --include-workspace-root --omit=dev --ignore-scripts && \
+    npm cache clean --force
+
+# Prisma engine binaries (for ARM64 Alpine)
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=builder /app/packages/db/prisma ./packages/db/prisma
+COPY --from=builder /app/apps/api/dist ./apps/api/dist
+
+RUN addgroup -S relayon && adduser -S relayon -G relayon && \
+    chown -R relayon:relayon /app
+USER relayon
+
+EXPOSE 3001
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
+  CMD curl -fsS http://localhost:3001/api/health || exit 1
+
+CMD ["node", "apps/api/dist/main.js"]

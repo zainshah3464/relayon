@@ -1,0 +1,74 @@
+# ═══════════════════════════════════════════════════════════════
+# v3.2 — Docker build context optimization
+# ═══════════════════════════════════════════════════════════════
+
+# Dependencies (rebuilt inside container)
+node_modules
+**/node_modules
+.npm
+
+# Build outputs
+**/dist
+**/.next
+**/.nuxt
+**/.angular
+apps/dashboard/dist
+packages/sdk/dist
+packages/cli/dist
+
+# Source that changes frequently (kept for build but excluded from context scan)
+.git
+.gitignore
+.github
+
+# IDE / OS
+.vscode
+.idea
+.DS_Store
+*.swp
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+docker/.env.example
+
+# Docker files themselves (not needed in context)
+docker-compose.yml
+docker-compose.*.yml
+docker/
+
+# Tests / coverage
+**/coverage
+**/.nyc_output
+**/playwright-report
+**/test-results
+
+# Docs / misc
+README.md
+docs/
+*.md
+!packages/*/README.md
+
+# Local DB dumps
+*.sql
+!docker/init-db.sql
+*.dump
+*.archive
+
+# Generated Prisma client (rebuilt)
+**/.prisma
+**/generated
+packages/sdk/src/generated
+
+# Turbo / Nx cache
+.turbo
+.nx
+bin_staf
+/bin_staf

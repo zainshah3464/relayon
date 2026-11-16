@@ -1,13 +1,21 @@
+// ═══════════════════════════════════════════════════════════════
+// v3.2 — binaryTargets for cross-platform deploy
+//   native                          → local dev machine
+//   rhel-openssl-3.0.x              → Vercel (RHEL)
+//   linux-musl-arm64-openssl-3.0.x  → Docker Alpine ARM64 (Oracle Cloud)
+//   linux-arm64-openssl-3.0.x       → Docker Debian ARM64
+//   linux-musl-openssl-3.0.x        → Docker Alpine x86_64 (dev)
+//   debian-openssl-3.0.x            → Docker Debian x86_64
+// ═══════════════════════════════════════════════════════════════
 generator client {
   provider      = "prisma-client-js"
-  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+  binaryTargets = ["native", "rhel-openssl-3.0.x", "linux-musl-arm64-openssl-3.0.x", "linux-arm64-openssl-3.0.x", "linux-musl-openssl-3.0.x", "debian-openssl-3.0.x"]
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
-
 enum Plan {
   free
   pro
