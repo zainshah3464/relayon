@@ -7,6 +7,7 @@ import { AuthService } from '../../core/auth/auth.service';
 import { environment } from '../../../environments/environment';
 import { ApiKeysComponent } from './api-keys.component';
 import { BillingComponent } from './billing.component';
+import { WebhooksSettingsComponent } from './webhooks.component';
 import { QuotaService } from '../../core/api/quota.service';
 
 interface TenantInfo {
@@ -19,12 +20,12 @@ interface TenantInfo {
   quotaMode: 'hard' | 'soft';
 }
 
-type Tab = 'workspace' | 'api-keys' | 'billing';
+type Tab = 'workspace' | 'api-keys' | 'billing' | 'webhooks';
 
 @Component({
   selector: 'app-settings',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, TranslocoModule, ApiKeysComponent, BillingComponent],
+  imports: [CommonModule, ReactiveFormsModule, TranslocoModule, ApiKeysComponent, BillingComponent, WebhooksSettingsComponent],
   template: `
     <div class="space-y-6 max-w-4xl">
       <div>
@@ -57,6 +58,14 @@ type Tab = 'workspace' | 'api-keys' | 'billing';
           [class.text-muted]="tab() !== 'billing'"
           [class.border-transparent]="tab() !== 'billing'"
         >{{ 'settings.tabs.billing' | transloco }}</button>
+        <button
+          (click)="tab.set('webhooks')"
+          class="px-4 py-2 text-sm border-b-2 -mb-px"
+          [class.border-relay-violet]="tab() === 'webhooks'"
+          [class.text-white]="tab() === 'webhooks'"
+          [class.text-muted]="tab() !== 'webhooks'"
+          [class.border-transparent]="tab() !== 'webhooks'"
+        >Webhooks</button>
       </div>
 
       @if (tab() === 'workspace') {
@@ -159,6 +168,10 @@ type Tab = 'workspace' | 'api-keys' | 'billing';
 
       @if (tab() === 'billing') {
         <app-billing />
+      }
+
+      @if (tab() === 'webhooks') {
+        <app-webhooks-settings />
       }
     </div>
   `,

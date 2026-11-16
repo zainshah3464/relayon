@@ -23,6 +23,7 @@ import { PresenceModule } from './modules/presence/presence.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { CommunityModule } from './modules/community/community.module';
 import { CronModule } from './modules/cron/cron.module';
+import { WebhooksModule } from './modules/webhooks/webhooks.module';
 
 @Module({
   imports: [
@@ -51,6 +52,7 @@ import { CronModule } from './modules/cron/cron.module';
     AdminModule,
     CommunityModule,
     CronModule,
+    WebhooksModule,
     RedisModule,
   ],
   providers: [JwtOrApiKeyGuard],

@@ -72,6 +72,8 @@ model Tenant {
   knowledgeChunks KnowledgeChunk[]
   // ⚠️ v2.5 — community marketplace
   communityPosts  CommunityPost[]
+  // ⚠️ v3.0 — outbound webhooks (Standard Webhooks 1.0.0)
+  webhookEndpoints WebhookEndpoint[]
 
   @@map("tenants")
 }
@@ -525,4 +527,48 @@ model AnnouncementShare {
 
   @@index([announcementId, platform])
   @@map("announcement_shares")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// v3.0 Wave 3 — Outbound webhooks (Standard Webhooks 1.0.0)
+// ═══════════════════════════════════════════════════════════════
+
+model WebhookEndpoint {
+  id                   String    @id @default(uuid())
+  tenantId             String    @map("tenant_id")
+  url                  String
+  secret               String
+  description          String?
+  eventTypes           String[]  @default([]) @map("event_types")
+  isActive             Boolean   @default(true) @map("is_active")
+  consecutiveFailures  Int       @default(0) @map("consecutive_failures")
+  lastSuccessAt        DateTime? @map("last_success_at")
+  lastFailureAt        DateTime? @map("last_failure_at")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, isActive])
+  @@map("webhook_endpoints")
+}
+
+model OutboxEvent {
+  id            String    @id @default(uuid())
+  tenantId      String    @map("tenant_id")
+  eventType     String    @map("event_type")
+  payload       Json
+  status        String    @default("pending")
+  attemptCount  Int       @default(0) @map("attempt_count")
+  nextAttemptAt DateTime  @default(now()) @map("next_attempt_at")
+  lastError     String?   @map("last_error")
+  deliveredAt   DateTime? @map("delivered_at")
+  expiresAt     DateTime  @map("expires_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@index([status, nextAttemptAt])
+  @@index([tenantId, createdAt])
+  @@index([expiresAt])
+  @@map("outbox_events")
 }

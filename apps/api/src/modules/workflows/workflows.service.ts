@@ -8,6 +8,7 @@ import jsonata from 'jsonata';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { WorkflowVersionsService } from './workflow-versions.service';
+import { OutboxService } from '../webhooks/outbox.service';
 import { CreateWorkflowDto } from './dto/create-workflow.dto';
 import { UpdateWorkflowDto } from './dto/update-workflow.dto';
 
@@ -47,6 +48,7 @@ export class WorkflowsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly versions: WorkflowVersionsService,
+    private readonly outbox: OutboxService,
   ) {}
 
   async list(tenantId: string) {
@@ -118,6 +120,20 @@ export class WorkflowsService {
           message: 'Initial version',
           createdBy: actorId,
         },
+      });
+
+      // ⚠️ v3.0 — Emit outbox event atomically
+      await this.outbox.emit({
+        tenantId,
+        eventType: 'workflow.created',
+        payload: {
+          workflowId: created.id,
+          name: created.name,
+          sourceType: created.sourceType,
+          enrichmentEnabled: created.enrichmentEnabled,
+          webhookUrl: `${process.env['INGRESS_URL'] ?? 'http://localhost:3002'}/webhook/${tenantId}/${created.id}`,
+        },
+        tx,
       });
 
       return created;
@@ -199,16 +215,45 @@ export class WorkflowsService {
         },
       });
 
+      // ⚠️ v3.0 — Emit outbox event atomically
+      await this.outbox.emit({
+        tenantId,
+        eventType: 'workflow.updated',
+        payload: {
+          workflowId: updated.id,
+          name: updated.name,
+          sourceType: updated.sourceType,
+          isActive: updated.isActive,
+          enrichmentEnabled: updated.enrichmentEnabled,
+          changedFields: Object.keys(dto).filter((k) => (dto as Record<string, unknown>)[k] !== undefined),
+        },
+        tx,
+      });
+
       return updated;
     });
   }
 
   async remove(tenantId: string, id: string) {
-    await this.get(tenantId, id);
-    await this.prisma.withTenant(tenantId, (tx) =>
-      tx.workflow.delete({ where: { id } }),
-    );
-    return { deleted: true, id };
+    const wf = await this.get(tenantId, id);
+
+    return this.prisma.withTenant(tenantId, async (tx) => {
+      await tx.workflow.delete({ where: { id } });
+
+      // ⚠️ v3.0 — Emit outbox event (after delete, same transaction)
+      await this.outbox.emit({
+        tenantId,
+        eventType: 'workflow.deleted',
+        payload: {
+          workflowId: id,
+          name: wf.name,
+          sourceType: wf.sourceType,
+        },
+        tx,
+      });
+
+      return { deleted: true as const, id };
+    });
   }
 
   // ── YAML export / import ──────────────────────────────────────
@@ -413,6 +458,19 @@ export class WorkflowsService {
       actorId,
       'Imported from YAML',
     );
+
+    // ⚠️ v3.0 — Emit outbox event for imported workflow
+    await this.outbox.emit({
+      tenantId,
+      eventType: 'workflow.created',
+      payload: {
+        workflowId: created.id,
+        name: created.name,
+        sourceType: created.sourceType,
+        imported: true,
+        webhookUrl: `${process.env['INGRESS_URL'] ?? 'http://localhost:3002'}/webhook/${tenantId}/${created.id}`,
+      },
+    });
 
     return {
       id: created.id,
