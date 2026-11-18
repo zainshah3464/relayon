@@ -4,6 +4,7 @@ import { Router, RouterLink, ActivatedRoute } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { TranslocoModule } from '@jsverse/transloco';
 import { AuthService } from '../../../core/auth/auth.service';
+import { SeoService } from '../../../core/seo/seo.service';
 
 @Component({
   selector: 'app-login',
@@ -155,6 +156,15 @@ export class LoginComponent {
   private auth = inject(AuthService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
+
+  // ⚠️ v3.3 — SEO metadata
+  constructor() {
+    inject(SeoService).set({
+      title: 'Sign In',
+      description: 'Sign in to your Relayon account to manage webhooks, workflows, and deliveries.',
+      path: '/login',
+    });
+  }
 
   loading = signal(false);
   error = signal<string | null>(null);

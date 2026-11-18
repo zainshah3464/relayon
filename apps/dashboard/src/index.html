@@ -1,18 +1,125 @@
 <!doctype html>
 <html lang="en" dir="ltr" class="dark">
 <head>
-  <link rel="manifest" href="manifest.webmanifest">
-<meta name="theme-color" content="#7C3AED">
   <meta charset="utf-8">
-  <title>Relayon — Reliable Webhook Infrastructure</title>
-  <base href="/">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Receive, enrich with AI, and route webhooks reliably. At-least-once delivery, dead-letter queue, and multi-destination fan-out — running on Vercel's free tier.">
+
+  <!-- ═══════════════════════════════════════════════════════
+       PRIMARY SEO
+  ═══════════════════════════════════════════════════════ -->
+  <title>Relayon — Reliable Webhook Infrastructure for the Serverless Era</title>
+  <meta name="description" content="Receive, enrich with AI, and route webhooks reliably. At-least-once delivery, dead-letter queue, multi-destination fan-out. Free tier, open source, self-hostable.">
+  <meta name="keywords" content="webhook relay, webhook infrastructure, webhook management, iPaaS, serverless webhooks, stripe webhook relay, github webhook, shopify webhook, webhook alternative to zapier">
+  <meta name="author" content="Zain Shah">
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+  <meta name="googlebot" content="index, follow">
   <meta name="theme-color" content="#0A0A0A">
+  <link rel="canonical" href="https://relayon.vercel.app/">
+
+  <!-- ═══════════════════════════════════════════════════════
+       OPEN GRAPH
+  ═══════════════════════════════════════════════════════ -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Relayon">
+  <meta property="og:title" content="Relayon — Reliable Webhook Infrastructure">
+  <meta property="og:description" content="Receive, enrich with AI, and route webhooks reliably. Free tier, open source, self-hostable.">
+  <meta property="og:url" content="https://relayon.vercel.app/">
+  <meta property="og:image" content="https://relayon.vercel.app/assets/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Relayon dashboard — webhook relay platform">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:locale:alternate" content="ur_PK">
+  <meta property="og:locale:alternate" content="ar_SA">
+
+  <!-- ═══════════════════════════════════════════════════════
+       TWITTER CARD
+  ═══════════════════════════════════════════════════════ -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:site" content="@zainshah3464">
+  <meta name="twitter:creator" content="@zainshah3464">
+  <meta name="twitter:title" content="Relayon — Reliable Webhook Infrastructure">
+  <meta name="twitter:description" content="Receive, enrich with AI, and route webhooks reliably. Free tier, open source.">
+  <meta name="twitter:image" content="https://relayon.vercel.app/assets/og-image.png">
+
+  <!-- ═══════════════════════════════════════════════════════
+       PERFORMANCE
+  ═══════════════════════════════════════════════════════ -->
+  <link rel="preconnect" href="https://relayon-api.vercel.app" crossorigin>
+  <link rel="preconnect" href="https://relayon-ingress.vercel.app" crossorigin>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="dns-prefetch" href="https://relayon-api.vercel.app">
+  <link rel="dns-prefetch" href="https://relayon-ingress.vercel.app">
+
+  <!-- ═══════════════════════════════════════════════════════
+       FONTS
+  ═══════════════════════════════════════════════════════ -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Nastaliq+Urdu:wght@400;600&family=Noto+Sans+Arabic:wght@400;600&display=swap" rel="stylesheet">
+
+  <!-- ═══════════════════════════════════════════════════════
+       FAVICON / PWA
+  ═══════════════════════════════════════════════════════ -->
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90' font-family='Inter' font-weight='700' fill='%237C3AED'>R</text></svg>">
+  <link rel="apple-touch-icon" href="/assets/icons/icon-192x192.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <base href="/">
+
+  <!-- ═══════════════════════════════════════════════════════
+       STRUCTURED DATA (sitewide)
+  ═══════════════════════════════════════════════════════ -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Organization",
+        "@id": "https://relayon.vercel.app/#organization",
+        "name": "Relayon",
+        "url": "https://relayon.vercel.app",
+        "logo": {
+          "@type": "ImageObject",
+          "url": "https://relayon.vercel.app/assets/icon-512x512.png",
+          "width": 512,
+          "height": 512
+        },
+        "founder": {
+          "@type": "Person",
+          "name": "Zain Shah",
+          "url": "https://github.com/zainshah3464"
+        },
+        "sameAs": [
+          "https://github.com/zainshah3464/relayon"
+        ]
+      },
+      {
+        "@type": "WebSite",
+        "@id": "https://relayon.vercel.app/#website",
+        "url": "https://relayon.vercel.app",
+        "name": "Relayon",
+        "description": "Reliable webhook infrastructure for the serverless era",
+        "publisher": { "@id": "https://relayon.vercel.app/#organization" },
+        "inLanguage": "en-US"
+      },
+      {
+        "@type": "SoftwareApplication",
+        "@id": "https://relayon.vercel.app/#software",
+        "name": "Relayon",
+        "applicationCategory": "DeveloperApplication",
+        "operatingSystem": "Web",
+        "description": "Serverless webhook relay platform — receive, enrich with AI, and route events to any destination.",
+        "url": "https://relayon.vercel.app",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD",
+          "availability": "https://schema.org/InStock"
+        },
+        "creator": { "@id": "https://relayon.vercel.app/#organization" }
+      }
+    ]
+  }
+  </script>
 </head>
 <body class="bg-midnight text-white font-sans antialiased">
   <app-root></app-root>

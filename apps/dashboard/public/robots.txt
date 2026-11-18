@@ -1,0 +1,43 @@
+# ═══════════════════════════════════════════════════════════════
+# Relayon — robots.txt
+# ═══════════════════════════════════════════════════════════════
+
+User-agent: *
+Allow: /
+
+# Private dashboard — no SEO value
+Disallow: /dashboard
+Disallow: /workflows
+Disallow: /events
+Disallow: /dlq
+Disallow: /analytics
+Disallow: /settings
+Disallow: /admin
+Disallow: /playground
+Disallow: /community
+Disallow: /api/
+Disallow: /t/
+Disallow: /webhook/
+Disallow: /play/
+
+# AI crawlers — allow (for AI Overviews)
+User-agent: GPTBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+# Block aggressive scrapers
+User-agent: CCBot
+Disallow: /
+
+Sitemap: https://relayon.vercel.app/sitemap.xml

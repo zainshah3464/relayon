@@ -1,5 +1,6 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { LegalLayoutComponent, type LegalSection } from './legal-layout.component';
+import { SeoService } from '../../core/seo/seo.service';
 
 @Component({
   selector: 'app-privacy',
@@ -15,6 +16,16 @@ import { LegalLayoutComponent, type LegalSection } from './legal-layout.componen
   `,
 })
 export class PrivacyComponent {
+  // ⚠️ v3.3 — SEO metadata (title, OG, Twitter, canonical)
+  constructor() {
+    inject(SeoService).set({
+      title: 'Privacy Policy',
+      description: 'How Relayon collects, uses, and protects your data. GDPR and DPDP compliant. Zero tracking cookies, hashed IPs, encrypted secrets.',
+      path: '/privacy',
+      noindex: false,
+    });
+  }
+
   readonly sections: LegalSection[] = [
     {
       id: 'introduction',

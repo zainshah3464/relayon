@@ -6,7 +6,7 @@ import {
   CommunityApiService,
   type CommunityPostSummary,
 } from '../../core/community/community.service';
-
+import { SeoService } from '../../core/seo/seo.service';
 type Tab = 'all' | 'discussion' | 'template' | 'article';
 
 @Component({
@@ -110,6 +110,24 @@ type Tab = 'all' | 'discussion' | 'template' | 'article';
 export class CommunityListComponent implements OnInit {
   private api = inject(CommunityApiService);
   private route = inject(ActivatedRoute);
+
+  // ⚠️ v3.3 — SEO metadata + JSON-LD (noindex: behind auth)
+  constructor() {
+    inject(SeoService).set({
+      title: 'Community — Discussions, Templates, Articles',
+      description: 'Share workflows, ask questions, and learn from other Relayon users. Workflow templates for Stripe, GitHub, Shopify and more.',
+      path: '/community',
+      keywords: ['relayon community', 'webhook templates', 'workflow templates'],
+      noindex: true,
+      jsonLd: {
+        '@context': 'https://schema.org',
+        '@type': 'CollectionPage',
+        name: 'Relayon Community',
+        description: 'Discussions, workflow templates, and articles from the Relayon community.',
+        url: 'https://relayon.vercel.app/community',
+      },
+    });
+  }
 
   readonly tabs: Array<{ value: Tab; label: string }> = [
     { value: 'all', label: 'All' },

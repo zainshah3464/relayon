@@ -24,6 +24,7 @@ import { TRANSLATIONS } from './i18n/translations';
 import { TranslocoHttpLoader } from './i18n/transloco-loader';
 import { TrackerService } from './core/tracking/tracker.service';
 import { PresenceHeartbeatService } from './core/presence/presence-heartbeat.service';
+import { provideClientHydration, withEventReplay } from '@angular/platform-browser';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -76,6 +77,6 @@ export const appConfig: ApplicationConfig = {
     provideServiceWorker('ngsw-worker.js', {
       enabled: !isDevMode(),
       registrationStrategy: 'registerWhenStable:30000',
-    }),
+    }), provideClientHydration(withEventReplay()),
   ],
 };

@@ -1,5 +1,6 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { LegalLayoutComponent, type LegalSection } from './legal-layout.component';
+import { SeoService } from '../../core/seo/seo.service';
 
 @Component({
   selector: 'app-terms',
@@ -15,6 +16,16 @@ import { LegalLayoutComponent, type LegalSection } from './legal-layout.componen
   `,
 })
 export class TermsComponent {
+  // ⚠️ v3.3 — SEO metadata (title, OG, Twitter, canonical)
+  constructor() {
+    inject(SeoService).set({
+      title: 'Terms of Service',
+      description: 'Relayon terms of service — acceptable use, payment, liability, and legal terms for using our webhook relay platform.',
+      path: '/terms',
+      noindex: false,
+    });
+  }
+
   readonly sections: LegalSection[] = [
     {
       id: 'acceptance',

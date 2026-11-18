@@ -1,4 +1,5 @@
-import { Injectable, signal, computed, inject } from '@angular/core';
+import { Injectable, signal, computed, inject, PLATFORM_ID } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { Observable, tap } from 'rxjs';
@@ -50,12 +51,18 @@ export class AuthService {
   // ⚠️ v2.5 — clear SW API caches on logout (cross-user leak prevention)
   private swCache = inject(SwCacheService);
 
+  // ⚠️ v3.3 — SSR-safe: never touch localStorage during prerender
+  private readonly platformId = inject(PLATFORM_ID);
+  private readonly isBrowser = isPlatformBrowser(this.platformId);
+
   private readonly ACCESS_KEY = 'relayon_access_token';
   private readonly REFRESH_KEY = 'relayon_refresh_token';
   private readonly USER_KEY = 'relayon_user';
 
   private _user = signal<User | null>(this.loadUser());
-  private _token = signal<string | null>(localStorage.getItem(this.ACCESS_KEY));
+  private _token = signal<string | null>(
+    this.isBrowser ? localStorage.getItem(this.ACCESS_KEY) : null,
+  );
 
   readonly user = this._user.asReadonly();
   readonly token = this._token.asReadonly();
@@ -95,6 +102,7 @@ export class AuthService {
   }
 
   refresh(): Observable<AuthResponse> | null {
+    if (!this.isBrowser) return null;
     const refreshToken = localStorage.getItem(this.REFRESH_KEY);
     if (!refreshToken) return null;
     return this.http
@@ -105,7 +113,9 @@ export class AuthService {
   }
 
   logout(): void {
-    const refreshToken = localStorage.getItem(this.REFRESH_KEY);
+    const refreshToken = this.isBrowser
+      ? localStorage.getItem(this.REFRESH_KEY)
+      : null;
     this.http
       .post(`${environment.apiUrl}/api/auth/logout`, { refreshToken })
       .subscribe({
@@ -117,10 +127,12 @@ export class AuthService {
   // ── OAuth ──────────────────────────────────────────────────────────
 
   startGoogleOAuth(returnTo = '/dashboard'): void {
+    if (!this.isBrowser) return;
     window.location.href = `${environment.apiUrl}/api/auth/google?returnTo=${encodeURIComponent(returnTo)}`;
   }
 
   startGitHubOAuth(returnTo = '/dashboard'): void {
+    if (!this.isBrowser) return;
     window.location.href = `${environment.apiUrl}/api/auth/github?returnTo=${encodeURIComponent(returnTo)}`;
   }
 
@@ -173,24 +185,32 @@ export class AuthService {
   // ── Internal ──────────────────────────────────────────────────────
 
   private setSession(res: AuthResponse): void {
-    localStorage.setItem(this.ACCESS_KEY, res.accessToken);
-    localStorage.setItem(this.REFRESH_KEY, res.refreshToken);
-    localStorage.setItem(this.USER_KEY, JSON.stringify(res.user));
+    if (this.isBrowser) {
+      localStorage.setItem(this.ACCESS_KEY, res.accessToken);
+      localStorage.setItem(this.REFRESH_KEY, res.refreshToken);
+      localStorage.setItem(this.USER_KEY, JSON.stringify(res.user));
+    }
     this._token.set(res.accessToken);
     this._user.set(res.user);
   }
 
   private async clearSession(): Promise<void> {
-    localStorage.removeItem(this.ACCESS_KEY);
-    localStorage.removeItem(this.REFRESH_KEY);
-    localStorage.removeItem(this.USER_KEY);
+    if (this.isBrowser) {
+      localStorage.removeItem(this.ACCESS_KEY);
+      localStorage.removeItem(this.REFRESH_KEY);
+      localStorage.removeItem(this.USER_KEY);
+    }
     this._token.set(null);
     this._user.set(null);
 
     // ⚠️ v2.5 — clear cached API data to prevent cross-user leaks
-    await this.swCache.clearApiCaches().catch(() => undefined);
+    if (this.isBrowser) {
+      await this.swCache.clearApiCaches().catch(() => undefined);
+    }
 
-    this.router.navigate(['/login']);
+    if (this.isBrowser) {
+      this.router.navigate(['/login']);
+    }
   }
 
   /**
@@ -201,19 +221,22 @@ export class AuthService {
     accessToken: string;
     user: User;
   }): void {
-    localStorage.setItem(this.ACCESS_KEY, payload.accessToken);
-    localStorage.setItem(this.USER_KEY, JSON.stringify(payload.user));
+    if (this.isBrowser) {
+      localStorage.setItem(this.ACCESS_KEY, payload.accessToken);
+      localStorage.setItem(this.USER_KEY, JSON.stringify(payload.user));
+    }
     this._token.set(payload.accessToken);
     this._user.set(payload.user);
   }
 
   private loadUser(): User | null {
-  const raw = localStorage.getItem(this.USER_KEY);  
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw) as User;
-  } catch {
-    return null;
+    if (!this.isBrowser) return null;
+    const raw = localStorage.getItem(this.USER_KEY);
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw) as User;
+    } catch {
+      return null;
+    }
   }
-}
 }

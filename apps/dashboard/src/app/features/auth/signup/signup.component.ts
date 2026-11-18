@@ -5,6 +5,7 @@ import { RouterLink } from '@angular/router';
 import { TranslocoModule } from '@jsverse/transloco';
 import { AuthService } from '../../../core/auth/auth.service';
 import { PasswordStrengthMeterComponent } from '../../../shared/password-strength/password-strength-meter.component';
+import { SeoService } from '../../../core/seo/seo.service';
 
 @Component({
   selector: 'app-signup',
@@ -206,6 +207,16 @@ import { PasswordStrengthMeterComponent } from '../../../shared/password-strengt
 export class SignupComponent {
   private fb = inject(FormBuilder);
   private auth = inject(AuthService);
+
+  // ⚠️ v3.3 — SEO metadata
+  constructor() {
+    inject(SeoService).set({
+      title: 'Create Free Account — No Credit Card Required',
+      description: 'Sign up for Relayon free. 10,000 events/month, 100,000 AI tokens, unlimited workflows. Google and GitHub sign-in supported.',
+      path: '/signup',
+      keywords: ['free webhook relay signup', 'webhook platform free trial'],
+    });
+  }
 
   loading = signal(false);
   error = signal<string | null>(null);

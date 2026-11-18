@@ -2,6 +2,7 @@ import { Component, signal, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
+import { SeoService } from '../../core/seo/seo.service';
 
 type Tab = 'overview' | 'how-it-works' | 'setup' | 'workflows' | 'destinations' | 'faq';
 
@@ -291,7 +292,6 @@ type Tab = 'overview' | 'how-it-works' | 'setup' | 'workflows' | 'destinations' 
               <p class="text-sm text-muted mb-3">
                 Use our CLI to forward production webhooks to your laptop:
               </p>
-              <!-- 🔧 FIX: @relayon escaped as &#64;relayon -->
               <pre class="bg-midnight p-3 rounded text-xs font-mono text-relay-cyan overflow-x-auto">npx &#64;relayon/cli listen --port 3000 --api-key rlk_live_...</pre>
               <p class="text-xs text-muted mt-2">
                 Get your API key from <strong>Settings → API Keys</strong>.
@@ -422,7 +422,6 @@ type Tab = 'overview' | 'how-it-works' | 'setup' | 'workflows' | 'destinations' 
       <!-- Footer -->
       <footer class="border-t border-hairline mt-12">
         <div class="mx-auto max-w-4xl px-6 py-8 text-center text-sm text-muted">
-          <!-- 🔧 FIX: hello@relayon.dev escaped as hello&#64;relayon.dev (href stays as-is) -->
           <p>Can't find what you need? 📧 <a href="mailto:hello@relayon.dev" class="text-relay-cyan hover:underline">hello&#64;relayon.dev</a></p>
           <div class="flex justify-center gap-4 mt-3">
             <a routerLink="/privacy" class="hover:text-white">Privacy</a>
@@ -437,6 +436,16 @@ type Tab = 'overview' | 'how-it-works' | 'setup' | 'workflows' | 'destinations' 
 export class GuideComponent {
   auth = inject(AuthService);
   tab = signal<Tab>('overview');
+
+  // ⚠️ v3.3 — SEO metadata
+  constructor() {
+    inject(SeoService).set({
+      title: 'Complete Guide — Setup, Workflows, Destinations',
+      description: 'Learn how Relayon works: create workflows, connect sources (Stripe, GitHub, Shopify), configure destinations (Slack, email, databases). Step-by-step guide with examples.',
+      path: '/guide',
+      keywords: ['relayon guide', 'webhook tutorial', 'how to setup webhooks', 'webhook relay tutorial'],
+    });
+  }
 
   readonly tabs: Array<{ value: Tab; label: string }> = [
     { value: 'overview', label: 'Overview' },

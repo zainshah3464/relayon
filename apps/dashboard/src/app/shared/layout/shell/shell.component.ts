@@ -13,6 +13,7 @@ import { ImpersonationBannerComponent } from '../impersonation-banner.component'
 import { OnboardingWizardComponent } from '../../../features/onboarding/onboarding-wizard.component';
 import { OnboardingService } from '../../../core/onboarding/onboarding.service';
 import { AppUpdateService } from '../../../core/pwa/app-update.service';
+import { SeoService } from '../../../core/seo/seo.service';
 
 interface NavItem {
   labelKey: string;
@@ -175,6 +176,7 @@ export class ShellComponent {
   private readonly appUpdate = inject(AppUpdateService);
   private readonly onboarding = inject(OnboardingService);
   private readonly router = inject(Router);
+  private readonly seo = inject(SeoService);
   sidebarOpen = signal(false);
   showWizard = signal(false);
 
@@ -195,6 +197,14 @@ export class ShellComponent {
     } catch (err) {
       console.warn('[Shell] PWA init failed (non-fatal):', err);
     }
+
+    // ⚠️ v3.3 — default SEO for all protected pages (children can override)
+    this.seo.set({
+      title: 'Dashboard',
+      description: 'Relayon dashboard',
+      path: '/dashboard',
+      noindex: true,
+    });
 
     // ⚠️ v3.2 — trigger onboarding wizard on first dashboard visit
     this.router.events
