@@ -38,7 +38,7 @@ export const routes: Routes = [
       ),
   },
 
-  // ── Public legal + guide pages (no auth, no guard) ─────────
+  // ── Public legal + guide + about pages (no auth, no guard) ─
   {
     path: 'privacy',
     loadComponent: () =>
@@ -58,6 +58,14 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/guide/guide.component').then(
         (m) => m.GuideComponent,
+      ),
+  },
+  // ⚠️ v3.2 — about page (credit + creator story)
+  {
+    path: 'about',
+    loadComponent: () =>
+      import('./features/about/about.component').then(
+        (m) => m.AboutComponent,
       ),
   },
 
