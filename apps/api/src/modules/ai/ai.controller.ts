@@ -6,18 +6,24 @@ import { ChatAgentService } from './chat-agent.service';
 import { ChatRequestDto } from './dto/chat.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser, type JwtUser } from '../../common/decorators/current-user.decorator';
+import { ProviderKeyResolver } from '../integrations/provider-resolver';
 
 @Controller('ai')
 @UseGuards(JwtAuthGuard)
 export class AiController {
-  constructor(private readonly agent: ChatAgentService) {}
+  constructor(
+    private readonly agent: ChatAgentService,
+    private readonly keys: ProviderKeyResolver,
+  ) {}
 
   @Get('status')
-  status() {
+  async status(@CurrentUser() user: JwtUser) {
+    const resolved = await this.keys.resolve(user.tenantId, 'groq');
     return {
-      enabled: this.agent.isEnabled(),
+      enabled: resolved !== null,
       provider: 'groq',
-      models: ['openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'qwen/qwen3.8-27b'],
+      model: resolved?.model ?? 'openai/gpt-oss-120b',
+      keySource: resolved?.source ?? 'none',
       features: { toolCalling: true, rag: 'postgres-fts', streaming: 'simulated' },
     };
   }

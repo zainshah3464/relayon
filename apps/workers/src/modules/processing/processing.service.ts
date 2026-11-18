@@ -219,6 +219,8 @@ export class ProcessingService {
     if (workflow.enrichmentEnabled) {
       try {
         const r = await this.groq.enrich({
+          // ⚠️ v3.3 — tenantId required (BYOK key resolution)
+          tenantId: input.tenantId,
           workflowId: workflow.id,
           prompt: workflow.enrichmentPrompt,
           payload: input.payload,
@@ -463,6 +465,8 @@ export class ProcessingService {
             // Skip Groq call — event still routes without enrichment
           } else {
             const enrich: EnrichmentResult = await this.groq.enrich({
+              // ⚠️ v3.3 — tenantId required (BYOK key resolution)
+              tenantId: event.tenantId,
               workflowId: workflow.id,
               prompt: workflow.enrichmentPrompt,
               payload: event.rawPayload,

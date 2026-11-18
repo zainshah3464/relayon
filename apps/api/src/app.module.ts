@@ -27,6 +27,7 @@ import { WebhooksModule } from './modules/webhooks/webhooks.module';
 import { FeatureFlagModule } from './common/feature-flags/feature-flag.module';
 import { PlaygroundModule } from './modules/playground/playground.module';
 import { TunnelModule } from './modules/tunnel/tunnel.module';
+import { IntegrationsModule } from './modules/integrations/integrations.module';
 
 @Module({
   imports: [
@@ -59,6 +60,7 @@ import { TunnelModule } from './modules/tunnel/tunnel.module';
     FeatureFlagModule,
     PlaygroundModule,
     TunnelModule,
+    IntegrationsModule,
     RedisModule,
   ],
   providers: [JwtOrApiKeyGuard],

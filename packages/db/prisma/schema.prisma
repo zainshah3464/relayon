@@ -16,6 +16,7 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
 enum Plan {
   free
   pro
@@ -84,6 +85,8 @@ model Tenant {
   webhookEndpoints WebhookEndpoint[]
   // ⚠️ v3.1 — CLI tunnel sessions
   tunnelSessions   TunnelSession[]
+  // ⚠️ v3.3 — BYOK (Bring Your Own Key) integrations
+  integrations     TenantIntegration[]
 
   @@map("tenants")
 }
@@ -619,4 +622,29 @@ model TunnelSession {
   @@index([tenantId, isActive])
   @@index([expiresAt])
   @@map("tunnel_sessions")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// v3.5 — BYOK (Bring Your Own Key) integrations
+// ═══════════════════════════════════════════════════════════════
+
+model TenantIntegration {
+  id               String    @id @default(uuid())
+  tenantId         String    @map("tenant_id")
+  provider         String    // 'groq' | 'openai' | 'anthropic' | 'resend'
+  encryptedKey     String    @map("encrypted_key")
+  model            String?
+  isActive         Boolean   @default(true) @map("is_active")
+  lastValidatedAt  DateTime? @map("last_validated_at")
+  lastValidationOk Boolean?  @map("last_validation_ok")
+  validationError  String?   @map("validation_error")
+  lastUsedAt       DateTime? @map("last_used_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, provider])
+  @@index([tenantId, isActive])
+  @@map("tenant_integrations")
 }

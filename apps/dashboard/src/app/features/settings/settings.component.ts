@@ -8,6 +8,8 @@ import { environment } from '../../../environments/environment';
 import { ApiKeysComponent } from './api-keys.component';
 import { BillingComponent } from './billing.component';
 import { WebhooksSettingsComponent } from './webhooks.component';
+// ⚠️ v3.3 — BYOK integrations tab
+import { IntegrationsSettingsComponent } from './integrations.component';
 import { QuotaService } from '../../core/api/quota.service';
 
 interface TenantInfo {
@@ -20,12 +22,22 @@ interface TenantInfo {
   quotaMode: 'hard' | 'soft';
 }
 
-type Tab = 'workspace' | 'api-keys' | 'billing' | 'webhooks';
+// ⚠️ v3.3 — 'integrations' tab added
+type Tab = 'workspace' | 'api-keys' | 'integrations' | 'billing' | 'webhooks';
 
 @Component({
   selector: 'app-settings',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, TranslocoModule, ApiKeysComponent, BillingComponent, WebhooksSettingsComponent],
+  imports: [
+    CommonModule,
+    ReactiveFormsModule,
+    TranslocoModule,
+    ApiKeysComponent,
+    BillingComponent,
+    WebhooksSettingsComponent,
+    // ⚠️ v3.3 — BYOK integrations
+    IntegrationsSettingsComponent,
+  ],
   template: `
     <div class="space-y-6 max-w-4xl">
       <div>
@@ -58,6 +70,15 @@ type Tab = 'workspace' | 'api-keys' | 'billing' | 'webhooks';
           [class.text-muted]="tab() !== 'billing'"
           [class.border-transparent]="tab() !== 'billing'"
         >{{ 'settings.tabs.billing' | transloco }}</button>
+        <!-- ⚠️ v3.3 — Integrations tab (between Billing and Webhooks) -->
+        <button
+          (click)="tab.set('integrations')"
+          class="px-4 py-2 text-sm border-b-2 -mb-px"
+          [class.border-relay-violet]="tab() === 'integrations'"
+          [class.text-white]="tab() === 'integrations'"
+          [class.text-muted]="tab() !== 'integrations'"
+          [class.border-transparent]="tab() !== 'integrations'"
+        >Integrations</button>
         <button
           (click)="tab.set('webhooks')"
           class="px-4 py-2 text-sm border-b-2 -mb-px"
@@ -168,6 +189,11 @@ type Tab = 'workspace' | 'api-keys' | 'billing' | 'webhooks';
 
       @if (tab() === 'billing') {
         <app-billing />
+      }
+
+      <!-- ⚠️ v3.3 — Integrations tab content -->
+      @if (tab() === 'integrations') {
+        <app-integrations-settings />
       }
 
       @if (tab() === 'webhooks') {

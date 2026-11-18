@@ -4,6 +4,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { RagService } from './rag.service';
 import { ALL_TOOLS, getToolByName, toGroqTools } from './tools/registry';
 import type { ToolContext } from './tools/tool.types';
+// ⚠️ v3.5 — BYOK provider key resolver
+import { ProviderKeyResolver } from '../integrations/provider-resolver';
 
 const MAX_ITERATIONS = 5;
 const RETRIES_PER_MODEL = 2; // ⚠️ DNS flaky handle
@@ -29,7 +31,8 @@ Current user context:
 - Role: {{role}}`;
 
 export interface ChatEvent {
-  type: 'token' | 'tool_call' | 'tool_result' | 'done' | 'error';
+  // ⚠️ v3.3 — 'meta' added so client knows which key source / model was used
+  type: 'token' | 'tool_call' | 'tool_result' | 'done' | 'error' | 'meta';
   data: unknown;
 }
 
@@ -57,19 +60,33 @@ interface GroqResponse {
 @Injectable()
 export class ChatAgentService {
   private readonly logger = new Logger(ChatAgentService.name);
-  private readonly apiKey: string | null;
+  // ⚠️ v3.5 — renamed from `apiKey` → `platformKey`; added `platformModel`
+  private readonly platformKey: string | null;
+  private readonly platformModel: string;
 
   constructor(
     private readonly config: ConfigService,
     private readonly prisma: PrismaService,
     private readonly rag: RagService,
+    // ⚠️ v3.5 — BYOK resolver (tenant keys override platform key)
+    private readonly keys: ProviderKeyResolver,
   ) {
-    this.apiKey = config.get<string>('GROQ_API_KEY') ?? null;
-    if (!this.apiKey) this.logger.warn('GROQ_API_KEY missing — chat disabled');
+    this.platformKey = config.get<string>('GROQ_API_KEY') ?? null;
+    this.platformModel =
+      config.get<string>('GROQ_MODEL') ?? 'openai/gpt-oss-120b';
+    if (!this.platformKey) {
+      this.logger.warn(
+        'GROQ_API_KEY missing — chat falls back to tenant keys',
+      );
+    }
   }
 
+  /**
+   * Platform-only availability check. Per-tenant availability is resolved
+   * dynamically in `run()` via ProviderKeyResolver.
+   */
   isEnabled(): boolean {
-    return this.apiKey !== null;
+    return this.platformKey !== null;
   }
 
   /**
@@ -77,33 +94,41 @@ export class ChatAgentService {
    * Why fetch not SDK: groq-sdk@0.9.1 has undici issues on Node 22 +
    * Pakistani ISP DNS flakiness. Raw fetch with AbortSignal.timeout is
    * more predictable and gives us real status codes.
+   *
+   * ⚠️ v3.5 — now takes `apiKey` + `models` explicitly so we can use
+   * tenant-provided (BYOK) keys and preferred model chain.
    */
-  private async createCompletion(params: ChatCompletionParams): Promise<GroqResponse> {
-    if (!this.apiKey) throw new Error('GROQ_API_KEY missing');
-
+  private async createCompletion(
+    params: ChatCompletionParams & { apiKey: string; models: readonly string[] },
+  ): Promise<GroqResponse> {
     const errors: string[] = [];
 
-    for (const model of MODEL_CHAIN) {
+    for (const model of params.models) {
       for (let attempt = 1; attempt <= RETRIES_PER_MODEL; attempt++) {
         try {
-          this.logger.debug(`Model ${model} (attempt ${attempt}/${RETRIES_PER_MODEL})`);
+          this.logger.debug(
+            `Model ${model} (attempt ${attempt}/${RETRIES_PER_MODEL})`,
+          );
 
-          const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${this.apiKey}`,
+          const res = await fetch(
+            'https://api.groq.com/openai/v1/chat/completions',
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${params.apiKey}`,
+              },
+              body: JSON.stringify({
+                model,
+                messages: params.messages,
+                tools: params.tools,
+                tool_choice: params.tool_choice,
+                temperature: params.temperature ?? 0.3,
+                max_tokens: params.max_tokens ?? 1024,
+              }),
+              signal: AbortSignal.timeout(60_000), // 60s (was 30s)
             },
-            body: JSON.stringify({
-              model,
-              messages: params.messages,
-              tools: params.tools,
-              tool_choice: params.tool_choice,
-              temperature: params.temperature ?? 0.3,
-              max_tokens: params.max_tokens ?? 1024,
-            }),
-            signal: AbortSignal.timeout(60_000), // 60s (was 30s)
-          });
+          );
 
           if (!res.ok) {
             const status = res.status;
@@ -128,7 +153,9 @@ export class ChatAgentService {
               await new Promise((r) => setTimeout(r, 500 * attempt));
               continue;
             }
-            this.logger.warn(`${model} exhausted retries (${status}), next model...`);
+            this.logger.warn(
+              `${model} exhausted retries (${status}), next model...`,
+            );
             break; // next model
           }
 
@@ -155,7 +182,9 @@ export class ChatAgentService {
             msg.includes('ECONNRESET') ||
             msg.includes('ENOTFOUND')
           ) {
-            errors.push(`${model} attempt ${attempt}: network — ${msg.slice(0, 80)}`);
+            errors.push(
+              `${model} attempt ${attempt}: network — ${msg.slice(0, 80)}`,
+            );
             if (attempt < RETRIES_PER_MODEL) {
               await new Promise((r) => setTimeout(r, 500 * attempt));
               continue;
@@ -178,10 +207,26 @@ export class ChatAgentService {
     role: 'owner' | 'admin' | 'viewer';
     messages: Array<{ role: 'user' | 'assistant'; content: string }>;
   }): AsyncGenerator<ChatEvent> {
-    if (!this.isEnabled()) {
-      yield { type: 'error', data: { message: 'AI assistant is not configured' } };
+    // ⚠️ v3.5 — resolve BYOK key (tenant key → platform key fallback)
+    const resolved = await this.keys.resolve(opts.tenantId, 'groq');
+    if (!resolved) {
+      yield {
+        type: 'error',
+        data: {
+          message:
+            'AI assistant is not configured. Add your Groq API key in Settings → Integrations.',
+        },
+      };
       return;
     }
+
+    // Build model chain: tenant-preferred model first, then defaults
+    const models = resolved.model
+      ? [resolved.model, ...MODEL_CHAIN.filter((m) => m !== resolved.model)]
+      : [...MODEL_CHAIN];
+
+    // ⚠️ v3.5 — tell the client which source/model is being used
+    yield { type: 'meta', data: { source: resolved.source, model: models[0] } };
 
     const ctx: ToolContext = {
       tenantId: opts.tenantId,
@@ -215,11 +260,17 @@ export class ChatAgentService {
           messages: conversation,
           tools: groqTools.length > 0 && !isLast ? groqTools : undefined,
           tool_choice: isLast ? 'none' : 'auto',
+          // ⚠️ v3.5 — resolved key + tenant-aware model chain
+          apiKey: resolved.key,
+          models,
         });
 
         const msg = response.choices[0]?.message;
         if (!msg) {
-          yield { type: 'error', data: { message: 'Empty response from model' } };
+          yield {
+            type: 'error',
+            data: { message: 'Empty response from model' },
+          };
           return;
         }
 
@@ -237,7 +288,9 @@ export class ChatAgentService {
           if (!content) {
             yield {
               type: 'error',
-              data: { message: 'Model returned no usable content. Please try again.' },
+              data: {
+                message: 'Model returned no usable content. Please try again.',
+              },
             };
             return;
           }
@@ -262,7 +315,11 @@ export class ChatAgentService {
 
           yield {
             type: 'tool_call',
-            data: { id: call.id, name: toolName, args: safeJsonParse(call.function.arguments) },
+            data: {
+              id: call.id,
+              name: toolName,
+              args: safeJsonParse(call.function.arguments),
+            },
           };
 
           if (!tool) {
@@ -271,7 +328,10 @@ export class ChatAgentService {
               tool_call_id: call.id,
               content: JSON.stringify({ error: `Unknown tool: ${toolName}` }),
             });
-            yield { type: 'tool_result', data: { id: call.id, name: toolName, error: 'Unknown tool' } };
+            yield {
+              type: 'tool_result',
+              data: { id: call.id, name: toolName, error: 'Unknown tool' },
+            };
             continue;
           }
 
@@ -281,7 +341,10 @@ export class ChatAgentService {
               tool_call_id: call.id,
               content: JSON.stringify({ error: 'Permission denied' }),
             });
-            yield { type: 'tool_result', data: { id: call.id, name: toolName, error: 'Permission denied' } };
+            yield {
+              type: 'tool_result',
+              data: { id: call.id, name: toolName, error: 'Permission denied' },
+            };
             continue;
           }
 
@@ -302,7 +365,10 @@ export class ChatAgentService {
                 error: 'Requires user confirmation. Ask user, then retry.',
               }),
             });
-            yield { type: 'tool_result', data: { id: call.id, name: toolName, requiresConfirmation: true } };
+            yield {
+              type: 'tool_result',
+              data: { id: call.id, name: toolName, requiresConfirmation: true },
+            };
             continue;
           }
 
@@ -314,7 +380,10 @@ export class ChatAgentService {
               tool_call_id: call.id,
               content: JSON.stringify(result).slice(0, 8000),
             });
-            yield { type: 'tool_result', data: { id: call.id, name: toolName, result } };
+            yield {
+              type: 'tool_result',
+              data: { id: call.id, name: toolName, result },
+            };
           } catch (err) {
             const message = err instanceof Error ? err.message : String(err);
             this.logger.error(`Tool ${toolName} failed: ${message}`);
@@ -323,14 +392,19 @@ export class ChatAgentService {
               tool_call_id: call.id,
               content: JSON.stringify({ error: message.slice(0, 500) }),
             });
-            yield { type: 'tool_result', data: { id: call.id, name: toolName, error: message } };
+            yield {
+              type: 'tool_result',
+              data: { id: call.id, name: toolName, error: message },
+            };
           }
         }
       }
 
       yield {
         type: 'error',
-        data: { message: 'Too many tool iterations. Try a simpler question.' },
+        data: {
+          message: 'Too many tool iterations. Try a simpler question.',
+        },
       };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
