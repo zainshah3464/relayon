@@ -39,19 +39,22 @@ export class KnowledgeService {
       const titleMatch = raw.match(/^#\s+(.+)$/m);
       const title = titleMatch?.[1]?.trim() ?? file;
 
-      for (const chunk of chunks) {
-        await this.prisma.withoutTenant((c) =>
-          c.knowledgeChunk.create({
-            data: {
-              sourceType: 'doc',
-              sourceId,
-              title,
-              content: chunk.content,
-              metadata: { chunkIndex: chunk.index },
-            },
-          }),
-        );
-      }
+for (const chunk of chunks) {
+  await this.prisma.withoutTenant((c) =>
+    c.knowledgeChunk.create({
+      data: {
+        sourceType: 'doc',
+        sourceId,
+        title,
+        content: chunk.content,
+        metadata: {
+          chunkIndex: chunk.index,
+          section: chunk.section ?? null,   // ⚠️ v3.6 — semantic section context
+        },
+      },
+    }),
+  );
+}
 
       files++;
       totalChunks += chunks.length;

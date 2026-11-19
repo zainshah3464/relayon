@@ -8,7 +8,7 @@ import type { ToolContext } from './tools/tool.types';
 import { ProviderKeyResolver } from '../integrations/provider-resolver';
 
 const MAX_ITERATIONS = 5;
-const RETRIES_PER_MODEL = 2; // ⚠️ DNS flaky handle
+const RETRIES_PER_MODEL = 2;
 
 const MODEL_CHAIN = [
   'openai/gpt-oss-120b',
@@ -16,22 +16,120 @@ const MODEL_CHAIN = [
   'qwen/qwen3.8-27b',
 ] as const;
 
-const SYSTEM_PROMPT = `You are Relayon's AI assistant. You help users understand and use Relayon, a serverless webhook relay platform.
+// ═══════════════════════════════════════════════════════════════
+// NEW SYSTEM PROMPT — intent detection + synthesis (v3.6)
+// ═══════════════════════════════════════════════════════════════
+const SYSTEM_PROMPT = `You are Relayon's AI assistant. Your ONE job: help the user solve their actual problem. Not to show them documentation.
 
-Rules:
-1. When user asks how to do something, use search_docs FIRST before answering.
-2. When creating workflows, ALWAYS confirm details with user before calling create_workflow.
-3. Never invent features. If unsure, search docs.
-4. Be concise. Prefer bullet points.
-5. Never expose secrets, tokens, or raw credentials.
-6. NEVER output XML tags like <tool_call> or <function=...> in your response. Use the tool calling API properly.
+## Understanding user intent (CRITICAL — do this first)
 
-Current user context:
+Before doing anything, silently classify the user's message:
+
+1. **LEARN** — "How do I...", "What is...", "Explain...", "Why does..."
+   → Use search_docs. Then SYNTHESIZE a specific, tailored answer.
+
+2. **DO** — "Create a...", "Make a...", "Set up a...", "Build me a..."
+   → This is a COMMAND, not a question. Ask for missing info (name, source type, secret), then use create_workflow.
+
+3. **LIST** — "Show me my...", "What workflows do I have..."
+   → Use list_workflows. Summarize results in 2-3 bullets.
+
+4. **DEBUG** — "It's not working", "Why did X fail", "Error..."
+   → Use get_workflow + get_delivery_stats. Diagnose, then suggest fix.
+
+5. **CHAT** — "Hi", "Thanks", "What can you do?"
+   → Answer briefly. Don't search docs for greetings.
+
+## ABSOLUTE RULES (violation = failure)
+
+### ❌ NEVER DO THESE:
+- NEVER paste raw markdown from docs. No "###" headers, no "---", no "## Section".
+- NEVER say "According to docs..." or "The documentation says..."
+- NEVER paste tool output verbatim (search results, JSON, workflow objects).
+- NEVER mention internal tool names (search_docs, create_workflow) to the user.
+- NEVER say "File: docs/relayon-guide.md".
+- NEVER respond with a wall of text. If > 250 words, you're doing it wrong.
+- NEVER invent features that don't exist in the docs.
+
+### ✅ ALWAYS DO THESE:
+- ALWAYS understand the intent before acting (see above).
+- ALWAYS synthesize: read the docs, extract only what answers THIS user's question, rewrite in your own words.
+- ALWAYS give SPECIFIC steps for THEIR case, not generic docs.
+- ALWAYS use bold for UI elements: click **Workflows**, not "click the workflows page".
+- ALWAYS use numbered steps for "how to" questions.
+- ALWAYS end with "Next step:" suggestion if relevant.
+
+## Answer format by intent
+
+**LEARN intent:**
+\`\`\`
+Here's how to do X:
+
+1. **Step 1** — specific action
+2. **Step 2** — specific action
+3. **Step 3** — specific action
+
+Example: <concrete example with real values>
+
+⚠️ Common mistake: <one thing to avoid>
+\`\`\`
+
+**DO intent:**
+Before creating, confirm in one short message:
+\`\`\`
+I'll create a workflow with:
+- Name: "X"
+- Source: <type>
+- Enrichment: <on/off>
+
+Confirm to proceed? (You'll also need the signing secret from <platform>)
+\`\`\`
+
+**DEBUG intent:**
+\`\`\`
+I see the issue:
+
+**Problem:** <what's failing in one line>
+**Why:** <root cause in one line>
+**Fix:** <specific action>
+\`\`\`
+
+## Example answers (learn from these)
+
+**Good answer (LEARN):**
+User: "How do I create a Stripe → Slack workflow?"
+
+Response:
+\`\`\`
+Here's the 60-second setup:
+
+1. Go to **Workflows** → click **+ New workflow**
+2. Name it "Stripe → Slack", pick **Stripe** as source
+3. Paste your Stripe signing secret (find it at Stripe Dashboard → Webhooks → your endpoint → Signing secret)
+4. Click **Create**, then **+ Add destination** → choose **Slack**
+5. Paste your Slack incoming webhook URL, test connection, save
+
+Next: copy the webhook URL from the workflow page and paste it in Stripe → Webhooks → Add endpoint.
+\`\`\`
+
+**BAD answer (NEVER do this):**
+\`\`\`
+## Creating a workflow
+
+A workflow consists of source, transform, destinations.
+
+### Steps
+1. Go to Workflows
+2. ...
+\`\`\`
+
+## User context
 - Tenant ID: {{tenantId}}
-- Role: {{role}}`;
+- Role: {{role}}
+
+Now answer the user. Understand intent first, then act.`;
 
 export interface ChatEvent {
-  // ⚠️ v3.3 — 'meta' added so client knows which key source / model was used
   type: 'token' | 'tool_call' | 'tool_result' | 'done' | 'error' | 'meta';
   data: unknown;
 }
@@ -60,7 +158,6 @@ interface GroqResponse {
 @Injectable()
 export class ChatAgentService {
   private readonly logger = new Logger(ChatAgentService.name);
-  // ⚠️ v3.5 — renamed from `apiKey` → `platformKey`; added `platformModel`
   private readonly platformKey: string | null;
   private readonly platformModel: string;
 
@@ -68,7 +165,6 @@ export class ChatAgentService {
     private readonly config: ConfigService,
     private readonly prisma: PrismaService,
     private readonly rag: RagService,
-    // ⚠️ v3.5 — BYOK resolver (tenant keys override platform key)
     private readonly keys: ProviderKeyResolver,
   ) {
     this.platformKey = config.get<string>('GROQ_API_KEY') ?? null;
@@ -81,23 +177,10 @@ export class ChatAgentService {
     }
   }
 
-  /**
-   * Platform-only availability check. Per-tenant availability is resolved
-   * dynamically in `run()` via ProviderKeyResolver.
-   */
   isEnabled(): boolean {
     return this.platformKey !== null;
   }
 
-  /**
-   * Fetch-based Groq call with per-model retries.
-   * Why fetch not SDK: groq-sdk@0.9.1 has undici issues on Node 22 +
-   * Pakistani ISP DNS flakiness. Raw fetch with AbortSignal.timeout is
-   * more predictable and gives us real status codes.
-   *
-   * ⚠️ v3.5 — now takes `apiKey` + `models` explicitly so we can use
-   * tenant-provided (BYOK) keys and preferred model chain.
-   */
   private async createCompletion(
     params: ChatCompletionParams & { apiKey: string; models: readonly string[] },
   ): Promise<GroqResponse> {
@@ -123,10 +206,11 @@ export class ChatAgentService {
                 messages: params.messages,
                 tools: params.tools,
                 tool_choice: params.tool_choice,
-                temperature: params.temperature ?? 0.3,
+                // ⚠️ v3.6 — lower temperature (0.3 → 0.2) for focused answers
+                temperature: params.temperature ?? 0.2,
                 max_tokens: params.max_tokens ?? 1024,
               }),
-              signal: AbortSignal.timeout(60_000), // 60s (was 30s)
+              signal: AbortSignal.timeout(60_000),
             },
           );
 
@@ -143,12 +227,8 @@ export class ChatAgentService {
               status === 503 ||
               status === 504;
 
-            if (!shouldFallback) {
-              // 4xx errors — no point retrying
-              throw new Error(errMsg);
-            }
+            if (!shouldFallback) throw new Error(errMsg);
 
-            // Retry with backoff
             if (attempt < RETRIES_PER_MODEL) {
               await new Promise((r) => setTimeout(r, 500 * attempt));
               continue;
@@ -156,7 +236,7 @@ export class ChatAgentService {
             this.logger.warn(
               `${model} exhausted retries (${status}), next model...`,
             );
-            break; // next model
+            break;
           }
 
           const json = (await res.json()) as GroqResponse;
@@ -165,7 +245,6 @@ export class ChatAgentService {
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
 
-          // Abort/timeout — retry same model
           if (msg.includes('aborted') || msg.includes('timeout')) {
             errors.push(`${model} attempt ${attempt}: timeout`);
             if (attempt < RETRIES_PER_MODEL) {
@@ -175,7 +254,6 @@ export class ChatAgentService {
             break;
           }
 
-          // Network error — retry
           if (
             msg.includes('fetch failed') ||
             msg.includes('ECONNREFUSED') ||
@@ -192,7 +270,6 @@ export class ChatAgentService {
             break;
           }
 
-          // Other error — bubble up
           throw err;
         }
       }
@@ -207,7 +284,6 @@ export class ChatAgentService {
     role: 'owner' | 'admin' | 'viewer';
     messages: Array<{ role: 'user' | 'assistant'; content: string }>;
   }): AsyncGenerator<ChatEvent> {
-    // ⚠️ v3.5 — resolve BYOK key (tenant key → platform key fallback)
     const resolved = await this.keys.resolve(opts.tenantId, 'groq');
     if (!resolved) {
       yield {
@@ -220,12 +296,10 @@ export class ChatAgentService {
       return;
     }
 
-    // Build model chain: tenant-preferred model first, then defaults
     const models = resolved.model
       ? [resolved.model, ...MODEL_CHAIN.filter((m) => m !== resolved.model)]
       : [...MODEL_CHAIN];
 
-    // ⚠️ v3.5 — tell the client which source/model is being used
     yield { type: 'meta', data: { source: resolved.source, model: models[0] } };
 
     const ctx: ToolContext = {
@@ -260,7 +334,6 @@ export class ChatAgentService {
           messages: conversation,
           tools: groqTools.length > 0 && !isLast ? groqTools : undefined,
           tool_choice: isLast ? 'none' : 'auto',
-          // ⚠️ v3.5 — resolved key + tenant-aware model chain
           apiKey: resolved.key,
           models,
         });
@@ -277,7 +350,6 @@ export class ChatAgentService {
         const toolCalls = msg.tool_calls ?? [];
 
         if (toolCalls.length === 0) {
-          // ⚠️ Strip any hallucinated XML tool-call syntax from qwen
           const raw = msg.content ?? '';
           const content = raw
             .replace(/<tool_call>[\s\S]*?<\/tool_call>/g, '')
