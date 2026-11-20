@@ -10,17 +10,17 @@ import { SeoService } from '../../core/seo/seo.service';
     <app-legal-layout
       eyebrow="Legal"
       title="Terms of Service"
-      lastUpdated="November 17, 2026"
+      lastUpdated="November 20, 2026"
       [sections]="sections"
     />
   `,
 })
 export class TermsComponent {
-  // ⚠️ v3.3 — SEO metadata (title, OG, Twitter, canonical)
+  // ⚠️ v3.7 — SEO metadata (title, OG, Twitter, canonical)
   constructor() {
     inject(SeoService).set({
-      title: 'Terms of Service',
-      description: 'Relayon terms of service — acceptable use, payment, liability, and legal terms for using our webhook relay platform.',
+      title: 'Terms of Service & License',
+      description: 'Relayon terms of service and Relayon Proprietary Source-Visible License v1.0 — acceptable use, payment, liability, and source code licensing for our webhook relay platform.',
       path: '/terms',
       noindex: false,
     });
@@ -194,8 +194,77 @@ export class TermsComponent {
       `,
     },
     {
+      id: 'license',
+      title: '10. License & source code',
+      content: `
+        <p>
+          Relayon's source code is <strong>publicly visible</strong> but is
+          <strong>NOT released under an open-source license</strong>.
+          It is governed by the <strong>Relayon Proprietary Source-Visible License v1.0</strong>
+          (effective November 20, 2026), which supersedes the previous MIT license.
+        </p>
+
+        <h3>You MAY (free, perpetual):</h3>
+        <ul>
+          <li>Use Relayon for personal or commercial purposes</li>
+          <li>Self-host the Software on servers you own or control</li>
+          <li>View the source code for transparency, security auditing, and learning</li>
+          <li>Contribute improvements via Pull Requests (assigned to the Licensor upon merge)</li>
+          <li>Create an unlimited number of webhook workflows</li>
+        </ul>
+
+        <h3>You MAY NOT (without prior written permission):</h3>
+        <ul>
+          <li>Modify, alter, adapt, translate, or create Derivative Works</li>
+          <li>Deploy, host, or operate any modified version or fork — publicly or privately</li>
+          <li>Sell, resell, sublicense, rent, lease, or redistribute the Software</li>
+          <li>Build, operate, or promote a competing webhook relay, integration platform, or iPaaS product</li>
+          <li>Use the Software or its source code to train, fine-tune, or evaluate any machine learning model</li>
+          <li>Remove, obscure, or alter any copyright notice, "Powered by Relayon" notice, or the author credit "Zain Shah"</li>
+          <li>Use the "Relayon" trademark, logo, or tagline "Your webhooks, relayed right" in a way that suggests endorsement</li>
+        </ul>
+
+        <h3>Written permission exception</h3>
+        <p>
+          The Licensor may, at their sole discretion, grant <strong>Written Permission</strong>
+          to modify, extend, or self-deploy Derivative Works, subject to a separate agreement.
+          If granted, mandatory attribution conditions apply (original copyright headers retained,
+          "Powered by Relayon — created by Zain Shah" displayed on every page, and
+          <strong>README.md</strong>, <strong>package.json</strong>, and all public docs crediting Zain Shah as the original author).
+        </p>
+
+        <h3>How to request permission</h3>
+        <p>
+          Email <a href="mailto:zainshahzs110@gmail.com">zainshahzs110@gmail.com</a> with the subject line:
+          <br>
+          <code>Relayon Permission Request — [Your Name]</code>
+        </p>
+
+        <h3>Termination of license</h3>
+        <p>
+          This License terminates automatically if you breach any of the restrictions above.
+          On termination you must immediately cease all use of the Software, delete all copies,
+          backups, and Derivative Works, and destroy any self-hosted deployments.
+        </p>
+
+        <h3>Governing law</h3>
+        <p>
+          The License is governed by the laws of <strong>Pakistan</strong>, with exclusive jurisdiction
+          in the courts of Karachi. Material changes to the License are announced at
+          <a href="https://github.com/zainshah3464/relayon" target="_blank" rel="noopener">github.com/zainshah3464/relayon</a>.
+        </p>
+
+        <p>
+          <strong>Full license text:</strong>
+          <a href="https://github.com/zainshah3464/relayon/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">
+            LICENSE on GitHub →
+          </a>
+        </p>
+      `,
+    },
+    {
       id: 'disclaimers',
-      title: '10. Disclaimers',
+      title: '11. Disclaimers',
       content: `
         <p>
           RELAYON IS PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND. TO THE MAXIMUM EXTENT PERMITTED BY LAW,
@@ -213,7 +282,7 @@ export class TermsComponent {
     },
     {
       id: 'liability',
-      title: '11. Limitation of liability',
+      title: '12. Limitation of liability',
       content: `
         <p>
           TO THE MAXIMUM EXTENT PERMITTED BY LAW, RELAYON'S TOTAL LIABILITY TO YOU FOR ANY CLAIM ARISING
@@ -228,7 +297,7 @@ export class TermsComponent {
     },
     {
       id: 'indemnification',
-      title: '12. Indemnification',
+      title: '13. Indemnification',
       content: `
         <p>
           You agree to indemnify and hold Relayon harmless from any claims, damages, or expenses arising
@@ -239,7 +308,7 @@ export class TermsComponent {
     },
     {
       id: 'law',
-      title: '13. Governing law',
+      title: '14. Governing law',
       content: `
         <p>
           These terms are governed by the laws of <strong>Pakistan</strong>, without regard to conflict
@@ -250,7 +319,7 @@ export class TermsComponent {
     },
     {
       id: 'changes',
-      title: '14. Changes to terms',
+      title: '15. Changes to terms',
       content: `
         <p>
           We may update these terms occasionally. Material changes will be notified by email 30 days
@@ -260,11 +329,12 @@ export class TermsComponent {
     },
     {
       id: 'contact',
-      title: '15. Contact',
+      title: '16. Contact',
       content: `
         <p>
           <strong>Relayon</strong><br />
           📧 <a href="mailto:hello@relayon.dev">hello@relayon.dev</a><br />
+          🔐 <a href="mailto:zainshahzs110@gmail.com">zainshahzs110@gmail.com</a> (license/permission requests)<br />
           🐙 <a href="https://github.com/zainshah3464" target="_blank" rel="noopener">github.com/zainshah3464</a>
         </p>
       `,

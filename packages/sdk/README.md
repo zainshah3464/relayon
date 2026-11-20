@@ -109,7 +109,30 @@ npm run generate
 
 ## License
 
-MIT
+**Proprietary source-visible.** Copyright (c) 2026 **Zain Shah**. All rights reserved.
+
+This SDK is **free to install and use** in any project — personal or commercial. You do **not** need to pay, sign up for a paid plan, or ask permission to import it and call Relayon's API with it.
+
+### ✅ You MAY
+- `npm install @relayon/sdk` and use it in any application
+- Use it commercially (SaaS, internal tools, client projects — anything)
+- Read the source code for auditing, learning, and security review
+- Contribute improvements via Pull Request (contributions are assigned to the Licensor upon merge)
+
+### ❌ You MAY NOT (without written permission)
+- **Modify** the source code for your own deployment or redistribution
+- **Fork** it to build or promote a competing webhook relay / iPaaS product
+- **Resell, sublicense, or redistribute** the package (modified or unmodified) under your own name
+- **Train machine-learning models** on the source code (including code-generation LLMs)
+- **Remove** copyright headers, license notices, or author attribution
+
+### 📄 Full terms
+See [`LICENSE`](./LICENSE) (shipped inside this package).
+
+### 📧 Permission requests
+Email **zainshahzs110@gmail.com** with subject line **"Relayon Permission Request — [Your Name]"**.
+
+> **Historical note (transparency):** Early versions of this SDK were published under the MIT License during the development phase, as a placeholder default — not as a deliberate licensing decision. Under copyright law, **MIT grants are irrevocable** for any copy already obtained before **November 20, 2026**; those specific versions remain usable under MIT by whoever downloaded them. **All versions published on or after November 20, 2026 are governed by the proprietary source-visible license above.** No new MIT grants are made going forward.
 ```
 
 ---

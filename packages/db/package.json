@@ -2,6 +2,8 @@
   "name": "db",
   "version": "0.1.0",
   "private": true,
+  "author": "Zain Shah <zainshahzs110@gmail.com>",
+  "license": "SEE LICENSE IN ../../LICENSE",
   "scripts": {
     "generate": "prisma generate",
     "migrate": "prisma migrate dev",

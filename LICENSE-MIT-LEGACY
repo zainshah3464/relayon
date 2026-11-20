@@ -1,0 +1,127 @@
+# LICENSE-HISTORY — Relayon
+
+**Copyright (c) 2026 Zain Shah. All Rights Reserved.**
+
+═══════════════════════════════════════════════════════════════
+TL;DR
+═══════════════════════════════════════════════════════════════
+
+- **v1.0 – v1.5** (publicly visible on GitHub until Nov 20, 2026):
+  These versions were published while the repository was public and
+  are therefore — by operation of copyright law — irrevocably
+  available under the MIT License to anyone who obtained a copy
+  during that window. **This cannot be undone.**
+
+- **v1.6 – v3.5** (never pushed to any remote): Never published.
+  No third party ever received these versions. They are fully
+  proprietary, all rights reserved.
+
+- **v3.6 and later**: Proprietary source-visible under the
+  RELAYON PROPRIETARY SOURCE-VISIBLE LICENSE — see `./LICENSE`.
+
+═══════════════════════════════════════════════════════════════
+WHY THE LICENSE CHANGED — INTENT WAS ALWAYS PROPRIETARY
+═══════════════════════════════════════════════════════════════
+
+Relayon was in active early development. During rapid prototyping,
+a boilerplate MIT `LICENSE` file was added to the repository by
+oversight — simply because it was the fastest "normal default"
+available, without any deliberate licensing decision having been
+made.
+
+**Relayon was never intended to be released under MIT.** From
+day one, the project was designed as a proprietary, source-visible
+product — the kind of software you may freely use and self-host,
+but may not modify, fork, rebrand, or resell.
+
+The MIT file was a development-phase placeholder that was not
+replaced in time before the v1.5 tag was publicly accessible.
+
+Effective **November 20, 2026**, the licensing is corrected and
+formalized:
+
+- All versions from **v1.6 onward** — and all future versions —
+  are licensed under the RELAYON PROPRIETARY SOURCE-VISIBLE
+  LICENSE. All rights reserved by Zain Shah.
+- v1.6 through v3.5 were **never made public** and carry no MIT
+  grant. They are fully proprietary.
+- The mistake for v1.0–v1.5 is documented here for transparency.
+  Due to the irrevocable nature of the MIT License, this
+  declaration does not and cannot revoke the MIT rights of anyone
+  who obtained a copy of those versions while the repository was
+  public.
+
+═══════════════════════════════════════════════════════════════
+WHAT THIS MEANS
+═══════════════════════════════════════════════════════════════
+
+✅ YOU MAY (for v3.6+ under ./LICENSE):
+   - Use the hosted Relayon platform for free
+   - Self-host Relayon on infrastructure you own
+   - Create unlimited workflows
+   - Use it for personal or commercial purposes
+   - Read the source code for auditing/learning
+
+❌ YOU MAY NOT (for v3.6+):
+   - Modify the source code for your own deployment
+   - Fork it to build a competing product
+   - Resell, sublicense, or redistribute it
+   - Train AI models on the code
+   - Remove copyright headers or attribution
+
+📌 For v1.0–v1.5: If you obtained a copy while the repository was
+public (before November 20, 2026), your original MIT rights on
+**that specific version's code** remain valid and irrevocable.
+No new MIT grants are made after November 20, 2026.
+
+📌 For v1.6–v3.5: You cannot have obtained these — they were never
+published. All rights reserved.
+
+═══════════════════════════════════════════════════════════════
+TRADEMARK NOTICE
+═══════════════════════════════════════════════════════════════
+
+"Relayon", the Relayon logo, and the tagline "Your webhooks,
+relayed right" are trademarks of Zain Shah. **No license — MIT
+or otherwise — has ever granted any trademark rights.** Even for
+v1.0–v1.5, you may not use these marks in a way that suggests
+endorsement or affiliation.
+
+═══════════════════════════════════════════════════════════════
+PRESERVED MIT TEXT (historical record for v1.0–v1.5 only)
+═══════════════════════════════════════════════════════════════
+
+The following MIT License text is preserved here solely as a
+historical record of the license that appeared in the repository
+from initial public visibility through v1.5.
+
+────────────────────────────────────────────────────────────────
+
+MIT License
+
+Copyright (c) 2026 Zain Shah
+
+Permission is hereby granted, free of charge, to any person
+obtaining a copy of this software and associated documentation
+files (the "Software"), to deal in the Software without
+restriction, including without limitation the rights to use,
+copy, modify, merge, publish, distribute, sublicense, and/or
+sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+OTHER DEALINGS IN THE SOFTWARE.
+
+────────────────────────────────────────────────────────────────
+
+For license questions: zainshahzs110@gmail.com

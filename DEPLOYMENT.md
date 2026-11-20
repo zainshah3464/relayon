@@ -4,6 +4,20 @@
 >
 > Target: Vercel Hobby ($0) + Neon + Upstash + MongoDB Atlas + Groq + Resend (optional).
 
+> ⚖️ **LICENSE NOTICE — READ BEFORE DEPLOYING**
+>
+> **Deployment requires acceptance of the Relayon Proprietary Source-Visible License v1.0.**
+>
+> By deploying Relayon — whether on the hosted platform (relayon.vercel.app) or as a self-hosted instance — you agree to be bound by the terms of the Relayon Proprietary Source-Visible License v1.0, effective November 20, 2026.
+>
+> **You MAY:** self-host the Software on servers you own or control, view the source, and contribute via Pull Requests.
+>
+> **You MAY NOT (without prior written permission from Zain Shah):** modify the source, deploy derivative works, fork to compete, resell, remove attribution, or train AI models on the code.
+>
+> The previous MIT license has been superseded. See `LICENSE` for the full terms or visit [relayon.vercel.app/terms#license](https://relayon.vercel.app/terms#license).
+>
+> For permission requests, email **zainshahzs110@gmail.com** with subject line `"Relayon Permission Request — [Your Name]"`.
+
 This guide is written for someone who has never seen Relayon before. If you follow it exactly, you will have a working production deployment in ~20 minutes. If you skip steps, you will spend 3 hours debugging.
 
 ---
@@ -27,6 +41,8 @@ This guide is written for someone who has never seen Relayon before. If you foll
 ---
 
 ## 0. Prerequisites
+
+> ⚖️ **Before you begin — license acceptance:** Deploying Relayon constitutes acceptance of the Relayon Proprietary Source-Visible License v1.0. If you intend to modify the source code, fork, rebrand, or deploy a derivative work, you must obtain **prior written permission** from Zain Shah (`zainshahzs110@gmail.com`). Unmodified self-hosting is permitted under the license without separate permission.
 
 - GitHub repo pushed to `main`
 - Neon PostgreSQL created (use **pooled** connection string with `?sslmode=require`)
@@ -471,6 +487,12 @@ Always `pg_dump` before applying a migration on production.
 
 Print this. Check every box. **Any unchecked box = broken production feature.**
 
+### License & legal
+- [ ] Read and accepted the Relayon Proprietary Source-Visible License v1.0 (see `LICENSE`)
+- [ ] Confirmed self-host deployment is unmodified (modifications require written permission)
+- [ ] "Powered by Relayon — created by Zain Shah" attribution remains visible in the dashboard footer
+- [ ] No copyright headers removed from any source file
+
 ### Infrastructure
 - [ ] All 4 Vercel projects green
 - [ ] API health: `curl https://relayon-api.vercel.app/api/health` → `{"status":"ok","db":"up"}`
@@ -560,6 +582,7 @@ For anyone upgrading an existing v1.0 deployment or debugging a v1.5 deploy. **T
 | **Dashboard env URLs** | `apiUrl`, `ingressUrl` | + `appVersion: '1.5.0'` | Cosmetic |
 | **Express default export** | Yes (v1.0 fix) | Yes (still) | Don't add `app.listen()` at module top level |
 | **`environment.prod.ts` fileReplacements** | Optional | **Required** | Without it, dashboard calls `localhost` in production |
+| **License** | MIT | **Relayon Proprietary Source-Visible License v1.0** | Modifications / rebranding / resale require written permission from Zain Shah |
 
 **Common failure signatures and their fixes:**
 
@@ -586,6 +609,9 @@ If you're stuck on deployment specifically, open an issue at [github.com/zainsha
 - The exact error message from the build log
 - Output of `npm run typecheck` and `npm run build:api` (or whichever app)
 - Your environment (Windows / Mac / Linux)
-```
 
 ---
+
+## License
+
+Relayon is released under the **Relayon Proprietary Source-Visible License v1.0** (effective November 20, 2026). See `LICENSE` for full terms. Self-hosting unmodified code is permitted; modifications, rebranding, and resale require prior written permission from Zain Shah (`zainshahzs110@gmail.com`). The previous MIT license has been superseded.

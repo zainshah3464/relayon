@@ -43,6 +43,11 @@ export async function listenCommand(opts: ListenOptions): Promise<void> {
     );
   }
 
+  // ⚠️ v3.7 — proprietary license notice at the start of every listen session
+  console.log('');
+  console.log(chalk.gray('  © 2026 Zain Shah · Relayon Proprietary License'));
+  console.log(chalk.gray('  relayon.vercel.app/license\n'));
+
   const authHeaders: Record<string, string> = {};
   if (opts.apiKey) authHeaders['X-API-Key'] = opts.apiKey;
   else if (opts.token) authHeaders['Authorization'] = `Bearer ${opts.token}`;

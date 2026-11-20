@@ -1,6 +1,6 @@
 {
   "name": "@relayon/cli",
-  "version": "3.1.0",
+  "version": "3.7.0",
   "description": "Forward Relayon webhooks to your localhost — ngrok alternative",
   "keywords": ["relayon", "webhooks", "tunnel", "ngrok", "cli"],
   "homepage": "https://relayon.vercel.app",
@@ -9,7 +9,7 @@
     "url": "git+https://github.com/zainshah3464/relayon.git",
     "directory": "packages/cli"
   },
-  "license": "MIT",
+  "license": "SEE LICENSE IN LICENSE",
   "author": "Zain Shah <zainshahzs110@gmail.com>",
   "type": "module",
   "bin": {

@@ -3,6 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "description": "Relayon — serverless-native webhook relay platform",
+  "author": "Zain Shah <zainshahzs110@gmail.com>",
+  "license": "SEE LICENSE IN LICENSE",
   "workspaces": [
     "apps/*",
     "packages/*"

@@ -56,7 +56,7 @@ interface NavItem {
               R
             </div>
             <span class="text-lg font-bold tracking-tightest text-white">Relayon</span>
-            <span class="rounded bg-surface-2 px-1.5 py-0.5 text-[10px] font-mono text-muted">v3.2</span>
+            <span class="rounded bg-surface-2 px-1.5 py-0.5 text-[10px] font-mono text-muted">v3.7</span>
           </a>
         </div>
 
@@ -103,7 +103,7 @@ interface NavItem {
           </select>
         </div>
 
-        <!-- ⚠️ v3.2 — Help menu -->
+        <!-- ⚠️ v3.7 — Help menu -->
         <div class="border-t border-hairline p-3">
           <p class="text-[10px] uppercase tracking-wider text-muted mb-2">Help</p>
           <div class="space-y-0.5">
@@ -111,11 +111,12 @@ interface NavItem {
             <a routerLink="/about" class="block text-xs text-muted hover:text-white py-1">👤 About</a>
             <a routerLink="/privacy" class="block text-xs text-muted hover:text-white py-1">🔒 Privacy Policy</a>
             <a routerLink="/terms" class="block text-xs text-muted hover:text-white py-1">📜 Terms of Service</a>
+            <a routerLink="/terms" fragment="license" class="block text-xs text-muted hover:text-white py-1">⚖️ License (source-available)</a>
             <a href="mailto:hello@relayon.dev" class="block text-xs text-muted hover:text-white py-1">✉️ Contact Support</a>
           </div>
         </div>
 
-        <!-- ⚠️ v3.2 — Credit (Made with ❤) -->
+        <!-- ⚠️ v3.7 — Credit (Made with ❤) -->
         <div class="border-t border-hairline p-3">
           <a
             routerLink="/about"
@@ -127,6 +128,7 @@ interface NavItem {
             <div class="min-w-0 flex-1">
               <p class="text-[10px] text-muted leading-tight">Made with ❤ by</p>
               <p class="text-xs font-medium text-white leading-tight truncate">Zain Shah</p>
+              <p class="text-[9px] text-muted leading-tight mt-0.5">© {{ year }} · All rights reserved</p>
             </div>
           </a>
         </div>
@@ -169,6 +171,8 @@ export class ShellComponent {
   lang = inject(LanguageService);
   sidebarOpen = signal(false);
 
+  readonly year = new Date().getFullYear();
+
   private readonly appUpdate = inject(AppUpdateService);
   private readonly onboarding = inject(OnboardingService);
   private readonly seo = inject(SeoService);
@@ -194,7 +198,7 @@ export class ShellComponent {
       console.warn('[Shell] PWA init failed (non-fatal):', err);
     }
 
-    // ⚠️ v3.3 — default SEO for protected pages (noindex)
+    // ⚠️ v3.7 — default SEO for protected pages (noindex)
     this.seo.set({
       title: 'Dashboard',
       description: 'Relayon dashboard',
@@ -202,7 +206,7 @@ export class ShellComponent {
       noindex: true,
     });
 
-    // ⚠️ v3.2 — onboarding wizard on first dashboard visit
+    // ⚠️ v3.7 — onboarding wizard on first dashboard visit
     this.router.events
       .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd))
       .subscribe((e) => {

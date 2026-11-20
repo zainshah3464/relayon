@@ -1,21 +1,213 @@
-MIT License
+RELAYON PROPRIETARY SOURCE-VISIBLE LICENSE
+Version 1.0 — Effective November 20, 2026
 
-Copyright (c) 2026 Zain Shah
+Copyright (c) 2026 Zain Shah. All Rights Reserved.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+═══════════════════════════════════════════════════════════════
+SUMMARY (non-binding, for readability only)
+═══════════════════════════════════════════════════════════════
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+ You MAY: use Relayon for free, self-host it, view its source,
+            contribute via Pull Requests.
+ You MAY NOT: modify the source for your own deployment, fork
+                to compete, resell, or train AI models on it
+                — WITHOUT WRITTEN PERMISSION from Zain Shah.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+═══════════════════════════════════════════════════════════════
+1. DEFINITIONS
+═══════════════════════════════════════════════════════════════
+
+1.1 "Software" means the Relayon platform, including all source
+    code, compiled binaries, configuration, documentation, and
+    assets in this repository (github.com/zainshah3464/relayon).
+
+1.2 "Licensor" means Zain Shah, the sole copyright holder.
+
+1.3 "You" means any individual or legal entity using the Software.
+
+1.4 "Platform" means the Relayon hosted service located at
+    relayon.vercel.app and any self-hosted instance you run
+    under this License.
+
+1.5 "Derivative Work" means any modified version of the Software,
+    including changes to source files, added features, or
+    rebranded versions.
+
+1.6 "Written Permission" means explicit, prior authorization from
+    the Licensor via email to zainshahzs110@gmail.com, which
+    must be retained in written form.
+
+═══════════════════════════════════════════════════════════════
+2. GRANT OF USE
+═══════════════════════════════════════════════════════════════
+
+2.1 USE GRANT (FREE, PERPETUAL):
+    Subject to Sections 3 and 4, the Licensor grants You a free,
+    non-exclusive, non-transferable, worldwide license to:
+    (a) access the Platform hosted by the Licensor
+    (b) self-host the Software on servers You own or control
+    (c) create an unlimited number of webhook workflows
+    (d) use the Platform for personal or commercial purposes
+
+2.2 SOURCE CODE VISIBILITY:
+    The source code is made publicly visible for:
+    (a) transparency and security auditing
+    (b) community learning and contribution
+    (c) personal study of its architecture
+
+    Visibility does NOT grant any license beyond Section 2.1.
+
+2.3 CONTRIBUTIONS:
+    Any code, documentation, or asset You contribute via Pull
+    Request is hereby assigned to the Licensor upon merge. You
+    retain no rights to withdraw contributions.
+
+═══════════════════════════════════════════════════════════════
+3. RESTRICTIONS (STRICTLY PROHIBITED)
+═══════════════════════════════════════════════════════════════
+
+3.1 NO MODIFICATION:
+    You may NOT modify, alter, adapt, translate, or create
+    Derivative Works of the Software, in whole or in part,
+    WITHOUT prior Written Permission from the Licensor.
+
+3.2 NO UNAUTHORIZED DEPLOYMENT:
+    You may NOT deploy, host, or operate any Derivative Work,
+    modified version, or fork of the Software — publicly or
+    privately — WITHOUT prior Written Permission.
+
+3.3 NO REDISTRIBUTION:
+    You may NOT sell, resell, sublicense, rent, lease, distribute,
+    or make the Software (modified or unmodified) available to
+    third parties.
+
+3.4 NO COMPETING PRODUCTS:
+    You may NOT use the Software or any Derivative Work to build,
+    operate, or promote a competing webhook relay, integration
+    platform, or iPaaS product.
+
+3.5 NO AI TRAINING:
+    You may NOT use the Software, its source code, or its
+    documentation for training, fine-tuning, or evaluating any
+    machine learning model (including but not limited to
+    code-generation LLMs).
+
+3.6 NO LICENSE HEADER REMOVAL:
+    You may NOT remove, obscure, or alter any copyright notice,
+    license header, attribution text, "Powered by Relayon"
+    notice, or the author credit "Zain Shah" from any file.
+
+3.7 NO TRADEMARK USE:
+    "Relayon", the Relayon logo, and "Your webhooks, relayed
+    right" are trademarks of Zain Shah. You may NOT use them in
+    a way that suggests endorsement without permission.
+
+═══════════════════════════════════════════════════════════════
+4. WRITTEN PERMISSION EXCEPTION
+═══════════════════════════════════════════════════════════════
+
+4.1 The Licensor MAY, at their sole discretion, grant Written
+    Permission to modify, extend, or self-deploy Derivative
+    Works, subject to a separate agreement.
+
+4.2 If Written Permission is granted, the following MANDATORY
+    ATTRIBUTION conditions apply:
+
+    (a) EVERY modified file MUST retain the original header:
+        
+        // Copyright (c) 2026 Zain Shah. All rights reserved.
+        // Part of Relayon — https://relayon.vercel.app
+        // Modifications under license by [Your Name] on [Date].
+
+    (b) The user-facing application MUST display:
+        
+        "Powered by Relayon — created by Zain Shah"
+        
+        in the footer of every page, with a link to
+        https://relayon.vercel.app.
+
+    (c) README.md, package.json, and every public-facing document
+        MUST credit Zain Shah as the original author.
+
+    (d) Any sub-licensing MUST preserve all terms of Sections
+        3.4 through 3.7 (no competing product, no AI training,
+        no attribution removal).
+
+4.3 Written Permission is non-transferable, revocable with
+    30 days' notice, and limited to the specific project scope
+    for which it was granted.
+
+═══════════════════════════════════════════════════════════════
+5. THIRD-PARTY COMPONENTS
+═══════════════════════════════════════════════════════════════
+
+5.1 The Software depends on third-party libraries (Angular,
+    NestJS, Prisma, Groq SDK, etc.) which are governed by their
+    own licenses. This License does NOT alter those terms.
+
+5.2 A complete list of third-party dependencies and their
+    licenses is available in package.json files and can be
+    regenerated with `npx license-checker`.
+
+═══════════════════════════════════════════════════════════════
+6. DISCLAIMER OF WARRANTY
+═══════════════════════════════════════════════════════════════
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND
+NON-INFRINGEMENT. THE LICENSOR DOES NOT WARRANT THAT THE
+SOFTWARE WILL BE UNINTERRUPTED, ERROR-FREE, OR FREE OF HARMFUL
+COMPONENTS.
+
+═══════════════════════════════════════════════════════════════
+7. LIMITATION OF LIABILITY
+═══════════════════════════════════════════════════════════════
+
+TO THE MAXIMUM EXTENT PERMITTED BY LAW, THE LICENSOR SHALL NOT
+BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL,
+OR PUNITIVE DAMAGES, OR ANY LOSS OF PROFITS OR REVENUES,
+WHETHER INCURRED DIRECTLY OR INDIRECTLY, OR ANY LOSS OF DATA,
+USE, GOODWILL, OR OTHER INTANGIBLE LOSSES, ARISING FROM YOUR
+USE OF THE SOFTWARE. THE LICENSOR'S TOTAL CUMULATIVE LIABILITY
+SHALL NOT EXCEED $100 (ONE HUNDRED US DOLLARS).
+
+═══════════════════════════════════════════════════════════════
+8. TERMINATION
+═══════════════════════════════════════════════════════════════
+
+8.1 This License terminates automatically if You breach any
+    term of Sections 2.2 through 3.7.
+
+8.2 On termination, You MUST immediately:
+    (a) cease all use of the Software
+    (b) delete all copies, backups, and Derivative Works
+    (c) destroy any self-hosted deployments
+
+8.3 Sections 3, 5, 6, 7, 9 survive termination.
+
+═══════════════════════════════════════════════════════════════
+9. GOVERNING LAW & GENERAL
+═══════════════════════════════════════════════════════════════
+
+9.1 This License is governed by the laws of Pakistan.
+
+9.2 Any dispute shall be resolved exclusively in the courts
+    of Karachi, Pakistan.
+
+9.3 If any provision of this License is held unenforceable,
+    the remaining provisions shall remain in full force.
+
+9.4 This License is the entire agreement between You and the
+    Licensor regarding the Software.
+
+9.5 The Licensor reserves the right to update this License.
+    Material changes will be announced at
+    https://github.com/zainshah3464/relayon.
+
+═══════════════════════════════════════════════════════════════
+
+For permission requests: zainshahzs110@gmail.com
+Subject line: "Relayon Permission Request — [Your Name]"
+
+═══════════════════════════════════════════════════════════════

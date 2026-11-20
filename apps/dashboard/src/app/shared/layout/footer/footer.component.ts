@@ -17,7 +17,7 @@ import { RouterLink } from '@angular/router';
                 R
               </div>
               <span class="text-sm font-semibold text-white">Relayon</span>
-              <span class="rounded bg-surface-2 px-1.5 py-0.5 text-[10px] font-mono text-muted">v3.2</span>
+              <span class="rounded bg-surface-2 px-1.5 py-0.5 text-[10px] font-mono text-muted">v3.7</span>
             </div>
             <p class="text-xs text-muted">
               Made with <span class="text-signal-rose">❤</span> by
@@ -54,7 +54,12 @@ import { RouterLink } from '@angular/router';
 
         <!-- Bottom line -->
         <div class="mt-4 border-t border-hairline pt-4 text-center text-[11px] text-muted">
-          © {{ year }} Relayon · Open source under MIT License · Built in Pakistan 🇵🇰
+          © {{ year }} Zain Shah · All rights reserved · Unauthorized modification prohibited
+        </div>
+        <div class="mt-1 text-center text-[11px] text-muted">
+          Relayon is <span class="text-relay-cyan">source-available</span>, not open source ·
+          <a routerLink="/terms#license" class="text-relay-cyan hover:underline">Read License</a>
+          · Built in Pakistan 🇵🇰
         </div>
       </div>
     </footer>

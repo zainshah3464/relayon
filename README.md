@@ -765,7 +765,9 @@ Contributions welcome! See [**docs/CONTRIBUTING.md**](./docs/CONTRIBUTING.md) fo
 
 ## 📄 License
 
-**MIT License** — see [LICENSE](./LICENSE).
+Source-available
+
+**License** — see [LICENSE](./LICENSE).
 
 You can use Relayon for personal or commercial purposes. Attribution appreciated but not required.
 

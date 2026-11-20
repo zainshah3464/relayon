@@ -1,11 +1,14 @@
-
 # Contributing to Relayon
 
 > **How to contribute to Relayon — from bug reports to pull requests.**
 >
 > **Current version:** v1.5.0
 
-Relayon is an open-source project (MIT licensed) and welcomes contributions of all sizes. This guide covers the workflow, conventions, and expectations.
+Relayon is a **source-available** project (governed by the Relayon Proprietary Source-Visible License v1.0) and welcomes contributions of all sizes. The source code is publicly visible so you can audit it, learn from it, and improve it via Pull Requests. However, it is **not** released under an open-source license — see [License & Copyright Assignment](#license--copyright-assignment) before submitting a PR.
+
+> ⚖️ **Important:** By submitting a Pull Request to Relayon, you assign copyright of your contribution to Zain Shah upon merge, per the Relayon Proprietary Source-Visible License v1.0 (Section 2.3). You retain no rights to withdraw contributions.
+
+This guide covers the workflow, conventions, and expectations.
 
 ---
 
@@ -21,6 +24,7 @@ Relayon is an open-source project (MIT licensed) and welcomes contributions of a
 - [What We're Looking For](#what-were-looking-for)
 - [What We Don't Accept](#what-we-dont-accept)
 - [Getting Help](#getting-help)
+- [License & Copyright Assignment](#license--copyright-assignment)
 
 ---
 
@@ -562,6 +566,10 @@ Approach taken. Mention tradeoffs if any.
 - [ ] If touching `crypto-box.ts`, both API and Workers copies are updated identically
 - [ ] If adding an adapter, `ctx.config.__dryRun` is checked before any write
 
+## Copyright assignment (required)
+- [ ] I confirm that by submitting this PR, I assign copyright of my contribution to Zain Shah (the Licensor) upon merge, per Section 2.3 of the Relayon Proprietary Source-Visible License v1.0
+- [ ] I confirm I have the right to make this contribution (not copied from another source without permission)
+
 ## Screenshots (if UI change)
 Before/After.
 ```
@@ -641,6 +649,17 @@ These are **hard rejections** — we will not merge even with a good-faith expla
 
 **Why these are hard rejections:** Each of these has caused real production incidents at companies far larger than this project. We cannot take "I'll fix it in a follow-up" for any of them.
 
+### License-related rejections (v3.7+)
+
+These PRs will be rejected because they violate the Relayon Proprietary Source-Visible License v1.0:
+
+| Category | Why |
+|---|---|
+| **PRs that remove copyright headers** | Section 3.6 — no license header removal permitted |
+| **PRs that remove "Powered by Relayon" attribution** | Section 3.6 — attribution is mandatory |
+| **PRs that rebrand the project under a different name** | Section 3.2 — no derivative works without written permission |
+| **PRs that re-add MIT license headers** | MIT was superseded by the proprietary license on Nov 20, 2026 |
+
 ---
 
 ## Getting Help
@@ -676,13 +695,24 @@ If none fit, open an issue describing what you'd like to work on and I'll help s
 
 ---
 
-## License
+## License & Copyright Assignment
 
-By contributing, you agree that your contributions will be licensed under the **MIT License** (see `LICENSE`).
+Relayon is **not** open source. The source code is publicly visible and contributions are welcome, but the project is governed by the **Relayon Proprietary Source-Visible License v1.0** (effective November 20, 2026), which supersedes the previous MIT license.
+
+**By submitting a Pull Request, you agree that:**
+
+1. **You assign copyright of your contribution to Zain Shah (the Licensor) upon merge**, per Section 2.3 of the Relayon Proprietary Source-Visible License v1.0.
+2. **You retain no rights to withdraw contributions** once merged. Your code becomes part of Relayon under the Licensor's copyright.
+3. **You have the right to make the contribution** — the code is your original work or you have explicit permission to contribute it, and it doesn't infringe any third-party rights.
+4. **Your contribution is licensed to the Licensor** under the terms of the Relayon Proprietary Source-Visible License v1.0. This includes the right for the Licensor to sublicense, relicense, or reincorporate your contribution in future versions of Relayon (including under different license terms).
+5. **You will not reintroduce MIT-licensed components** without explicit written permission, unless they are legitimate third-party dependencies.
+
+If you're contributing on behalf of an employer, you confirm that your employer has authorized the contribution and agrees to the copyright assignment above.
+
+**Why this matters:** The Licensor needs full ownership of all contributions so that the project can be reliably enforced, sublicensed, or relicensed in the future without needing to track down every past contributor. This is standard for proprietary projects accepting open contributions.
+
+**Full license text:** See `LICENSE` for the complete terms. For questions, email **zainshahzs110@gmail.com** with subject line `"Relayon Contributing Question — [Your Name]"`.
 
 ---
 
 Thank you for contributing. Every bug report, every typo fix, every new adapter makes Relayon better for someone else.
-```
-
----

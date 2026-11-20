@@ -1,6 +1,6 @@
 {
   "name": "@relayon/sdk",
-  "version": "3.0.0",
+  "version": "3.7.0",
   "description": "Official Relayon SDK — typed client for the Relayon API",
   "keywords": [
     "relayon",
@@ -15,7 +15,7 @@
     "url": "git+https://github.com/zainshah3464/relayon.git",
     "directory": "packages/sdk"
   },
-  "license": "MIT",
+  "license": "SEE LICENSE IN LICENSET",
   "author": "Zain Shah <zainshahzs110@gmail.com>",
   "type": "module",
   "main": "./dist/index.js",

@@ -2,6 +2,8 @@
   "name": "api",
   "version": "0.1.0",
   "private": true,
+  "author": "Zain Shah <zainshahzs110@gmail.com>",
+  "license": "SEE LICENSE IN ../../LICENSE",
   "scripts": {
     "dev": "nest start --watch",
     "build": "nest build",

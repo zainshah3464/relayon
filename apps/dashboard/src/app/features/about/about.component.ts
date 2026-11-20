@@ -93,6 +93,53 @@ import { SeoService } from '../../core/seo/seo.service';
         </div>
       </section>
 
+      <!-- ⚠️ v3.7 — License Section -->
+      <section class="mx-auto max-w-3xl px-6 pb-12">
+        <div class="card border-2 border-signal-amber/40 bg-surface p-6">
+          <div class="flex items-start gap-3">
+            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-signal-amber/10 text-xl">
+              ⚖️
+            </div>
+            <div class="flex-1">
+              <p class="text-xs uppercase tracking-wider text-signal-amber font-semibold">
+                License Notice
+              </p>
+              <h2 class="mt-1 text-lg font-bold text-white">
+                Source-available, not open source
+              </h2>
+              <p class="mt-2 text-sm text-muted leading-relaxed">
+                Relayon's source code is publicly visible for transparency and learning —
+                but it is <strong class="text-white">NOT</strong> released under an open-source license.
+                It is governed by the <strong class="text-white">Relayon Proprietary Source-Visible License v1.0</strong>.
+              </p>
+              <ul class="mt-3 space-y-1 text-sm text-muted">
+                <li class="flex gap-2"><span class="text-signal-emerald">✅</span> Free to use, self-host, view, and contribute via PR</li>
+                <li class="flex gap-2"><span class="text-signal-rose">❌</span> No modification, forking, resale, or AI training without written permission</li>
+                <li class="flex gap-2"><span class="text-signal-rose">❌</span> No rebranding, no competing products</li>
+                <li class="flex gap-2"><span class="text-signal-rose">❌</span> No removal of "Powered by Relayon" or author attribution</li>
+              </ul>
+              <p class="mt-3 text-sm text-muted">
+                The previous MIT license has been superseded. For permission requests, email
+                <a href="mailto:zainshahzs110@gmail.com" class="text-relay-cyan hover:underline">zainshahzs110@gmail.com</a>
+                with the subject line
+                <span class="font-mono text-xs text-white">"Relayon Permission Request — [Your Name]"</span>.
+              </p>
+              <div class="mt-4 flex flex-wrap gap-2">
+                <a routerLink="/terms" fragment="license" class="btn-primary text-xs">Read full license terms</a>
+                <a
+                  href="https://github.com/zainshah3464/relayon/blob/main/LICENSE"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="btn-secondary text-xs"
+                >
+                  LICENSE on GitHub →
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- By the Numbers -->
       <section class="border-y border-hairline bg-surface">
         <div class="mx-auto max-w-5xl px-6 py-12">
@@ -183,10 +230,12 @@ import { SeoService } from '../../core/seo/seo.service';
       <!-- Footer -->
       <footer class="border-t border-hairline">
         <div class="mx-auto max-w-5xl px-6 py-8 text-center text-xs text-muted">
-          <p>Relayon v3.2 · Made with <span class="text-signal-rose">❤</span> in Pakistan 🇵🇰</p>
+          <p>Relayon v3.7 · Made with <span class="text-signal-rose">❤</span> in Pakistan 🇵🇰</p>
+          <p class="mt-2">© {{ year }} Zain Shah · All rights reserved · Source-available under Relayon Proprietary License</p>
           <div class="mt-3 flex justify-center gap-4">
             <a routerLink="/privacy" class="hover:text-white">Privacy</a>
             <a routerLink="/terms" class="hover:text-white">Terms</a>
+            <a routerLink="/terms" fragment="license" class="hover:text-white">License</a>
             <a routerLink="/guide" class="hover:text-white">Guide</a>
             <a href="mailto:hello@relayon.dev" class="hover:text-white">Contact</a>
           </div>
@@ -196,13 +245,15 @@ import { SeoService } from '../../core/seo/seo.service';
   `,
 })
 export class AboutComponent {
+  readonly year = new Date().getFullYear();
+
   constructor() {
     inject(SeoService).set({
       title: 'About — Built by Zain Shah',
       description:
-        'Relayon is a serverless webhook relay platform built by Zain Shah — one developer, zero funding, 60,000+ lines of code, all running on free tier.',
+        'Relayon is a serverless webhook relay platform built by Zain Shah — one developer, zero funding, 60,000+ lines of code, all running on free tier. Source-available under the Relayon Proprietary License.',
       path: '/about',
-      keywords: ['relayon story', 'zain shah', 'webhook platform creator', 'indie developer'],
+      keywords: ['relayon story', 'zain shah', 'webhook platform creator', 'indie developer', 'source-available license'],
       jsonLd: {
         '@context': 'https://schema.org',
         '@type': 'AboutPage',
@@ -229,6 +280,7 @@ export class AboutComponent {
     { version: 'v2.5', title: 'Testing & hardening', description: '347 tests, mutation coverage, load-tested to 500 RPS. Locked down.' },
     { version: 'v3.0', title: 'The Standard', description: 'Standard Webhooks, transactional outbox, OpenAPI SDK, CLI tunnel, PWA, i18n (EN/UR/AR).' },
     { version: 'v3.2', title: 'Complete', description: 'Privacy Policy, Terms, interactive guide, onboarding wizard, admin panel, community.' },
+    { version: 'v3.7', title: 'Licensed & locked', description: 'Relayon Proprietary Source-Visible License v1.0. MIT legacy retired. All IP protected.' },
   ];
 
   readonly stack = [
