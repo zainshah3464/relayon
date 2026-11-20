@@ -80,7 +80,7 @@ import { SeoService } from '../../core/seo/seo.service';
                       Instagram
                     </a>
                     <a
-                      href="mailto:zainshahzs110@gmail.com"
+                      href="mailto:zainshahzs110&#64;gmail.com"
                       class="btn-secondary text-xs"
                     >
                       Email
@@ -120,7 +120,7 @@ import { SeoService } from '../../core/seo/seo.service';
               </ul>
               <p class="mt-3 text-sm text-muted">
                 The previous MIT license has been superseded. For permission requests, email
-                <a href="mailto:zainshahzs110@gmail.com" class="text-relay-cyan hover:underline">zainshahzs110@gmail.com</a>
+                <a href="mailto:zainshahzs110&#64;gmail.com" class="text-relay-cyan hover:underline">zainshahzs110&#64;gmail.com</a>
                 with the subject line
                 <span class="font-mono text-xs text-white">"Relayon Permission Request — [Your Name]"</span>.
               </p>
@@ -237,7 +237,7 @@ import { SeoService } from '../../core/seo/seo.service';
             <a routerLink="/terms" class="hover:text-white">Terms</a>
             <a routerLink="/terms" fragment="license" class="hover:text-white">License</a>
             <a routerLink="/guide" class="hover:text-white">Guide</a>
-            <a href="mailto:hello@relayon.dev" class="hover:text-white">Contact</a>
+            <a href="mailto:hello&#64;relayon.dev" class="hover:text-white">Contact</a>
           </div>
         </div>
       </footer>
