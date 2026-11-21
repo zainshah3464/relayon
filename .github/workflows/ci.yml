@@ -19,6 +19,8 @@ jobs:
       DATABASE_URL: postgresql://ci:ci@localhost:5432/ci?sslmode=disable
       JWT_SECRET: ci-jwt-secret-minimum-32-characters-long
       JWT_REFRESH_SECRET: ci-refresh-secret-minimum-32-chars-long
+      GROQ_API_KEY: gsk_ci_dummy
+      NODE_ENV: test
 
     steps:
       - name: Checkout
@@ -35,6 +37,9 @@ jobs:
 
       - name: Generate Prisma client
         run: npm run db:generate
+
+      - name: Generate SDK from openapi.json
+        run: npm run sdk:generate
 
       - name: Typecheck all workspaces
         run: npm run typecheck

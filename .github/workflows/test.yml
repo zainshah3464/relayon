@@ -40,17 +40,30 @@ jobs:
           --health-cmd="mongosh --eval 'db.adminCommand({ping:1})'"
           --health-interval=10s
     env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/relayon_ci?sslmode=disable
+      DIRECT_DATABASE_URL: postgresql://ci:ci@localhost:5432/relayon_ci?sslmode=disable
       TEST_DATABASE_URL: postgresql://ci:ci@localhost:5432/relayon_ci?sslmode=disable
       TEST_REDIS_URL: redis://localhost:6379
       TEST_MONGODB_URI: mongodb://localhost:27017/relayon_ci
+      UPSTASH_REDIS_TCP_URL: redis://localhost:6379
+      MONGODB_URI: mongodb://localhost:27017/relayon_ci
+      MONGODB_DB_NAME: relayon_ci
+      JWT_SECRET: ci-jwt-secret-minimum-32-characters-long
+      JWT_REFRESH_SECRET: ci-refresh-secret-minimum-32-chars-long
+      CRON_SECRET: ci-cron-secret-minimum-32-characters
+      CONNECTOR_ENCRYPTION_KEYS: ci-kid:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      IP_HASH_SALT: ci-salt-min-16-chars
+      API_KEY_PEPPER: ci-pepper-min-32-chars-long-xxx
+      GROQ_API_KEY: gsk_ci_dummy
+      NODE_ENV: test
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - run: npm ci
       - run: npm run db:generate
+      - run: npm run sdk:generate
       - run: npx prisma migrate deploy --schema packages/db/prisma/schema.prisma
-      - run: npm run db:rls
       - run: npm run test:coverage
       - uses: codecov/codecov-action@v4
         if: always()
@@ -83,15 +96,29 @@ jobs:
           --health-cmd="mongosh --eval 'db.adminCommand({ping:1})'"
           --health-interval=10s
     env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/relayon_ci?sslmode=disable
+      DIRECT_DATABASE_URL: postgresql://ci:ci@localhost:5432/relayon_ci?sslmode=disable
       TEST_DATABASE_URL: postgresql://ci:ci@localhost:5432/relayon_ci?sslmode=disable
       TEST_REDIS_URL: redis://localhost:6379
       TEST_MONGODB_URI: mongodb://localhost:27017/relayon_ci
+      UPSTASH_REDIS_TCP_URL: redis://localhost:6379
+      MONGODB_URI: mongodb://localhost:27017/relayon_ci
+      MONGODB_DB_NAME: relayon_ci
+      JWT_SECRET: ci-jwt-secret-minimum-32-characters-long
+      JWT_REFRESH_SECRET: ci-refresh-secret-minimum-32-chars-long
+      CRON_SECRET: ci-cron-secret-minimum-32-characters
+      CONNECTOR_ENCRYPTION_KEYS: ci-kid:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      IP_HASH_SALT: ci-salt-min-16-chars
+      API_KEY_PEPPER: ci-pepper-min-32-chars-long-xxx
+      GROQ_API_KEY: gsk_ci_dummy
+      NODE_ENV: test
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - run: npm ci
       - run: npm run db:generate
+      - run: npm run sdk:generate
       - run: npx prisma migrate deploy --schema packages/db/prisma/schema.prisma
       - run: npm run db:rls
       - run: npm run test:integration
@@ -112,13 +139,19 @@ jobs:
           --health-cmd="pg_isready -U ci"
           --health-interval=5s
     env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/relayon_ci?sslmode=disable
+      DIRECT_DATABASE_URL: postgresql://ci:ci@localhost:5432/relayon_ci?sslmode=disable
       TEST_DATABASE_URL: postgresql://ci:ci@localhost:5432/relayon_ci?sslmode=disable
+      JWT_SECRET: ci-jwt-secret-minimum-32-characters-long
+      JWT_REFRESH_SECRET: ci-refresh-secret-minimum-32-chars-long
+      NODE_ENV: test
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - run: npm ci
       - run: npm run db:generate
+      - run: npm run sdk:generate
       - run: npx prisma migrate deploy --schema packages/db/prisma/schema.prisma
       - run: npm run db:rls
       - run: npx vitest run --config vitest.integration.config.ts test/integration/rls.integration.spec.ts
@@ -130,7 +163,12 @@ jobs:
     if: github.event_name == 'pull_request'
     continue-on-error: true
     env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/relayon_ci?sslmode=disable
+      DIRECT_DATABASE_URL: postgresql://ci:ci@localhost:5432/relayon_ci?sslmode=disable
       TEST_DATABASE_URL: postgresql://ci:ci@localhost:5432/relayon_ci?sslmode=disable
+      JWT_SECRET: ci-jwt-secret-minimum-32-characters-long
+      JWT_REFRESH_SECRET: ci-refresh-secret-minimum-32-chars-long
+      NODE_ENV: test
     services:
       postgres:
         image: postgres:16-alpine
@@ -145,6 +183,7 @@ jobs:
         with: { node-version: 22, cache: npm }
       - run: npm ci
       - run: npm run db:generate
+      - run: npm run sdk:generate
       - run: npm run test:mutation:critical
       - uses: actions/upload-artifact@v4
         if: always()

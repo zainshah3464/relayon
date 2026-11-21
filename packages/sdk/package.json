@@ -37,7 +37,7 @@
     "sync": "node scripts/sync-spec.mjs",
     "generate": "openapi-ts",
     "build": "tsup",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "typecheck": "npm run generate && tsc --noEmit -p tsconfig.json",
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
     "prebuild": "npm run clean",
     "prepublishOnly": "npm run generate && npm run build",

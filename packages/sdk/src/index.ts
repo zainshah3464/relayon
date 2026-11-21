@@ -1,4 +1,12 @@
 /**
+ * Relayon — https://relayon.vercel.app
+ * Copyright (c) 2026 Zain Shah. All rights reserved.
+ *
+ * Licensed under the Relayon Proprietary Source-Visible License.
+ * See LICENSE in the repository root.
+ * Modification requires written permission from Zain Shah.
+ */
+/**
  * @relayon/sdk — Official SDK for the Relayon webhook relay platform.
  *
  * Two ways to use:

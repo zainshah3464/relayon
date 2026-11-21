@@ -1,5 +1,4 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { BadRequestException } from '@nestjs/common';
 import { WorkflowsService } from './workflows.service';
 import { makePrismaMock } from '../../../../../test/mocks/prisma';
 
@@ -11,13 +10,21 @@ vi.mock('jsonata', () => ({
 
 describe('WorkflowsService — YAML', () => {
   let service: WorkflowsService;
-  let prisma: ReturnType<typeof makePrismaMock>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let prisma: any;
   let versions: { capture: ReturnType<typeof vi.fn> };
+  let outbox: { emit: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
     prisma = makePrismaMock();
-    versions = { capture: vi.fn() };
-    service = new WorkflowsService(prisma as never, versions as never);
+    versions = { capture: vi.fn(async () => undefined) };
+    // ⚠️ v3.0 — outbox is 3rd constructor arg
+    outbox = { emit: vi.fn(async () => ({ outboxId: 'outbox-1' })) };
+    service = new WorkflowsService(
+      prisma,
+      versions as never,
+      outbox as never,
+    );
   });
 
   describe('exportYaml', () => {
@@ -90,7 +97,10 @@ spec:
       enabled: true`;
 
     it('rejects YAML with ${...} placeholders', async () => {
-      const withPlaceholder = validYaml.replace('whsec_real_value', '${SECRET}');
+      const withPlaceholder = validYaml.replace(
+        'whsec_real_value',
+        '${SECRET}',
+      );
 
       await expect(
         service.importYaml('t-1', withPlaceholder, null, 'create'),
@@ -118,18 +128,22 @@ spec:
         _count: { destinations: 1 },
       });
 
-      const result = await service.importYaml('t-1', validYaml, 'user-1', 'create');
+      const result = await service.importYaml(
+        't-1',
+        validYaml,
+        'user-1',
+        'create',
+      );
 
       expect(result.id).toBe('new-wf');
       expect(result.destinationsCreated).toBe(1);
       expect(result.updated).toBe(false);
       expect(versions.capture).toHaveBeenCalled();
+      expect(outbox.emit).toHaveBeenCalled();
     });
 
-    // ⚠️ FIX #3 — inline version capture needs full workflow + version mocks
     it('upserts by name in upsert mode', async () => {
       prisma.workflow.findFirst.mockResolvedValue({ id: 'existing-wf' });
-      // update() returns workflow WITH destinations (inline capture uses it)
       prisma.workflow.update.mockResolvedValue({
         id: 'existing-wf',
         name: 'Imported Flow',
@@ -142,14 +156,17 @@ spec:
         isActive: true,
         destinations: [],
       });
-      // Inline version capture inside update() needs these mocks
       prisma.workflowVersion.findFirst.mockResolvedValue({ version: 1 });
       prisma.workflowVersion.create.mockResolvedValue({});
-
       prisma.destination.deleteMany.mockResolvedValue({});
       prisma.destination.createMany.mockResolvedValue({ count: 1 });
 
-      const result = await service.importYaml('t-1', validYaml, 'user-1', 'upsert');
+      const result = await service.importYaml(
+        't-1',
+        validYaml,
+        'user-1',
+        'upsert',
+      );
 
       expect(result.updated).toBe(true);
       expect(result.id).toBe('existing-wf');

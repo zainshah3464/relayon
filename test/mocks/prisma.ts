@@ -15,6 +15,7 @@ interface TableMock {
   count: MockFn;
   aggregate: MockFn;
   groupBy: MockFn;
+  upsert: MockFn;
 }
 
 function makeTable(): TableMock {
@@ -31,33 +32,23 @@ function makeTable(): TableMock {
     count: vi.fn(),
     aggregate: vi.fn(),
     groupBy: vi.fn(),
+    upsert: vi.fn(),
   };
 }
 
 /**
- * Factory for a PrismaService mock. Every tenant table is pre-created
- * with all common methods as vi.fn(). Tests override return values
- * per call. `withTenant` / `withoutTenant` transparently delegate to
- * the mock itself so tests don't need to know about RLS wrapping.
+ * Factory for a PrismaService mock. Every table we use across the app
+ * is pre-created with all common methods as vi.fn(). Tests override
+ * return values per call.
+ *
+ * ⚠️ Return type is `any` intentionally — keeps all existing tests
+ * working without rewriting every single mock chain. Tests that need
+ * strict types can cast locally.
  */
-export function makePrismaMock(): {
-  tenant: TableMock;
-  user: TableMock;
-  workflow: TableMock;
-  destination: TableMock;
-  workflowVersion: TableMock;
-  workflowSchedule: TableMock;
-  apiKey: TableMock;
-  apiKeyRotation: TableMock;
-  usageCounter: TableMock;
-  refreshToken: TableMock;
-  $transaction: MockFn;
-  $queryRaw: MockFn;
-  $executeRaw: MockFn;
-  withTenant: MockFn;
-  withoutTenant: MockFn;
-} {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function makePrismaMock(): any {
   const tables = {
+    // ── Core (v1.0) ──
     tenant: makeTable(),
     user: makeTable(),
     workflow: makeTable(),
@@ -68,13 +59,55 @@ export function makePrismaMock(): {
     apiKeyRotation: makeTable(),
     usageCounter: makeTable(),
     refreshToken: makeTable(),
+
+    // ── v2.1 — auth ──
+    emailVerification: makeTable(),
+    passwordReset: makeTable(),
+
+    // ── v2.3 — AI chat + knowledge ──
+    chatSession: makeTable(),
+    chatMessage: makeTable(),
+    knowledgeChunk: makeTable(),
+
+    // ── v2.4 — analytics + admin ──
+    pageEvent: makeTable(),
+    adminAuditLog: makeTable(),
+
+    // ── v2.5 — community ──
+    communityPost: makeTable(),
+    communityReply: makeTable(),
+    communityLike: makeTable(),
+    communityFlag: makeTable(),
+
+    // ── v2.8 — moderation ──
+    moderationAction: makeTable(),
+    announcementShare: makeTable(),
+
+    // ── v3.0 — outbound webhooks + feature flags ──
+    outboxEvent: makeTable(),
+    webhookEndpoint: makeTable(),
+    featureFlag: makeTable(),
+
+    // ── v3.1 — CLI tunnel ──
+    tunnelSession: makeTable(),
+
+    // ── v3.5 — BYOK integrations ──
+    tenantIntegration: makeTable(),
   };
 
-  const prisma = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const prisma: any = {
     ...tables,
-    $transaction: vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => fn(prisma)),
+    $transaction: vi.fn(async (arg: unknown) => {
+      if (typeof arg === 'function') {
+        return (arg as (tx: unknown) => Promise<unknown>)(prisma);
+      }
+      return Promise.all(arg as Promise<unknown>[]);
+    }),
     $queryRaw: vi.fn(),
+    $queryRawUnsafe: vi.fn(),
     $executeRaw: vi.fn(),
+    $executeRawUnsafe: vi.fn(),
     withTenant: vi.fn(async (_tid: string, fn: (tx: unknown) => Promise<unknown>) =>
       fn(prisma),
     ),
