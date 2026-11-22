@@ -1,16 +1,17 @@
 import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ImpersonationClientService } from '../../core/admin/impersonation.service';
+import { IconComponent } from '../../shared/ui/icon/icon.component';
 
 @Component({
   selector: 'app-impersonation-banner',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, IconComponent],
   template: `
     @if (imp.isActive()) {
       <div class="fixed top-0 inset-x-0 z-[60] bg-signal-amber text-midnight py-1.5 px-4 flex items-center justify-between text-xs font-medium">
         <div class="flex items-center gap-2">
-          <span class="text-base">⚠</span>
+          <app-icon name="alert-triangle" [size]="14" [strokeWidth]="2.5" />
           <span>
             Impersonating <strong>{{ imp.target()?.name }}</strong>
             · {{ imp.minutesRemaining() }}min remaining

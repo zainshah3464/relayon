@@ -8,6 +8,10 @@ import {
   type ProviderStatus,
   type TestResult,
 } from '../../core/integrations/integrations.service';
+import { IconComponent } from '../../shared/ui/icon/icon.component';
+import { ModalComponent } from '../../shared/ui/modal/modal.component';
+import { ConfirmDialogService } from '../../shared/ui/confirm/confirm-dialog.service';
+import { ToastService } from '../../shared/ui/toast/toast.service';
 
 interface ProviderMeta {
   id: Provider;
@@ -16,134 +20,182 @@ interface ProviderMeta {
   keyPrefix: string;
   docsUrl: string;
   modelHint: string;
+  supportsModel: boolean;
 }
 
 const PROVIDERS: ProviderMeta[] = [
   {
     id: 'groq',
     name: 'Groq',
-    description: 'Powers AI enrichment and chat assistant. Free tier: 30 req/min.',
+    description: 'Powers AI enrichment and chat assistant.',
     keyPrefix: 'gsk_',
     docsUrl: 'https://console.groq.com/keys',
-    modelHint: 'e.g. openai/gpt-oss-120b, openai/gpt-oss-20b',
+    modelHint: 'e.g. openai/gpt-oss-120b',
+    supportsModel: true,
   },
   {
     id: 'openai',
     name: 'OpenAI',
-    description: 'Alternative AI provider. Useful if you want GPT-4 or embeddings.',
+    description: 'Alternative AI provider — GPT-4, embeddings.',
     keyPrefix: 'sk-',
     docsUrl: 'https://platform.openai.com/api-keys',
-    modelHint: 'e.g. gpt-4o-mini, gpt-4o',
+    modelHint: 'e.g. gpt-4o-mini',
+    supportsModel: true,
   },
   {
     id: 'anthropic',
     name: 'Anthropic',
-    description: 'Claude models — good for long context and careful reasoning.',
+    description: 'Claude models for long context.',
     keyPrefix: 'sk-ant-',
     docsUrl: 'https://console.anthropic.com/settings/keys',
-    modelHint: 'e.g. claude-3-5-sonnet-20241022',
+    modelHint: 'e.g. claude-3-5-sonnet',
+    supportsModel: true,
   },
   {
     id: 'resend',
     name: 'Resend',
-    description: 'Powers auth emails (verification, password reset).',
+    description: 'Auth emails — verification, password reset.',
     keyPrefix: 're_',
     docsUrl: 'https://resend.com/api-keys',
     modelHint: '',
+    supportsModel: false,
   },
 ];
 
 @Component({
   selector: 'app-integrations-settings',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, IconComponent, ModalComponent],
   template: `
-    <div class="space-y-6 max-w-4xl">
+    <div class="space-y-4">
+      <!-- ═══════════ HEADER ═══════════ -->
       <div>
-        <h1 class="text-2xl font-bold text-white">Integrations & API Keys</h1>
-        <p class="text-sm text-muted mt-1">
-          Bring your own API keys to use your own quota. If you don't add a key, Relayon uses its own.
+        <h2 class="text-lg font-semibold text-foreground">Integrations & API keys</h2>
+        <p class="mt-0.5 text-sm text-muted">
+          Bring your own API keys to use your own quota. Without a key, Relayon uses its own.
         </p>
       </div>
 
-      <div class="rounded-xl border border-relay-cyan/20 bg-relay-cyan/5 p-4">
-        <p class="text-sm text-relay-cyan">
-          <strong>💡 Why BYOK?</strong> Your keys give you control — your quota, your rate limits, your billing. When you add a key, that provider uses it exclusively for your workspace.
-        </p>
+      <!-- Info banner -->
+      <div class="flex items-start gap-2.5 rounded-lg border border-relay-cyan/25 bg-relay-cyan/[0.06] p-3 text-sm">
+        <app-icon name="zap" [size]="16" [strokeWidth]="2" class="mt-0.5 shrink-0 text-relay-cyan" />
+        <div class="min-w-0 flex-1">
+          <p class="text-xs text-relay-cyan">
+            <strong>Why BYOK?</strong> Your keys give you control — your quota, your rate limits, your billing. When you add a key, that provider uses it exclusively for your workspace.
+          </p>
+        </div>
       </div>
 
+      <!-- ═══════════ LOADING ═══════════ -->
       @if (loading()) {
-        <div class="card text-sm text-muted">Loading integrations...</div>
+        <div class="space-y-2">
+          @for (i of [1, 2, 3, 4]; track i) {
+            <div class="card">
+              <div class="flex items-center gap-3">
+                <div class="skeleton h-10 w-10 rounded-lg"></div>
+                <div class="flex-1">
+                  <div class="skeleton h-3 w-24"></div>
+                  <div class="skeleton mt-1.5 h-2.5 w-48"></div>
+                </div>
+              </div>
+            </div>
+          }
+        </div>
       } @else {
-        <div class="space-y-3">
+        <div class="space-y-2">
           @for (p of providers; track p.id) {
             <div class="card">
-              <div class="flex justify-between items-start mb-3">
-                <div class="flex items-center gap-3">
-                  <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-relay-violet to-relay-cyan text-white text-sm font-bold">
+              <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div class="flex items-start gap-3">
+                  <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-relay-violet to-relay-cyan text-sm font-bold text-white">
                     {{ p.name[0] }}
                   </div>
-                  <div>
-                    <h3 class="text-white font-medium">{{ p.name }}</h3>
-                    <p class="text-xs text-muted">{{ p.description }}</p>
+                  <div class="min-w-0">
+                    <div class="flex flex-wrap items-center gap-1.5">
+                      <h3 class="text-sm font-semibold text-foreground">{{ p.name }}</h3>
+                      @if (status()[p.id]) {
+                        @if (status()[p.id]!.source === 'tenant') {
+                          <span class="badge badge-success">
+                            <app-icon name="check" [size]="9" [strokeWidth]="3" />
+                            Your key
+                          </span>
+                        } @else if (status()[p.id]!.source === 'platform') {
+                          <span class="badge badge-warning">Platform key</span>
+                        } @else {
+                          <span class="badge badge-danger">Not configured</span>
+                        }
+                      }
+                    </div>
+                    <p class="mt-0.5 text-xs text-muted">{{ p.description }}</p>
                   </div>
                 </div>
-                @if (status()[p.id]; as s) {
-                  @if (s.source === 'tenant') {
-                    <span class="text-xs px-2 py-0.5 rounded bg-signal-green/20 text-signal-green whitespace-nowrap">
-                      ✓ Your key
-                    </span>
-                  } @else if (s.source === 'platform') {
-                    <span class="text-xs px-2 py-0.5 rounded bg-signal-amber/20 text-signal-amber whitespace-nowrap">
-                      Platform key
-                    </span>
-                  } @else {
-                    <span class="text-xs px-2 py-0.5 rounded bg-signal-rose/20 text-signal-rose whitespace-nowrap">
-                      Not configured
-                    </span>
-                  }
-                }
               </div>
 
-              <!-- Active state -->
-              @if (integrations()[p.id]; as int) {
-                <div class="bg-surface-2 rounded-lg p-3 space-y-2">
-                  <div class="flex justify-between text-xs">
-                    <span class="text-muted">API key</span>
-                    <span class="font-mono text-white">{{ int.apiKey }}</span>
-                  </div>
-                  @if (int.model) {
-                    <div class="flex justify-between text-xs">
-                      <span class="text-muted">Model</span>
-                      <span class="font-mono text-white">{{ int.model }}</span>
-                    </div>
-                  }
-                  <div class="flex justify-between text-xs">
-                    <span class="text-muted">Status</span>
-                    <span [class.text-signal-green]="int.lastValidationOk" [class.text-signal-rose]="int.lastValidationOk === false">
-                      @if (int.lastValidationOk === true) { ✓ Valid }
-                      @else if (int.lastValidationOk === false) { ✗ Invalid — {{ int.validationError }} }
-                      @else { Untested }
-                    </span>
-                  </div>
-                  @if (int.lastUsedAt) {
-                    <div class="flex justify-between text-xs">
-                      <span class="text-muted">Last used</span>
-                      <span class="text-white">{{ int.lastUsedAt | date: 'short' }}</span>
-                    </div>
-                  }
+              <!-- Active integration view -->
+              @if (integrations()[p.id]) {
+                @if (integrations()[p.id]; as int) {
+                  <div class="mt-3 rounded-lg border border-hairline bg-surface-2 p-3">
+                    <dl class="space-y-1.5 text-xs">
+                      <div class="flex items-center justify-between gap-2">
+                        <dt class="text-muted">API key</dt>
+                        <dd class="truncate font-mono text-foreground">{{ int.apiKey }}</dd>
+                      </div>
+                      @if (int.model) {
+                        <div class="flex items-center justify-between gap-2">
+                          <dt class="text-muted">Model</dt>
+                          <dd class="truncate font-mono text-foreground">{{ int.model }}</dd>
+                        </div>
+                      }
+                      <div class="flex items-center justify-between gap-2">
+                        <dt class="text-muted">Status</dt>
+                        <dd class="flex items-center gap-1">
+                          @if (int.lastValidationOk === true) {
+                            <app-icon name="check-circle" [size]="11" [strokeWidth]="2" class="text-signal-green" />
+                            <span class="text-signal-green">Valid</span>
+                          } @else if (int.lastValidationOk === false) {
+                            <app-icon name="x-circle" [size]="11" [strokeWidth]="2" class="text-signal-rose" />
+                            <span class="text-signal-rose">Invalid</span>
+                          } @else {
+                            <span class="text-muted">Untested</span>
+                          }
+                        </dd>
+                      </div>
+                      @if (int.lastUsedAt) {
+                        <div class="flex items-center justify-between gap-2">
+                          <dt class="text-muted">Last used</dt>
+                          <dd class="text-foreground">{{ int.lastUsedAt | date: 'short' }}</dd>
+                        </div>
+                      }
+                    </dl>
 
-                  <div class="flex gap-2 pt-2">
-                    <button (click)="edit(p.id)" class="btn-secondary text-xs">Update key</button>
-                    <button (click)="toggle(p.id)" class="btn-secondary text-xs">
-                      {{ int.isActive ? 'Disable' : 'Enable' }}
-                    </button>
-                    <button (click)="remove(p.id)" class="text-xs text-signal-rose hover:underline">Remove</button>
+                    <div class="mt-3 flex flex-wrap gap-1.5">
+                      <button type="button" (click)="edit(p.id)" class="btn-secondary text-xs">
+                        <app-icon name="edit" [size]="11" [strokeWidth]="2" />
+                        <span>Update key</span>
+                      </button>
+                      <button type="button" (click)="toggle(p.id)" class="btn-secondary text-xs">
+                        <app-icon
+                          [name]="int.isActive ? 'pause' : 'play'"
+                          [size]="11"
+                          [strokeWidth]="2"
+                        />
+                        <span>{{ int.isActive ? 'Disable' : 'Enable' }}</span>
+                      </button>
+                      <button
+                        type="button"
+                        (click)="remove(p.id)"
+                        class="btn-ghost text-xs text-signal-rose hover:bg-signal-rose/10"
+                      >
+                        <app-icon name="trash" [size]="11" [strokeWidth]="2" />
+                        <span>Remove</span>
+                      </button>
+                    </div>
                   </div>
-                </div>
+                }
               } @else {
-                <button (click)="edit(p.id)" class="btn-secondary text-xs">
-                  + Add your {{ p.name }} key
+                <button type="button" (click)="edit(p.id)" class="btn-secondary mt-3 self-start text-xs">
+                  <app-icon name="plus" [size]="11" [strokeWidth]="2.5" />
+                  <span>Add your {{ p.name }} key</span>
                 </button>
               }
             </div>
@@ -151,112 +203,156 @@ const PROVIDERS: ProviderMeta[] = [
         </div>
       }
 
-      <!-- Edit modal -->
+      <!-- ═══════════ EDIT MODAL ═══════════ -->
       @if (editing(); as editProvider) {
-        <div class="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" (click)="closeEdit()">
-          <div class="card w-full max-w-lg" (click)="$event.stopPropagation()">
-            <h2 class="text-lg font-semibold text-white mb-1">Add {{ meta(editProvider).name }} key</h2>
-            <p class="text-xs text-muted mb-4">
-              Get your key from
-              <a [href]="meta(editProvider).docsUrl" target="_blank" rel="noopener" class="text-relay-cyan hover:underline">
-                {{ meta(editProvider).docsUrl }}
-              </a>
-            </p>
+        <app-modal
+          title="Add {{ meta(editProvider).name }} key"
+          subtitle="Get your key from {{ meta(editProvider).docsUrl }}"
+          size="md"
+          (closed)="closeEdit()"
+        >
+          <div class="space-y-4">
+            <div>
+              <label for="int-key" class="label">API key</label>
+              <input
+                id="int-key"
+                [(ngModel)]="form.apiKey"
+                type="password"
+                [placeholder]="meta(editProvider).keyPrefix + '...'"
+                class="input font-mono text-sm"
+                autocomplete="off"
+              />
+              <p class="mt-1.5 text-[11px] text-muted">
+                <a
+                  [href]="meta(editProvider).docsUrl"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="inline-flex items-center gap-0.5 text-relay-cyan hover:underline"
+                >
+                  Open {{ meta(editProvider).name }} dashboard
+                  <app-icon name="external-link" [size]="10" [strokeWidth]="2" />
+                </a>
+              </p>
+            </div>
 
-            <div class="space-y-3">
+            @if (meta(editProvider).supportsModel) {
               <div>
-                <label class="label">API key</label>
+                <label for="int-model" class="label">Model (optional)</label>
                 <input
-                  [(ngModel)]="form.apiKey"
-                  type="password"
-                  [placeholder]="meta(editProvider).keyPrefix + '...'"
+                  id="int-model"
+                  [(ngModel)]="form.model"
+                  [placeholder]="meta(editProvider).modelHint"
                   class="input font-mono text-sm"
+                  list="available-models"
+                  autocomplete="off"
                 />
-              </div>
-
-              @if (editProvider === 'groq' || editProvider === 'openai' || editProvider === 'anthropic') {
-                <div>
-                  <label class="label">Model (optional)</label>
-                  <input
-                    [(ngModel)]="form.model"
-                    [placeholder]="meta(editProvider).modelHint"
-                    class="input font-mono text-sm"
-                    list="available-models"
-                  />
-                  @if (testResult()?.models?.length) {
-                    <datalist id="available-models">
-                      @for (m of testResult()!.models!; track m) {
-                        <option [value]="m"></option>
-                      }
-                    </datalist>
-                    <p class="text-xs text-muted mt-1">
-                      {{ testResult()!.models!.length }} models available
-                    </p>
-                  }
-                  <p class="text-xs text-muted mt-1">
-                    Leave empty to use the platform default.
+                @if (testResult()?.models?.length) {
+                  <datalist id="available-models">
+                    @for (m of testResult()!.models!; track m) {
+                      <option [value]="m"></option>
+                    }
+                  </datalist>
+                  <p class="mt-1.5 text-[11px] text-muted">
+                    {{ testResult()!.models!.length }} models available
                   </p>
-                </div>
-              }
+                }
+                <p class="mt-1.5 text-[11px] text-muted-2">
+                  Leave empty to use the platform default.
+                </p>
+              </div>
+            }
 
+            @if (testResult()) {
               @if (testResult(); as r) {
-                <!-- ⚠️ Fixed: slashed Tailwind classes moved into ngClass string values -->
                 <div
-                  class="rounded-lg border p-2 text-xs"
-                  [ngClass]="r.ok ? 'border-signal-green/30 bg-signal-green/5' : 'border-signal-rose/30 bg-signal-rose/5'"
+                  class="rounded-lg border p-3 text-xs"
+                  [ngClass]="{
+                    'border-signal-green/30': r.ok,
+                    'bg-signal-green/[0.06]': r.ok,
+                    'border-signal-rose/30': !r.ok,
+                    'bg-signal-rose/[0.06]': !r.ok
+                  }"
                 >
                   @if (r.ok) {
-                    <p class="text-signal-green font-medium">✓ Key is valid</p>
+                    <p class="flex items-center gap-1.5 font-medium text-signal-green">
+                      <app-icon name="check-circle" [size]="13" [strokeWidth]="2" />
+                      Key is valid
+                    </p>
                     @if (r.models?.length) {
-                      <p class="text-muted mt-1">{{ r.models!.length }} models available</p>
+                      <p class="mt-1 text-muted">{{ r.models!.length }} models available</p>
                     }
                   } @else {
-                    <p class="text-signal-rose font-medium">✗ {{ r.error }}</p>
+                    <p class="flex items-center gap-1.5 font-medium text-signal-rose">
+                      <app-icon name="x-circle" [size]="13" [strokeWidth]="2" />
+                      {{ r.error }}
+                    </p>
                   }
                 </div>
               }
+            }
 
-              @if (error()) {
-                <p class="text-sm text-signal-rose">{{ error() }}</p>
-              }
-            </div>
-
-            <div class="flex justify-between gap-2 mt-4">
-              <button (click)="test()" [disabled]="!form.apiKey || testing()" class="btn-secondary text-xs">
-                {{ testing() ? 'Testing...' : 'Test key' }}
-              </button>
-              <div class="flex gap-2">
-                <button (click)="closeEdit()" class="btn-secondary text-xs">Cancel</button>
-                <button
-                  (click)="save()"
-                  [disabled]="!form.apiKey || saving() || testResult()?.ok === false"
-                  class="btn-primary text-xs"
-                >
-                  {{ saving() ? 'Saving...' : 'Save key' }}
-                </button>
+            @if (error()) {
+              <div class="flex items-start gap-2.5 rounded-lg border border-signal-rose/30 bg-signal-rose/10 px-3 py-2.5 text-sm text-signal-rose">
+                <app-icon name="alert-circle" [size]="16" [strokeWidth]="2" class="mt-0.5 shrink-0" />
+                <span>{{ error() }}</span>
               </div>
+            }
+          </div>
+
+          <div modal-footer class="flex-col-reverse sm:flex-row">
+            <button
+              type="button"
+              (click)="test()"
+              [disabled]="!form.apiKey || testing()"
+              class="btn-secondary text-xs sm:mr-auto"
+            >
+              @if (testing()) {
+                <app-icon name="loader" [size]="12" [strokeWidth]="2.5" class="animate-spin" />
+              } @else {
+                <app-icon name="zap" [size]="12" [strokeWidth]="2" />
+              }
+              <span>{{ testing() ? 'Testing…' : 'Test key' }}</span>
+            </button>
+            <div class="flex flex-col-reverse gap-2 sm:flex-row">
+              <button type="button" (click)="closeEdit()" class="btn-secondary text-xs">
+                Cancel
+              </button>
+              <button
+                type="button"
+                (click)="save()"
+                [disabled]="!form.apiKey || saving() || testResult()?.ok === false"
+                class="btn-primary text-xs"
+              >
+                @if (saving()) {
+                  <app-icon name="loader" [size]="12" [strokeWidth]="2.5" class="animate-spin" />
+                }
+                <span>{{ saving() ? 'Saving…' : 'Save key' }}</span>
+              </button>
             </div>
           </div>
-        </div>
+        </app-modal>
       }
     </div>
   `,
 })
 export class IntegrationsSettingsComponent implements OnInit {
   private readonly api = inject(IntegrationsApiService);
+  private readonly confirm = inject(ConfirmDialogService);
+  private readonly toast = inject(ToastService);
 
   readonly providers = PROVIDERS;
 
-  integrations = signal<Record<string, Integration>>({});
-  status = signal<Record<string, ProviderStatus>>({});
-  loading = signal(true);
+  readonly integrations = signal<Record<string, Integration>>({});
+  readonly status = signal<Record<string, ProviderStatus>>({});
+  readonly loading = signal(true);
 
-  editing = signal<Provider | null>(null);
+  readonly editing = signal<Provider | null>(null);
+  readonly testing = signal(false);
+  readonly saving = signal(false);
+  readonly testResult = signal<TestResult | null>(null);
+  readonly error = signal<string | null>(null);
+
   form = { apiKey: '', model: '' };
-  testing = signal(false);
-  saving = signal(false);
-  testResult = signal<TestResult | null>(null);
-  error = signal<string | null>(null);
 
   ngOnInit(): void {
     this.load();
@@ -313,10 +409,13 @@ export class IntegrationsSettingsComponent implements OnInit {
       next: (r) => {
         this.testResult.set(r);
         this.testing.set(false);
+        if (r.ok) this.toast.success('Key is valid');
+        else this.toast.error(r.error ?? 'Key is invalid');
       },
       error: (err) => {
         this.testResult.set({ ok: false, error: err?.error?.message ?? 'Test failed' });
         this.testing.set(false);
+        this.toast.error('Test failed');
       },
     });
   }
@@ -337,6 +436,7 @@ export class IntegrationsSettingsComponent implements OnInit {
         next: () => {
           this.saving.set(false);
           this.editing.set(null);
+          this.toast.success(`${this.meta(provider).name} key saved`);
           this.load();
         },
         error: (err) => {
@@ -347,11 +447,31 @@ export class IntegrationsSettingsComponent implements OnInit {
   }
 
   toggle(provider: Provider): void {
-    this.api.toggle(provider).subscribe({ next: () => this.load() });
+    this.api.toggle(provider).subscribe({
+      next: () => {
+        this.toast.success('Integration updated');
+        this.load();
+      },
+      error: () => this.toast.error('Failed to update'),
+    });
   }
 
-  remove(provider: Provider): void {
-    if (!confirm(`Remove your ${this.meta(provider).name} key? Platform key will be used as fallback.`)) return;
-    this.api.remove(provider).subscribe({ next: () => this.load() });
+  async remove(provider: Provider): Promise<void> {
+    const ok = await this.confirm.confirm({
+      title: `Remove ${this.meta(provider).name} key`,
+      message: `Remove your ${this.meta(provider).name} key? The platform key will be used as fallback.`,
+      confirmText: 'Remove',
+      variant: 'danger',
+      icon: 'trash',
+    });
+    if (!ok) return;
+
+    this.api.remove(provider).subscribe({
+      next: () => {
+        this.toast.success('Key removed');
+        this.load();
+      },
+      error: () => this.toast.error('Failed to remove'),
+    });
   }
 }

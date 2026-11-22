@@ -16,11 +16,11 @@ import { SeoService } from '../../core/seo/seo.service';
   `,
 })
 export class TermsComponent {
-  // ⚠️ v3.7 — SEO metadata (title, OG, Twitter, canonical)
   constructor() {
     inject(SeoService).set({
       title: 'Terms of Service & License',
-      description: 'Relayon terms of service and Relayon Proprietary Source-Visible License v1.0 — acceptable use, payment, liability, and source code licensing for our webhook relay platform.',
+      description:
+        'Relayon terms of service and Relayon Proprietary Source-Visible License v1.0 — acceptable use, payment, liability, and source code licensing for our webhook relay platform.',
       path: '/terms',
       noindex: false,
     });
@@ -154,7 +154,7 @@ export class TermsComponent {
         </ul>
 
         <h3>Refunds</h3>
-        <p>After the first 30 days, refunds are provided only for extended service outages (>24 hours).</p>
+        <p>After the first 30 days, refunds are provided only for extended service outages (&gt;24 hours).</p>
 
         <h3>Price changes</h3>
         <p>We'll notify you 30 days before any price increase. Existing subscriptions are grandfathered at the old rate for 12 months.</p>
@@ -257,7 +257,7 @@ export class TermsComponent {
         <p>
           <strong>Full license text:</strong>
           <a href="https://github.com/zainshah3464/relayon/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">
-            LICENSE on GitHub →
+            LICENSE on GitHub
           </a>
         </p>
       `,
@@ -333,9 +333,9 @@ export class TermsComponent {
       content: `
         <p>
           <strong>Relayon</strong><br />
-          📧 <a href="mailto:hello@relayon.dev">hello@relayon.dev</a><br />
-          🔐 <a href="mailto:zainshahzs110@gmail.com">zainshahzs110@gmail.com</a> (license/permission requests)<br />
-          🐙 <a href="https://github.com/zainshah3464" target="_blank" rel="noopener">github.com/zainshah3464</a>
+          General: <a href="mailto:hello@relayon.dev">hello@relayon.dev</a><br />
+          License/permission requests: <a href="mailto:zainshahzs110@gmail.com">zainshahzs110@gmail.com</a><br />
+          GitHub: <a href="https://github.com/zainshah3464" target="_blank" rel="noopener">github.com/zainshah3464</a>
         </p>
       `,
     },

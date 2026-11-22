@@ -1,4 +1,12 @@
-import { Component, inject, signal, input, OnInit } from '@angular/core';
+import {
+  Component,
+  inject,
+  signal,
+  input,
+  OnInit,
+  ElementRef,
+  ViewChild,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -8,118 +16,307 @@ import {
   type CommunityPostDetail,
 } from '../../core/community/community.service';
 import { AuthService } from '../../core/auth/auth.service';
+import { IconComponent } from '../../shared/ui/icon/icon.component';
+import { ModalComponent } from '../../shared/ui/modal/modal.component';
+import { ConfirmDialogService } from '../../shared/ui/confirm/confirm-dialog.service';
+import { ToastService } from '../../shared/ui/toast/toast.service';
+
+type FlagReason = 'spam' | 'abuse' | 'off-topic' | 'other';
+
+interface FlagOption {
+  value: FlagReason;
+  label: string;
+  desc: string;
+}
 
 @Component({
   selector: 'app-post-detail',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, MarkdownComponent],
+  imports: [
+    CommonModule,
+    FormsModule,
+    RouterLink,
+    MarkdownComponent,
+    IconComponent,
+    ModalComponent,
+  ],
   template: `
+    <!-- ═══════════ LOADING ═══════════ -->
     @if (loading()) {
-      <div class="card text-sm text-muted">Loading post...</div>
-    } @else {
+      <div class="mx-auto max-w-4xl space-y-4">
+        <div class="skeleton h-3 w-32"></div>
+        <div class="card">
+          <div class="skeleton h-5 w-24"></div>
+          <div class="skeleton mt-3 h-7 w-3/4"></div>
+          <div class="skeleton mt-3 h-3 w-1/2"></div>
+          <div class="skeleton mt-4 h-9 w-40"></div>
+        </div>
+        <div class="card">
+          <div class="skeleton h-3 w-full"></div>
+          <div class="skeleton mt-2 h-3 w-full"></div>
+          <div class="skeleton mt-2 h-3 w-5/6"></div>
+        </div>
+      </div>
+    } @else if (post()) {
       @if (post(); as p) {
-        <div class="space-y-6 max-w-4xl">
-          <a routerLink="/community" class="text-xs text-muted hover:text-white">← Back to community</a>
+        <div class="mx-auto max-w-4xl space-y-4">
+          <!-- ═══════════ BACK LINK ═══════════ -->
+          <a
+            routerLink="/community"
+            class="inline-flex items-center gap-1 text-xs text-muted transition-colors hover:text-foreground"
+          >
+            <app-icon name="arrow-left" [size]="12" [strokeWidth]="2.5" />
+            <span>Back to community</span>
+          </a>
 
-          <div class="card">
-            <div class="flex items-center gap-2 mb-3">
-              <span class="text-xs px-2 py-0.5 rounded bg-surface-2 font-mono text-relay-cyan">{{ p.type }}</span>
+          <!-- ═══════════ POST HEADER ═══════════ -->
+          <article class="card">
+            <div class="flex flex-wrap items-center gap-1.5">
+              <span [ngClass]="typeBadgeClass(p.type)">
+                <app-icon [name]="typeIcon(p.type)" [size]="9" [strokeWidth]="2.5" />
+                {{ p.type }}
+              </span>
               @if (p.isOfficial) {
-                <span class="text-xs px-2 py-0.5 rounded bg-signal-amber/20 text-signal-amber">Official</span>
+                <span class="badge badge-warning">Official</span>
+              }
+              @if (p.isPinned) {
+                <span class="badge badge-info">
+                  <app-icon name="pin" [size]="9" [strokeWidth]="2.5" />
+                  Pinned
+                </span>
               }
             </div>
-            <h1 class="text-2xl font-bold text-white">{{ p.title }}</h1>
-            <p class="text-sm text-muted mt-2">
-              by {{ p.author?.name || 'Relayon' }}
-              @if (p.tenant) { · {{ p.tenant.name }} }
-              · {{ p.createdAt | date: 'medium' }}
-              · {{ p.viewCount }} views
-            </p>
 
-            <div class="flex gap-2 mt-4">
+            <h1 class="mt-3 text-2xl font-bold leading-tight tracking-tight text-foreground sm:text-3xl">
+              {{ p.title }}
+            </h1>
+
+            <div class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
+              <div class="flex items-center gap-2">
+                <div class="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-relay-violet to-relay-cyan text-[10px] font-semibold text-white">
+                  {{ initial(p.author?.name) }}
+                </div>
+                <span class="font-medium text-foreground">{{ p.author?.name || 'Relayon' }}</span>
+                @if (p.tenant) {
+                  <span class="text-muted-2">·</span>
+                  <span>{{ p.tenant.name }}</span>
+                }
+              </div>
+              <span class="text-muted-2">·</span>
+              <span>{{ p.createdAt | date: 'medium' }}</span>
+              <span class="text-muted-2">·</span>
+              <span class="flex items-center gap-1">
+                <app-icon name="eye" [size]="11" [strokeWidth]="2" />
+                {{ p.viewCount }}
+              </span>
+            </div>
+
+            <!-- Tags -->
+            @if (p.tags && p.tags.length > 0) {
+              <div class="mt-3 flex flex-wrap gap-1">
+                @for (tag of p.tags; track tag) {
+                  <span class="rounded bg-surface-2 px-1.5 py-0.5 font-mono text-[10px] text-muted">
+                    {{ tag }}
+                  </span>
+                }
+              </div>
+            }
+
+            <!-- Actions -->
+            <div class="mt-4 flex flex-wrap items-center gap-1.5 border-t border-hairline pt-3">
               <button
+                type="button"
                 (click)="like()"
-                class="btn-secondary text-xs"
-                [class.border-relay-violet]="p.hasLiked"
-                [class.text-relay-violet]="p.hasLiked"
+                class="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors"
+                [ngClass]="{
+                  'bg-signal-rose/10': p.hasLiked,
+                  'text-signal-rose': p.hasLiked,
+                  'text-muted': !p.hasLiked,
+                  'hover:bg-surface-2': !p.hasLiked
+                }"
               >
-                ♥ {{ p.likeCount }}
+                <app-icon
+                  name="heart"
+                  [size]="13"
+                  [strokeWidth]="2"
+                  [class.fill-current]="p.hasLiked"
+                />
+                <span class="tabular-nums">{{ p.likeCount }}</span>
               </button>
+
               @if (p.type === 'template') {
-                <button (click)="openImport(p.id)" class="btn-primary text-xs">Use this template</button>
+                <button
+                  type="button"
+                  (click)="openImport(p.id)"
+                  class="btn-primary text-xs"
+                >
+                  <app-icon name="download" [size]="12" [strokeWidth]="2.5" />
+                  <span>Use this template</span>
+                </button>
               }
-              <button (click)="flag()" class="btn-secondary text-xs text-signal-rose">Report</button>
+
+              <button
+                type="button"
+                (click)="openFlag()"
+                class="ml-auto flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-muted transition-colors hover:bg-signal-rose/10 hover:text-signal-rose"
+              >
+                <app-icon name="flag" [size]="12" [strokeWidth]="2" />
+                <span>Report</span>
+              </button>
             </div>
-          </div>
+          </article>
 
+          <!-- ═══════════ POST CONTENT ═══════════ -->
           <div class="card prose prose-invert max-w-none">
-            <markdown [data]="p.content"></markdown>
+            <markdown [data]="p.content" />
           </div>
 
+          <!-- ═══════════ REPLIES ═══════════ -->
           <div>
-            <h2 class="text-lg font-semibold text-white mb-3">Replies ({{ p.replies.length }})</h2>
+            <h2 class="flex items-center gap-2 text-lg font-semibold text-foreground">
+              <app-icon name="message-circle" [size]="16" [strokeWidth]="2" class="text-muted" />
+              Replies
+              <span class="rounded bg-surface-2 px-1.5 py-0.5 font-mono text-xs text-muted">
+                {{ p.replies.length }}
+              </span>
+            </h2>
 
             @if (p.replies.length === 0) {
-              <div class="card text-sm text-muted">No replies yet. Be the first!</div>
+              <div class="card mt-3 flex flex-col items-center justify-center py-10 text-center">
+                <div class="flex h-12 w-12 items-center justify-center rounded-xl border border-hairline bg-surface-2 text-muted">
+                  <app-icon name="message-circle" [size]="22" [strokeWidth]="1.75" />
+                </div>
+                <p class="mt-3 text-sm font-medium text-foreground">No replies yet</p>
+                <p class="mt-1 text-xs text-muted">Be the first to respond.</p>
+              </div>
             } @else {
-              <div class="space-y-2">
+              <div class="mt-3 space-y-2">
                 @for (r of p.replies; track r.id) {
                   <div
                     class="card"
                     [ngClass]="{
-                      'ms-8': r.parentId,
-                      'border-signal-green/30': r.isSolution
+                      'ms-4': r.parentId,
+                      'sm:ms-8': r.parentId,
+                      'border-signal-green/30': r.isSolution,
+                      'bg-signal-green/[0.03]': r.isSolution
                     }"
                   >
-                    <div class="flex justify-between items-start">
-                      <p class="text-sm font-medium text-white">
-                        {{ r.author.name }}
-                        @if (r.isSolution) {
-                          <span class="text-xs ms-2 text-signal-green">✓ Solution</span>
-                        }
-                      </p>
-                      <p class="text-xs text-muted">{{ r.createdAt | date: 'short' }}</p>
-                    </div>
-                    <div class="prose prose-invert max-w-none text-sm mt-2">
-                      <markdown [data]="r.content"></markdown>
-                    </div>
-                    <div class="flex gap-2 mt-3">
-                      <button
-                        (click)="likeReply(r.id)"
-                        class="text-xs"
-                        [class.text-relay-violet]="r.hasLiked"
-                        [class.text-muted]="!r.hasLiked"
-                      >♥ {{ r.likeCount }}</button>
-                      <button (click)="replyTo(r.id)" class="text-xs text-muted hover:text-white">Reply</button>
-                      @if (canMarkSolution() && !r.isSolution) {
-                        <button (click)="markSolution(r.id)" class="text-xs text-signal-green hover:underline">Mark as solution</button>
-                      }
+                    <div class="flex items-start gap-2.5">
+                      <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-relay-violet to-relay-cyan text-[11px] font-semibold text-white">
+                        {{ initial(r.author.name) }}
+                      </div>
+
+                      <div class="min-w-0 flex-1">
+                        <div class="flex flex-wrap items-center gap-1.5">
+                          <span class="text-sm font-medium text-foreground">
+                            {{ r.author.name }}
+                          </span>
+                          @if (r.isSolution) {
+                            <span class="badge badge-success">
+                              <app-icon name="check-circle" [size]="9" [strokeWidth]="2.5" />
+                              Solution
+                            </span>
+                          }
+                          <span class="text-[11px] text-muted-2">{{ r.createdAt | date: 'short' }}</span>
+                        </div>
+
+                        <div class="prose prose-invert mt-2 max-w-none text-sm">
+                          <markdown [data]="r.content" />
+                        </div>
+
+                        <div class="mt-2 flex flex-wrap items-center gap-1">
+                          <button
+                            type="button"
+                            (click)="likeReply(r.id)"
+                            class="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors"
+                            [class.text-signal-rose]="r.hasLiked"
+                            [class.text-muted]="!r.hasLiked"
+                            [class.hover:bg-surface-2]="!r.hasLiked"
+                          >
+                            <app-icon
+                              name="heart"
+                              [size]="11"
+                              [strokeWidth]="2"
+                              [class.fill-current]="r.hasLiked"
+                            />
+                            <span class="tabular-nums">{{ r.likeCount }}</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            (click)="replyTo(r.id)"
+                            class="rounded-md px-2 py-1 text-xs font-medium text-muted transition-colors hover:bg-surface-2 hover:text-foreground"
+                          >
+                            Reply
+                          </button>
+
+                          @if (canMarkSolution() && !r.isSolution) {
+                            <button
+                              type="button"
+                              (click)="markSolution(r.id)"
+                              class="ml-auto rounded-md px-2 py-1 text-xs font-medium text-signal-green transition-colors hover:bg-signal-green/10"
+                            >
+                              <app-icon name="check" [size]="11" [strokeWidth]="2.5" class="mr-0.5 inline" />
+                              Mark as solution
+                            </button>
+                          }
+                        </div>
+                      </div>
                     </div>
                   </div>
                 }
               </div>
             }
 
+            <!-- ═══════════ REPLY BOX ═══════════ -->
             <div class="card mt-4">
-              @if (replyToId()) {
-                <p class="text-xs text-muted mb-1">
-                  Replying to a comment ·
-                  <button (click)="cancelReply()" class="text-relay-cyan hover:underline">Cancel</button>
-                </p>
-              }
+              <div class="flex items-center gap-2">
+                <div class="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-relay-violet to-relay-cyan text-[11px] font-semibold text-white">
+                  {{ initial(auth.displayName()) }}
+                </div>
+                <div class="min-w-0 flex-1">
+                  @if (replyToId()) {
+                    <p class="flex items-center gap-1.5 text-xs text-muted">
+                      Replying to a comment
+                      <button
+                        type="button"
+                        (click)="cancelReply()"
+                        class="text-relay-cyan hover:underline"
+                      >
+                        Cancel
+                      </button>
+                    </p>
+                  } @else {
+                    <p class="text-xs font-medium text-foreground">Write a reply</p>
+                  }
+                </div>
+              </div>
+
               <textarea
+                #replyTextarea
                 [(ngModel)]="replyContent"
                 rows="3"
-                class="input font-mono text-sm"
-                placeholder="Write a reply (Markdown supported)..."
+                class="input mt-3 font-mono text-sm"
+                placeholder="Markdown supported…"
               ></textarea>
-              <div class="flex justify-end mt-2">
+
+              <div class="mt-2 flex items-center justify-between">
+                <p class="text-[11px] text-muted-2">
+                  <app-icon name="sparkles" [size]="10" [strokeWidth]="2" class="mr-0.5 inline" />
+                  Markdown supported
+                </p>
                 <button
+                  type="button"
                   (click)="submitReply()"
                   [disabled]="!replyContent.trim() || submitting()"
                   class="btn-primary text-xs"
                 >
-                  {{ submitting() ? 'Posting...' : 'Post reply' }}
+                  @if (submitting()) {
+                    <app-icon name="loader" [size]="12" [strokeWidth]="2.5" class="animate-spin" />
+                  } @else {
+                    <app-icon name="send" [size]="12" [strokeWidth]="2.5" />
+                  }
+                  <span>{{ submitting() ? 'Posting…' : 'Post reply' }}</span>
                 </button>
               </div>
             </div>
@@ -128,55 +325,152 @@ import { AuthService } from '../../core/auth/auth.service';
       }
     }
 
+    <!-- ═══════════ IMPORT TEMPLATE MODAL ═══════════ -->
     @if (importPreview(); as imp) {
-      <div class="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" (click)="closeImport()">
-        <div class="card w-full max-w-3xl max-h-[90vh] overflow-y-auto" (click)="$event.stopPropagation()">
-          <h2 class="text-lg font-semibold text-white mb-3">Import template</h2>
-          <p class="text-xs text-muted mb-3">Fill in the placeholders below.</p>
-
+      <app-modal
+        title="Import template"
+        subtitle="Fill in the placeholders to create a workflow from this template."
+        size="lg"
+        (closed)="closeImport()"
+      >
+        <div class="space-y-3">
           @for (ph of imp.placeholders; track ph) {
-            <div class="mb-3">
-              <label class="label font-mono text-xs">{{ ph }}</label>
+            <div>
+              <label [for]="'ph-' + ph" class="label font-mono text-xs">{{ ph }}</label>
               <input
+                [id]="'ph-' + ph"
                 [value]="placeholderValues()[ph] || ''"
                 (input)="setPlaceholder(ph, $any($event.target).value)"
                 class="input font-mono text-sm"
-                placeholder="Paste your value..."
+                placeholder="Paste your value…"
+                autocomplete="off"
               />
             </div>
           }
-
-          @if (importError()) {
-            <div class="text-sm text-signal-rose mt-2">{{ importError() }}</div>
+          @if (imp.placeholders.length === 0) {
+            <p class="text-sm text-muted">
+              No configuration needed — you can import this template as-is.
+            </p>
           }
 
-          <div class="flex justify-end gap-2 mt-4">
-            <button (click)="closeImport()" class="btn-secondary text-xs">Cancel</button>
-            <button (click)="submitImport()" [disabled]="importing()" class="btn-primary text-xs">
-              {{ importing() ? 'Importing...' : 'Import workflow' }}
-            </button>
-          </div>
+          @if (importError()) {
+            <div class="flex items-start gap-2.5 rounded-lg border border-signal-rose/30 bg-signal-rose/10 px-3 py-2.5 text-sm text-signal-rose">
+              <app-icon name="alert-circle" [size]="16" [strokeWidth]="2" class="mt-0.5 shrink-0" />
+              <span>{{ importError() }}</span>
+            </div>
+          }
         </div>
-      </div>
+
+        <div modal-footer>
+          <button type="button" (click)="closeImport()" class="btn-secondary">
+            Cancel
+          </button>
+          <button
+            type="button"
+            (click)="submitImport()"
+            [disabled]="importing()"
+            class="btn-primary"
+          >
+            @if (importing()) {
+              <app-icon name="loader" [size]="13" [strokeWidth]="2.5" class="animate-spin" />
+            } @else {
+              <app-icon name="download" [size]="13" [strokeWidth]="2.5" />
+            }
+            <span>{{ importing() ? 'Importing…' : 'Import workflow' }}</span>
+          </button>
+        </div>
+      </app-modal>
+    }
+
+    <!-- ═══════════ FLAG MODAL ═══════════ -->
+    @if (showFlag()) {
+      <app-modal
+        title="Report this post"
+        subtitle="Help keep the community safe — tell us why."
+        size="sm"
+        (closed)="closeFlag()"
+      >
+        <div class="space-y-1.5">
+          @for (opt of flagOptions; track opt.value) {
+            <button
+              type="button"
+              (click)="selectedReason.set(opt.value)"
+              class="flex w-full items-start gap-2.5 rounded-lg border p-3 text-left transition-colors"
+              [ngClass]="{
+                'border-relay-violet': selectedReason() === opt.value,
+                'bg-relay-violet/[0.06]': selectedReason() === opt.value,
+                'border-hairline': selectedReason() !== opt.value,
+                'hover:border-hairline-strong': selectedReason() !== opt.value
+              }"
+            >
+              <app-icon
+                [name]="selectedReason() === opt.value ? 'check-circle' : 'circle'"
+                [size]="14"
+                [strokeWidth]="2"
+                [class.text-relay-violet]="selectedReason() === opt.value"
+                [class.text-muted-2]="selectedReason() !== opt.value"
+                class="mt-0.5 shrink-0"
+              />
+              <div class="min-w-0">
+                <p class="text-sm font-medium text-foreground">{{ opt.label }}</p>
+                <p class="mt-0.5 text-[11px] text-muted">{{ opt.desc }}</p>
+              </div>
+            </button>
+          }
+        </div>
+
+        <div modal-footer>
+          <button type="button" (click)="closeFlag()" class="btn-secondary">
+            Cancel
+          </button>
+          <button
+            type="button"
+            (click)="submitFlag()"
+            [disabled]="!selectedReason() || flagging()"
+            class="btn-danger"
+          >
+            @if (flagging()) {
+              <app-icon name="loader" [size]="13" [strokeWidth]="2.5" class="animate-spin" />
+            }
+            <span>{{ flagging() ? 'Reporting…' : 'Report post' }}</span>
+          </button>
+        </div>
+      </app-modal>
     }
   `,
 })
 export class PostDetailComponent implements OnInit {
   readonly slug = input.required<string>();
 
-  private api = inject(CommunityApiService);
-  private auth = inject(AuthService);
+  private readonly api = inject(CommunityApiService);
+  readonly auth = inject(AuthService);
+  private readonly confirm = inject(ConfirmDialogService);
+  private readonly toast = inject(ToastService);
 
-  post = signal<CommunityPostDetail | null>(null);
-  loading = signal(true);
-  submitting = signal(false);
+  @ViewChild('replyTextarea')
+  replyTextarea?: ElementRef<HTMLTextAreaElement>;
+
+  readonly post = signal<CommunityPostDetail | null>(null);
+  readonly loading = signal(true);
+  readonly submitting = signal(false);
+  readonly replyToId = signal<string | null>(null);
   replyContent = '';
-  replyToId = signal<string | null>(null);
 
-  importPreview = signal<{ yaml: string; placeholders: string[] } | null>(null);
-  placeholderValues = signal<Record<string, string>>({});
-  importError = signal<string | null>(null);
-  importing = signal(false);
+  readonly importPreview = signal<{ yaml: string; placeholders: string[] } | null>(null);
+  readonly placeholderValues = signal<Record<string, string>>({});
+  readonly importError = signal<string | null>(null);
+  readonly importing = signal(false);
+
+  readonly showFlag = signal(false);
+  readonly selectedReason = signal<FlagReason | null>(null);
+  readonly flagging = signal(false);
+
+  readonly flagOptions: FlagOption[] = [
+    { value: 'spam', label: 'Spam', desc: 'Unsolicited promotion or repetitive content' },
+    { value: 'abuse', label: 'Abuse', desc: 'Harassment, hate speech, or threats' },
+    { value: 'off-topic', label: 'Off-topic', desc: 'Unrelated to webhooks or Relayon' },
+    { value: 'other', label: 'Other', desc: 'Something else that needs review' },
+  ];
 
   ngOnInit(): void {
     this.load();
@@ -198,6 +492,25 @@ export class PostDetailComponent implements OnInit {
     return !!p && p.author?.id === this.auth.user()?.id;
   }
 
+  initial(name?: string): string {
+    if (!name) return '?';
+    return name[0]!.toUpperCase();
+  }
+
+  typeIcon(type: string): 'code' | 'file-text' | 'message-square' {
+    if (type === 'template') return 'code';
+    if (type === 'article') return 'file-text';
+    return 'message-square';
+  }
+
+  typeBadgeClass(type: string): string {
+    const base =
+      'inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-[10px] font-medium';
+    if (type === 'template') return `${base} bg-relay-violet/15 text-relay-violet`;
+    if (type === 'article') return `${base} bg-info/15 text-info`;
+    return `${base} bg-surface-3 text-muted`;
+  }
+
   like(): void {
     const p = this.post();
     if (!p) return;
@@ -209,6 +522,7 @@ export class PostDetailComponent implements OnInit {
           likeCount: p.likeCount + (r.liked ? 1 : -1),
         });
       },
+      error: () => this.toast.error('Failed to like post'),
     });
   }
 
@@ -230,12 +544,13 @@ export class PostDetailComponent implements OnInit {
           ),
         });
       },
+      error: () => this.toast.error('Failed to like reply'),
     });
   }
 
   replyTo(id: string): void {
     this.replyToId.set(id);
-    document.querySelector<HTMLTextAreaElement>('textarea')?.focus();
+    setTimeout(() => this.replyTextarea?.nativeElement?.focus(), 0);
   }
 
   cancelReply(): void {
@@ -258,25 +573,61 @@ export class PostDetailComponent implements OnInit {
           this.replyContent = '';
           this.replyToId.set(null);
           this.submitting.set(false);
+          this.toast.success('Reply posted');
           this.load();
         },
-        error: () => this.submitting.set(false),
+        error: () => {
+          this.submitting.set(false);
+          this.toast.error('Failed to post reply');
+        },
       });
   }
 
-  markSolution(id: string): void {
-    this.api.markSolution(id).subscribe({ next: () => this.load() });
+  async markSolution(id: string): Promise<void> {
+    const ok = await this.confirm.confirm({
+      title: 'Mark as solution',
+      message:
+        'This will mark the reply as the accepted solution. You can change it later.',
+      confirmText: 'Mark as solution',
+      variant: 'default',
+      icon: 'info',
+    });
+    if (!ok) return;
+
+    this.api.markSolution(id).subscribe({
+      next: () => {
+        this.toast.success('Marked as solution');
+        this.load();
+      },
+      error: () => this.toast.error('Failed to mark solution'),
+    });
   }
 
-  flag(): void {
+  openFlag(): void {
+    this.selectedReason.set(null);
+    this.showFlag.set(true);
+  }
+
+  closeFlag(): void {
+    if (!this.flagging()) this.showFlag.set(false);
+  }
+
+  submitFlag(): void {
     const p = this.post();
-    if (!p) return;
-    const reason = prompt(
-      'Reason: spam / abuse / off-topic / other',
-    ) as 'spam' | 'abuse' | 'off-topic' | 'other' | null;
-    if (!reason) return;
+    const reason = this.selectedReason();
+    if (!p || !reason || this.flagging()) return;
+
+    this.flagging.set(true);
     this.api.flag({ postId: p.id, reason }).subscribe({
-      next: () => alert('Reported. Thanks.'),
+      next: () => {
+        this.flagging.set(false);
+        this.showFlag.set(false);
+        this.toast.success('Report submitted — thank you');
+      },
+      error: () => {
+        this.flagging.set(false);
+        this.toast.error('Failed to submit report');
+      },
     });
   }
 
@@ -286,7 +637,7 @@ export class PostDetailComponent implements OnInit {
     this.api.previewTemplate(postId).subscribe({
       next: (r) => this.importPreview.set(r),
       error: (err) =>
-        this.importError.set(err?.error?.message ?? 'Failed to load template'),
+        this.toast.error(err?.error?.message ?? 'Failed to load template'),
     });
   }
 
@@ -319,7 +670,10 @@ export class PostDetailComponent implements OnInit {
       next: (r) => {
         this.importing.set(false);
         this.importPreview.set(null);
-        window.location.href = `/workflows/${r.workflowId}`;
+        this.toast.success('Template imported');
+        if (typeof window !== 'undefined') {
+          window.location.href = `/workflows/${r.workflowId}`;
+        }
       },
       error: (err) => {
         this.importing.set(false);

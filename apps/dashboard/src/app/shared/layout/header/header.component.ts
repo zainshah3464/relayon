@@ -6,141 +6,132 @@ import {
   inject,
   output,
   signal,
+  computed,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { TranslocoModule } from '@jsverse/transloco';
 import { AuthService } from '../../../core/auth/auth.service';
 import { LanguageService, type SupportedLang } from '../../../i18n/language.service';
+import { LogoComponent } from '../../ui/logo/logo.component';
+import { IconComponent } from '../../ui/icon/icon.component';
 
 @Component({
   selector: 'app-header',
   standalone: true,
-  imports: [CommonModule, RouterLink, TranslocoModule],
+  imports: [CommonModule, RouterLink, TranslocoModule, LogoComponent, IconComponent],
   template: `
     <header
-      class="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-2 border-b border-hairline bg-surface/95 px-4 backdrop-blur-sm lg:px-6"
+      class="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-2 border-b border-hairline bg-surface/95 px-3 backdrop-blur-md lg:px-6 pt-safe"
     >
-      <!-- ── LEFT: Hamburger (mobile) + Logo (mobile) or Breadcrumb (desktop) ── -->
+      <!-- ═══ LEFT: Hamburger (mobile) + Logo (mobile) or Page title (desktop) ═══ -->
       <button
+        type="button"
         (click)="toggleSidebar.emit()"
-        class="flex h-9 w-9 items-center justify-center rounded-lg text-muted hover:bg-surface-2 hover:text-white lg:hidden"
-        aria-label="Toggle sidebar"
+        class="flex h-9 w-9 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-2 hover:text-foreground lg:hidden"
+        aria-label="Open menu"
       >
-        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-        </svg>
+        <app-icon name="menu" [size]="18" [strokeWidth]="2" />
       </button>
 
       <!-- Mobile logo -->
-      <a routerLink="/dashboard" class="flex items-center gap-2 lg:hidden">
-        <div class="flex h-7 w-7 items-center justify-center rounded-md bg-gradient-to-br from-relay-violet to-relay-cyan text-[11px] font-bold text-white">
-          R
-        </div>
-        <span class="text-sm font-bold tracking-tight text-white">Relayon</span>
-      </a>
-
-      <!-- Desktop breadcrumb placeholder -->
-      <div class="hidden items-center gap-2 text-sm lg:flex">
-        <span class="text-white font-medium">{{ pageTitle() }}</span>
+      <div class="lg:hidden">
+        <app-logo size="sm" />
       </div>
 
-      <!-- ── CENTER: Search (desktop) ── -->
+      <!-- Desktop page title -->
+      <div class="hidden items-center gap-2 lg:flex">
+        <span class="text-sm font-semibold tracking-tight text-foreground">{{ pageTitle() }}</span>
+      </div>
+
+      <!-- ═══ CENTER: Search (desktop) ═══ -->
       <div class="hidden flex-1 justify-center lg:flex">
         <button
+          type="button"
           (click)="openSearch()"
-          class="group flex w-full max-w-md items-center gap-2 rounded-lg border border-hairline bg-surface-2 px-3 py-1.5 text-left text-xs text-muted transition hover:border-relay-violet/40 hover:text-white"
+          class="group flex w-full max-w-md items-center gap-2 rounded-lg border border-hairline bg-surface-2 px-3 py-1.5 text-left text-xs text-muted transition-colors hover:border-hairline-strong hover:text-foreground"
         >
-          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-          <span class="flex-1">Search events, workflows...</span>
-          <kbd class="hidden rounded border border-hairline bg-midnight px-1.5 py-0.5 text-[10px] font-mono text-muted xl:inline">
+          <app-icon name="search" [size]="14" [strokeWidth]="2" />
+          <span class="flex-1">Search events…</span>
+          <kbd class="hidden rounded border border-hairline bg-midnight px-1.5 py-0.5 text-[10px] font-mono text-muted-2 xl:inline">
             ⌘K
           </kbd>
         </button>
       </div>
 
-      <!-- ── RIGHT: Actions ── -->
-      <div class="ml-auto flex items-center gap-1 lg:gap-2">
+      <!-- ═══ RIGHT: Actions ═══ -->
+      <div class="ml-auto flex items-center gap-1 lg:gap-1.5">
         <!-- Search (mobile) -->
         <button
+          type="button"
           (click)="openSearch()"
-          class="flex h-9 w-9 items-center justify-center rounded-lg text-muted hover:bg-surface-2 hover:text-white lg:hidden"
+          class="flex h-9 w-9 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-2 hover:text-foreground lg:hidden"
           aria-label="Search"
         >
-          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
+          <app-icon name="search" [size]="16" [strokeWidth]="2" />
         </button>
 
-        <!-- Quick action: New workflow -->
+        <!-- New workflow (desktop) -->
         <a
           routerLink="/workflows"
           [queryParams]="{ new: '1' }"
-          class="hidden items-center gap-1.5 rounded-lg bg-relay-violet px-3 py-1.5 text-xs font-medium text-white transition hover:bg-relay-violet/90 sm:flex"
+          class="hidden items-center gap-1.5 rounded-lg bg-relay-violet px-3 py-1.5 text-xs font-medium text-white transition-all duration-150 hover:bg-relay-violet-dim sm:flex"
         >
-          <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-          </svg>
-          New workflow
+          <app-icon name="plus" [size]="13" [strokeWidth]="2.25" />
+          <span>New workflow</span>
         </a>
 
         <!-- Help -->
         <a
           routerLink="/guide"
-          class="flex h-9 w-9 items-center justify-center rounded-lg text-muted hover:bg-surface-2 hover:text-white"
+          class="flex h-9 w-9 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-2 hover:text-foreground"
           title="Help & guide"
+          aria-label="Help"
         >
-          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
+          <app-icon name="help" [size]="16" [strokeWidth]="2" />
         </a>
-
-        <!-- Language switcher (desktop compact) -->
-        <div class="hidden items-center lg:flex">
-          <select
-            [value]="lang.current()"
-            (change)="onLangChange($event)"
-            class="rounded-lg border border-hairline bg-surface-2 px-2 py-1 text-xs text-white focus:border-relay-violet focus:outline-none"
-            aria-label="Language"
-          >
-            <option value="en">EN</option>
-            <option value="ur">UR</option>
-            <option value="ar">AR</option>
-          </select>
-        </div>
 
         <!-- User menu -->
         <div #userMenuRef class="relative">
           <button
+            type="button"
             (click)="toggleUserMenu()"
             [attr.aria-expanded]="userMenuOpen()"
             aria-haspopup="menu"
-            class="flex items-center gap-2 rounded-lg p-1 hover:bg-surface-2"
+            class="flex items-center gap-2 rounded-lg p-1 transition-colors hover:bg-surface-2"
           >
-            <div class="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-relay-violet to-relay-cyan text-xs font-semibold text-white">
+            <div class="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-relay-violet to-relay-cyan text-xs font-semibold text-white shadow-sm">
               {{ initial() }}
             </div>
             <div class="hidden text-left lg:block">
-              <p class="text-xs font-medium text-white leading-tight">{{ auth.displayName() }}</p>
-              <p class="text-[10px] text-muted leading-tight">{{ auth.user()?.tenantName }}</p>
+              <p class="max-w-[140px] truncate text-xs font-medium leading-tight text-foreground">
+                {{ auth.displayName() }}
+              </p>
+              <p class="max-w-[140px] truncate text-[10px] leading-tight text-muted">
+                {{ auth.user()?.tenantName }}
+              </p>
             </div>
-            <svg class="hidden h-3 w-3 text-muted lg:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-            </svg>
+            <app-icon
+              name="chevron-down"
+              [size]="12"
+              [strokeWidth]="2"
+              class="hidden text-muted-2 lg:block"
+            />
           </button>
 
           <!-- Dropdown -->
           @if (userMenuOpen()) {
             <div
-              class="absolute end-0 mt-2 w-56 overflow-hidden rounded-xl border border-hairline bg-surface shadow-xl"
+              class="absolute end-0 mt-2 w-64 overflow-hidden rounded-xl border border-hairline bg-surface shadow-xl animate-slide-down"
               role="menu"
+              aria-label="User menu"
             >
               <!-- User header -->
               <div class="border-b border-hairline px-4 py-3">
-                <p class="text-sm font-medium text-white truncate">{{ auth.displayName() }}</p>
-                <p class="text-xs text-muted truncate">{{ auth.user()?.email }}</p>
+                <p class="truncate text-sm font-semibold text-foreground">
+                  {{ auth.displayName() }}
+                </p>
+                <p class="truncate text-xs text-muted">{{ auth.user()?.email }}</p>
               </div>
 
               <!-- Menu items -->
@@ -148,65 +139,90 @@ import { LanguageService, type SupportedLang } from '../../../i18n/language.serv
                 <a
                   routerLink="/settings"
                   (click)="closeUserMenu()"
-                  class="flex items-center gap-2.5 rounded-md px-2.5 py-2 text-xs text-muted hover:bg-surface-2 hover:text-white"
+                  class="flex items-center gap-2.5 rounded-md px-2.5 py-2 text-xs text-muted transition-colors hover:bg-surface-2 hover:text-foreground"
                   role="menuitem"
                 >
-                  <span>⚙️</span> Settings
+                  <app-icon name="settings" [size]="14" [strokeWidth]="1.75" />
+                  <span>Settings</span>
                 </a>
                 <a
                   routerLink="/settings"
                   [queryParams]="{ tab: 'api-keys' }"
                   (click)="closeUserMenu()"
-                  class="flex items-center gap-2.5 rounded-md px-2.5 py-2 text-xs text-muted hover:bg-surface-2 hover:text-white"
+                  class="flex items-center gap-2.5 rounded-md px-2.5 py-2 text-xs text-muted transition-colors hover:bg-surface-2 hover:text-foreground"
                   role="menuitem"
                 >
-                  <span>🔑</span> API keys
+                  <app-icon name="key" [size]="14" [strokeWidth]="1.75" />
+                  <span>API keys</span>
                 </a>
                 <a
                   routerLink="/about"
                   (click)="closeUserMenu()"
-                  class="flex items-center gap-2.5 rounded-md px-2.5 py-2 text-xs text-muted hover:bg-surface-2 hover:text-white"
+                  class="flex items-center gap-2.5 rounded-md px-2.5 py-2 text-xs text-muted transition-colors hover:bg-surface-2 hover:text-foreground"
                   role="menuitem"
                 >
-                  <span>👤</span> About Relayon
+                  <app-icon name="info" [size]="14" [strokeWidth]="1.75" />
+                  <span>About Relayon</span>
                 </a>
                 <a
                   routerLink="/guide"
                   (click)="closeUserMenu()"
-                  class="flex items-center gap-2.5 rounded-md px-2.5 py-2 text-xs text-muted hover:bg-surface-2 hover:text-white"
+                  class="flex items-center gap-2.5 rounded-md px-2.5 py-2 text-xs text-muted transition-colors hover:bg-surface-2 hover:text-foreground"
                   role="menuitem"
                 >
-                  <span>📖</span> Help & guide
+                  <app-icon name="book" [size]="14" [strokeWidth]="1.75" />
+                  <span>Help & guide</span>
                 </a>
                 <a
                   href="mailto:hello@relayon.dev"
                   (click)="closeUserMenu()"
-                  class="flex items-center gap-2.5 rounded-md px-2.5 py-2 text-xs text-muted hover:bg-surface-2 hover:text-white"
+                  class="flex items-center gap-2.5 rounded-md px-2.5 py-2 text-xs text-muted transition-colors hover:bg-surface-2 hover:text-foreground"
                   role="menuitem"
                 >
-                  <span>✉️</span> Contact support
+                  <app-icon name="mail" [size]="14" [strokeWidth]="1.75" />
+                  <span>Contact support</span>
                 </a>
+              </div>
+
+              <!-- Language section -->
+              <div class="border-t border-hairline p-2">
+                <p class="px-2 pb-1.5 pt-1 text-[10px] font-medium uppercase tracking-wider text-muted-2">
+                  {{ 'language.label' | transloco }}
+                </p>
+                <div class="grid grid-cols-3 gap-1">
+                  @for (l of languages; track l.code) {
+                    <button
+                      type="button"
+                      (click)="setLanguage(l.code)"
+                      [class.bg-surface-2]="lang.current() === l.code"
+                      [class.text-foreground]="lang.current() === l.code"
+                      [class.text-muted]="lang.current() !== l.code"
+                      class="rounded-md px-2 py-1.5 text-xs font-medium transition-colors hover:bg-surface-2"
+                      role="menuitemradio"
+                      [attr.aria-checked]="lang.current() === l.code"
+                    >
+                      {{ l.short }}
+                    </button>
+                  }
+                </div>
               </div>
 
               <!-- Sign out -->
               <div class="border-t border-hairline p-1.5">
                 <button
+                  type="button"
                   (click)="signOut()"
-                  class="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-xs text-signal-rose hover:bg-signal-rose/10"
+                  class="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-xs text-signal-rose transition-colors hover:bg-signal-rose/10"
                   role="menuitem"
                 >
-                  <span>🚪</span> Sign out
+                  <app-icon name="logout" [size]="14" [strokeWidth]="1.75" />
+                  <span>Sign out</span>
                 </button>
               </div>
 
-              <!-- Version / credit -->
-              <div class="border-t border-hairline bg-surface-2 px-3 py-2 text-[10px] text-muted">
-                <div class="flex items-center justify-between">
-                  <span>Relayon v3.2</span>
-                  <a routerLink="/about" (click)="closeUserMenu()" class="hover:text-white">
-                    by Zain Shah
-                  </a>
-                </div>
+              <!-- Version footer -->
+              <div class="border-t border-hairline bg-surface-2 px-3 py-2 text-[10px] text-muted-2">
+                <span class="font-mono">Relayon v3.7</span>
               </div>
             </div>
           }
@@ -219,23 +235,30 @@ export class HeaderComponent {
   readonly toggleSidebar = output<void>();
   readonly openSearchEvent = output<void>();
 
-  auth = inject(AuthService);
-  lang = inject(LanguageService);
+  readonly auth = inject(AuthService);
+  readonly lang = inject(LanguageService);
   private readonly router = inject(Router);
 
   @ViewChild('userMenuRef') userMenuRef?: ElementRef<HTMLDivElement>;
 
-  userMenuOpen = signal(false);
+  readonly userMenuOpen = signal(false);
 
-  initial = (): string => {
+  readonly languages: Array<{ code: SupportedLang; short: string; label: string }> = [
+    { code: 'en', short: 'EN', label: 'English' },
+    { code: 'ur', short: 'UR', label: 'اردو' },
+    { code: 'ar', short: 'AR', label: 'العربية' },
+  ];
+
+  readonly initial = computed(() => {
     const name = this.auth.displayName();
     return name ? name[0]!.toUpperCase() : '?';
-  };
+  });
 
-  pageTitle(): string {
+  readonly pageTitle = computed(() => {
     const url = this.router.url.split('?')[0] ?? '';
     if (url.startsWith('/dashboard')) return 'Dashboard';
     if (url.startsWith('/workflows')) return 'Workflows';
+    if (url.startsWith('/playground')) return 'Playground';
     if (url.startsWith('/events')) return 'Events';
     if (url.startsWith('/dlq')) return 'Dead Letter Queue';
     if (url.startsWith('/analytics')) return 'Analytics';
@@ -245,10 +268,10 @@ export class HeaderComponent {
     if (url.startsWith('/guide')) return 'Guide';
     if (url.startsWith('/about')) return 'About';
     return 'Relayon';
-  }
+  });
 
   toggleUserMenu(): void {
-    this.userMenuOpen.set(!this.userMenuOpen());
+    this.userMenuOpen.update((v) => !v);
   }
 
   closeUserMenu(): void {
@@ -260,9 +283,9 @@ export class HeaderComponent {
     this.auth.logout();
   }
 
-  onLangChange(event: Event): void {
-    const value = (event.target as HTMLSelectElement).value as SupportedLang;
-    this.lang.setLanguage(value);
+  setLanguage(code: SupportedLang): void {
+    this.lang.setLanguage(code);
+    this.closeUserMenu();
   }
 
   openSearch(): void {

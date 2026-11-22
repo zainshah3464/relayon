@@ -16,11 +16,11 @@ import { SeoService } from '../../core/seo/seo.service';
   `,
 })
 export class PrivacyComponent {
-  // ⚠️ v3.3 — SEO metadata (title, OG, Twitter, canonical)
   constructor() {
     inject(SeoService).set({
       title: 'Privacy Policy',
-      description: 'How Relayon collects, uses, and protects your data. GDPR and DPDP compliant. Zero tracking cookies, hashed IPs, encrypted secrets.',
+      description:
+        'How Relayon collects, uses, and protects your data. GDPR and DPDP compliant. Zero tracking cookies, hashed IPs, encrypted secrets.',
       path: '/privacy',
       noindex: false,
     });
@@ -77,11 +77,11 @@ export class PrivacyComponent {
 
         <h3>What we do NOT collect</h3>
         <ul>
-          <li>❌ Tracking cookies (we use zero third-party cookies)</li>
-          <li>❌ Your real IP address in logs (only hashed values)</li>
-          <li>❌ Web browsing history outside Relayon</li>
-          <li>❌ Payment card numbers (handled entirely by Stripe)</li>
-          <li>❌ Biometric data, location, or device fingerprints</li>
+          <li>Tracking cookies (we use zero third-party cookies)</li>
+          <li>Your real IP address in logs (only hashed values)</li>
+          <li>Web browsing history outside Relayon</li>
+          <li>Payment card numbers (handled entirely by Stripe)</li>
+          <li>Biometric data, location, or device fingerprints</li>
         </ul>
       `,
     },
@@ -200,8 +200,8 @@ export class PrivacyComponent {
         <p>
           <strong>Relayon</strong><br />
           Zain Shah (Data Protection Officer)<br />
-          📧 <a href="mailto:hello@relayon.dev">hello@relayon.dev</a><br />
-          🐙 <a href="https://github.com/zainshah3464" target="_blank" rel="noopener">github.com/zainshah3464</a>
+          Email: <a href="mailto:hello@relayon.dev">hello@relayon.dev</a><br />
+          GitHub: <a href="https://github.com/zainshah3464" target="_blank" rel="noopener">github.com/zainshah3464</a>
         </p>
       `,
     },

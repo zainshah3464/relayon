@@ -1,7 +1,16 @@
-import { Component, inject, signal, output, ElementRef, ViewChild, AfterViewChecked } from '@angular/core';
+import {
+  Component,
+  inject,
+  signal,
+  output,
+  ElementRef,
+  ViewChild,
+  AfterViewChecked,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AiService, type ChatEvent } from '../../core/ai/ai.service';
+import { IconComponent } from '../../shared/ui/icon/icon.component';
 
 interface UiMessage {
   role: 'user' | 'assistant';
@@ -13,64 +22,82 @@ interface UiMessage {
 @Component({
   selector: 'app-chat-panel',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, IconComponent],
   template: `
-    <div class="fixed bottom-24 end-6 z-50 flex h-[600px] w-[420px] max-w-[calc(100vw-2rem)] flex-col rounded-2xl border border-hairline bg-surface shadow-2xl">
+    <div
+      class="fixed z-50 flex flex-col overflow-hidden border border-hairline bg-surface shadow-2xl animate-slide-up
+             inset-x-2 top-2 bottom-20 rounded-2xl
+             sm:inset-auto sm:bottom-24 sm:end-6 sm:h-[600px] sm:w-[420px] sm:max-w-[calc(100vw-3rem)]"
+    >
       <!-- Header -->
-      <div class="flex items-center justify-between border-b border-hairline px-4 py-3">
-        <div class="flex items-center gap-2">
-          <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-relay-violet to-relay-cyan text-white text-sm font-bold">AI</div>
+      <div class="flex shrink-0 items-center justify-between border-b border-hairline px-4 py-3">
+        <div class="flex items-center gap-2.5">
+          <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-relay-violet to-relay-cyan text-white">
+            <app-icon name="sparkles" [size]="16" [strokeWidth]="2" />
+          </div>
           <div>
-            <p class="text-sm font-semibold text-white">Relayon Assistant</p>
-            <p class="text-[10px] text-muted">Powered by Groq · gpt-oss-120b</p>
+            <p class="text-sm font-semibold text-foreground">Relayon Assistant</p>
+            <p class="text-[10px] text-muted">Powered by Groq</p>
           </div>
         </div>
-        <button (click)="close.emit()" class="text-muted hover:text-white">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        <button
+          type="button"
+          (click)="close.emit()"
+          class="flex h-8 w-8 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-2 hover:text-foreground"
+          aria-label="Close assistant"
+        >
+          <app-icon name="x" [size]="16" [strokeWidth]="2" />
         </button>
       </div>
 
       <!-- Messages -->
-      <div #scrollContainer class="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+      <div #scrollContainer class="flex-1 overflow-y-auto px-3 py-4 space-y-3">
         @if (messages().length === 0) {
-          <div class="space-y-3">
-            <p class="text-sm text-muted">Hi! I can help you:</p>
+          <div class="space-y-2">
+            <p class="px-1 text-xs text-muted">Hi! I can help you:</p>
             @for (s of suggestions; track s) {
               <button
+                type="button"
                 (click)="sendSuggestion(s)"
-                class="block w-full text-start rounded-lg border border-hairline bg-surface-2 px-3 py-2 text-xs text-white hover:bg-surface-2/70 transition"
-              >{{ s }}</button>
+                class="block w-full rounded-lg border border-hairline bg-surface-2 px-3 py-2 text-left text-xs text-foreground transition-colors hover:bg-surface-3 hover:border-hairline-strong"
+              >
+                {{ s }}
+              </button>
             }
           </div>
         }
+
         @for (m of messages(); track $index) {
           <div [class.text-end]="m.role === 'user'">
+            <!-- Tool calls -->
             @if (m.toolCalls.length > 0) {
-              <div class="space-y-1 mb-2" [class.ms-auto]="m.role === 'user'">
+              <div class="mb-1.5 space-y-1" [class.ms-auto]="m.role === 'user'">
                 @for (tc of m.toolCalls; track tc.name) {
                   <div class="inline-flex items-center gap-1.5 rounded-full bg-surface-2 px-2.5 py-1 text-[10px] text-muted">
                     @if (tc.status === 'pending') {
-                      <span class="inline-block w-2 h-2 rounded-full bg-relay-cyan animate-pulse"></span>
+                      <span class="inline-block h-2 w-2 rounded-full bg-relay-cyan animate-pulse"></span>
                     } @else if (tc.status === 'done') {
-                      <span class="text-signal-green">✓</span>
+                      <app-icon name="check" [size]="10" [strokeWidth]="2.5" class="text-signal-green" />
                     } @else {
-                      <span class="text-signal-rose">✗</span>
+                      <app-icon name="x" [size]="10" [strokeWidth]="2.5" class="text-signal-rose" />
                     }
                     <span class="font-mono">{{ toolLabel(tc.name) }}</span>
                   </div>
                 }
               </div>
             }
+
+            <!-- Message bubble -->
             <div
-              class="inline-block max-w-[85%] rounded-2xl px-3 py-2 text-sm text-start whitespace-pre-wrap break-words"
+              class="inline-block max-w-[85%] rounded-2xl px-3.5 py-2 text-sm leading-relaxed text-left break-words whitespace-pre-wrap"
               [class.bg-relay-violet]="m.role === 'user'"
               [class.text-white]="m.role === 'user'"
               [class.bg-surface-2]="m.role === 'assistant'"
-              [class.text-white]="m.role === 'assistant'"
+              [class.text-foreground]="m.role === 'assistant'"
             >
               {{ m.content }}
               @if (m.streaming) {
-                <span class="inline-block w-1.5 h-3 ms-0.5 bg-white animate-pulse"></span>
+                <span class="ms-0.5 inline-block h-3.5 w-1 animate-pulse bg-current align-middle"></span>
               }
             </div>
           </div>
@@ -78,18 +105,26 @@ interface UiMessage {
       </div>
 
       <!-- Input -->
-      <form (submit)="send($event)" class="border-t border-hairline p-3">
+      <form (submit)="send($event)" class="shrink-0 border-t border-hairline bg-surface p-2.5 pb-safe">
         <div class="flex gap-2">
           <input
             [(ngModel)]="input"
             name="input"
             [disabled]="sending()"
-            placeholder="Ask about workflows, docs, setup..."
+            placeholder="Ask about workflows, docs, setup…"
             class="input flex-1 text-sm"
+            autocomplete="off"
           />
-          <button type="submit" [disabled]="!input.trim() || sending()" class="btn-primary px-3">
-            @if (sending()) { … } @else {
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M12 5l7 7-7 7"/></svg>
+          <button
+            type="submit"
+            [disabled]="!input.trim() || sending()"
+            class="btn-primary px-3 py-2"
+            aria-label="Send message"
+          >
+            @if (sending()) {
+              <app-icon name="loader" [size]="16" [strokeWidth]="2" class="animate-spin" />
+            } @else {
+              <app-icon name="send" [size]="16" [strokeWidth]="2" />
             }
           </button>
         </div>
@@ -99,13 +134,13 @@ interface UiMessage {
 })
 export class ChatPanelComponent implements AfterViewChecked {
   readonly close = output<void>();
-  private ai = inject(AiService);
+  private readonly ai = inject(AiService);
 
   @ViewChild('scrollContainer') scrollContainer?: ElementRef<HTMLDivElement>;
 
-  messages = signal<UiMessage[]>([]);
+  readonly messages = signal<UiMessage[]>([]);
+  readonly sending = signal(false);
   input = '';
-  sending = signal(false);
 
   readonly suggestions = [
     'How do I create a Stripe → Slack workflow?',
@@ -173,12 +208,13 @@ export class ChatPanelComponent implements AfterViewChecked {
         target.content += token;
       } else if (event.type === 'tool_call') {
         const d = event.data as { name: string; requiresConfirmation?: boolean };
-        target.toolCalls = [
-          ...target.toolCalls,
-          { name: d.name, status: 'pending' },
-        ];
+        target.toolCalls = [...target.toolCalls, { name: d.name, status: 'pending' }];
       } else if (event.type === 'tool_result') {
-        const d = event.data as { name: string; error?: string; requiresConfirmation?: boolean };
+        const d = event.data as {
+          name: string;
+          error?: string;
+          requiresConfirmation?: boolean;
+        };
         target.toolCalls = target.toolCalls.map((tc) =>
           tc.name === d.name && tc.status === 'pending'
             ? { ...tc, status: d.error || d.requiresConfirmation ? 'error' : 'done' }
@@ -188,7 +224,7 @@ export class ChatPanelComponent implements AfterViewChecked {
         target.streaming = false;
       } else if (event.type === 'error') {
         const d = event.data as { message: string };
-        target.content += (target.content ? '\n\n' : '') + `⚠️ ${d.message}`;
+        target.content += (target.content ? '\n\n' : '') + `⚠ ${d.message}`;
         target.streaming = false;
       }
       return next;

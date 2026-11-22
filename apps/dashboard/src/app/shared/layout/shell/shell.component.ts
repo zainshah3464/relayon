@@ -1,10 +1,23 @@
-import { Component, inject, signal } from '@angular/core';
-import { RouterLink, RouterLinkActive, RouterOutlet, Router, NavigationEnd } from '@angular/router';
+import {
+  Component,
+  inject,
+  signal,
+  effect,
+  PLATFORM_ID,
+} from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
+import {
+  RouterLink,
+  RouterLinkActive,
+  RouterOutlet,
+  Router,
+  NavigationEnd,
+} from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { filter } from 'rxjs';
 import { TranslocoModule } from '@jsverse/transloco';
 import { AuthService } from '../../../core/auth/auth.service';
-import { LanguageService, type SupportedLang } from '../../../i18n/language.service';
+import { LanguageService } from '../../../i18n/language.service';
 import { ChatWidgetComponent } from '../../../features/ai/chat-widget.component';
 import { OfflineBannerComponent } from '../../pwa/offline-banner.component';
 import { UpdatePromptComponent } from '../../pwa/update-prompt.component';
@@ -16,11 +29,23 @@ import { OnboardingWizardComponent } from '../../../features/onboarding/onboardi
 import { OnboardingService } from '../../../core/onboarding/onboarding.service';
 import { AppUpdateService } from '../../../core/pwa/app-update.service';
 import { SeoService } from '../../../core/seo/seo.service';
+import { LogoComponent } from '../../ui/logo/logo.component';
+import { IconComponent, type IconName } from '../../ui/icon/icon.component';
 
 interface NavItem {
   labelKey: string;
   path: string;
-  icon: string;
+  icon: IconName;
+}
+
+interface HelpItem {
+  labelKey?: string;
+  label?: string;
+  path?: string;
+  href?: string;
+  fragment?: string;
+  icon: IconName;
+  external?: boolean;
 }
 
 @Component({
@@ -40,113 +65,125 @@ interface NavItem {
     HeaderComponent,
     FooterComponent,
     OnboardingWizardComponent,
+    LogoComponent,
+    IconComponent,
   ],
   template: `
-    <div class="flex h-screen bg-midnight">
-      <!-- ── SIDEBAR ────────────────────────────────────────── -->
+    <div class="flex h-screen bg-midnight overflow-hidden">
+      <!-- ═══════════════ SIDEBAR ═══════════════ -->
       <aside
-        class="fixed inset-y-0 start-0 z-40 flex w-64 flex-col border-e border-hairline bg-surface transition-transform lg:static lg:translate-x-0"
+        class="fixed inset-y-0 start-0 z-40 flex w-64 flex-col border-e border-hairline bg-surface transition-transform duration-200 ease-out lg:static lg:translate-x-0"
         [class.-translate-x-full]="!sidebarOpen() && !lang.isRtl()"
         [class.translate-x-full]="!sidebarOpen() && lang.isRtl()"
+        [attr.aria-hidden]="!sidebarOpen()"
       >
-        <!-- Logo + version badge -->
-        <div class="flex h-14 items-center border-b border-hairline px-4">
-          <a routerLink="/dashboard" class="flex items-center gap-2">
-            <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-relay-violet to-relay-cyan text-sm font-bold text-white">
-              R
-            </div>
-            <span class="text-lg font-bold tracking-tightest text-white">Relayon</span>
-            <span class="rounded bg-surface-2 px-1.5 py-0.5 text-[10px] font-mono text-muted">v3.7</span>
-          </a>
+        <!-- Sidebar header: logo + close -->
+        <div class="flex h-14 shrink-0 items-center justify-between border-b border-hairline px-3 sm:px-4">
+          <app-logo size="md" [showVersion]="true" />
+
+          <!-- Close button (mobile only) -->
+          <button
+            type="button"
+            (click)="closeSidebar()"
+            class="flex h-8 w-8 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-2 hover:text-foreground lg:hidden"
+            aria-label="Close sidebar"
+          >
+            <app-icon name="x" [size]="16" [strokeWidth]="2" />
+          </button>
         </div>
 
         <!-- Nav -->
-        <nav class="flex-1 space-y-1 overflow-y-auto p-3">
+        <nav class="flex-1 space-y-0.5 overflow-y-auto p-2.5" aria-label="Main navigation">
           @for (item of navItems; track item.path) {
             <a
               [routerLink]="item.path"
-              routerLinkActive="bg-surface-2 text-white"
+              routerLinkActive="bg-surface-2 text-foreground"
               [routerLinkActiveOptions]="{ exact: item.path === '/dashboard' }"
-              class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted transition hover:bg-surface-2 hover:text-white"
+              (click)="closeSidebar()"
+              class="group flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm font-medium text-muted transition-colors duration-100 hover:bg-surface-2 hover:text-foreground"
             >
-              <span class="text-base">{{ item.icon }}</span>
+              <app-icon
+                [name]="item.icon"
+                [size]="16"
+                [strokeWidth]="2"
+                class="text-muted-2 group-hover:text-foreground transition-colors"
+              />
               <span>{{ item.labelKey | transloco }}</span>
             </a>
           }
 
-          <!-- ⚠️ v2.4 — super admin only link -->
+          <!-- Admin link (super admin only) -->
           @if (auth.user()?.isSuperAdmin) {
             <a
               routerLink="/admin"
               routerLinkActive="bg-signal-rose/10 text-signal-rose"
-              class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted transition hover:bg-signal-rose/10 hover:text-signal-rose"
+              (click)="closeSidebar()"
+              class="group mt-1 flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm font-medium text-muted transition-colors duration-100 hover:bg-signal-rose/10 hover:text-signal-rose"
             >
-              <span class="text-base">👑</span>
+              <app-icon
+                name="crown"
+                [size]="16"
+                [strokeWidth]="2"
+                class="text-muted-2 group-hover:text-signal-rose transition-colors"
+              />
               <span>Admin</span>
             </a>
           }
         </nav>
 
-        <!-- Language switcher (mobile only) -->
-        <div class="border-t border-hairline p-3 lg:hidden">
-          <label class="text-xs text-muted uppercase tracking-wider">
-            {{ 'language.label' | transloco }}
-          </label>
-          <select
-            [value]="lang.current()"
-            (change)="onLangChange($event)"
-            class="mt-1 w-full rounded-lg border border-hairline bg-surface-2 px-2 py-1.5 text-xs text-white focus:border-relay-violet focus:outline-none"
-          >
-            <option value="en">English</option>
-            <option value="ur">اردو</option>
-            <option value="ar">العربية</option>
-          </select>
-        </div>
-
-        <!-- ⚠️ v3.7 — Help menu -->
-        <div class="border-t border-hairline p-3">
-          <p class="text-[10px] uppercase tracking-wider text-muted mb-2">Help</p>
+        <!-- Help menu -->
+        <div class="border-t border-hairline px-2.5 py-2">
+          <p class="px-1 pb-1 text-[10px] font-medium uppercase tracking-wider text-muted-2">
+            Help
+          </p>
           <div class="space-y-0.5">
-            <a routerLink="/guide" class="block text-xs text-muted hover:text-white py-1">📖 Complete Guide</a>
-            <a routerLink="/about" class="block text-xs text-muted hover:text-white py-1">👤 About</a>
-            <a routerLink="/privacy" class="block text-xs text-muted hover:text-white py-1">🔒 Privacy Policy</a>
-            <a routerLink="/terms" class="block text-xs text-muted hover:text-white py-1">📜 Terms of Service</a>
-            <a routerLink="/terms" fragment="license" class="block text-xs text-muted hover:text-white py-1">⚖️ License (source-available)</a>
-            <a href="mailto:hello@relayon.dev" class="block text-xs text-muted hover:text-white py-1">✉️ Contact Support</a>
+            @for (item of helpItems; track item.label ?? item.labelKey) {
+              @if (item.href) {
+                <a
+                  [href]="item.href"
+                  class="flex items-center gap-2.5 rounded-md px-1.5 py-1.5 text-xs text-muted transition-colors hover:bg-surface-2 hover:text-foreground"
+                >
+                  <app-icon [name]="item.icon" [size]="13" [strokeWidth]="1.75" class="text-muted-2" />
+                  <span>{{ item.label ?? (item.labelKey! | transloco) }}</span>
+                </a>
+              } @else {
+                <a
+                  [routerLink]="item.path!"
+                  [fragment]="item.fragment ?? ''"
+                  (click)="closeSidebar()"
+                  class="flex items-center gap-2.5 rounded-md px-1.5 py-1.5 text-xs text-muted transition-colors hover:bg-surface-2 hover:text-foreground"
+                >
+                  <app-icon [name]="item.icon" [size]="13" [strokeWidth]="1.75" class="text-muted-2" />
+                  <span>{{ item.label ?? (item.labelKey! | transloco) }}</span>
+                </a>
+              }
+            }
           </div>
         </div>
 
-        <!-- ⚠️ v3.7 — Credit (Made with ❤) -->
-        <div class="border-t border-hairline p-3">
-          <a
-            routerLink="/about"
-            class="flex items-center gap-2 rounded-lg p-2 -m-2 hover:bg-surface-2 transition"
-          >
-            <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-relay-violet to-relay-cyan text-[10px] font-bold text-white">
-              Z
-            </div>
-            <div class="min-w-0 flex-1">
-              <p class="text-[10px] text-muted leading-tight">Made with ❤ by</p>
-              <p class="text-xs font-medium text-white leading-tight truncate">Zain Shah</p>
-              <p class="text-[9px] text-muted leading-tight mt-0.5">© {{ year }} · All rights reserved</p>
-            </div>
-          </a>
+        <!-- Copyright (minimal — full credit in footer) -->
+        <div class="border-t border-hairline px-3 py-2.5 pb-safe">
+          <p class="text-center text-[10px] text-muted-2">
+            © {{ year }} Zain Shah
+          </p>
         </div>
       </aside>
 
       <!-- Mobile backdrop -->
       @if (sidebarOpen()) {
-        <div class="fixed inset-0 z-30 bg-black/60 lg:hidden" (click)="sidebarOpen.set(false)"></div>
+        <div
+          class="fixed inset-0 z-30 bg-black/60 backdrop-blur-sm lg:hidden animate-fade-in"
+          (click)="closeSidebar()"
+          aria-hidden="true"
+        ></div>
       }
 
-      <!-- ── MAIN COLUMN ─────────────────────────────────────── -->
+      <!-- ═══════════════ MAIN COLUMN ═══════════════ -->
       <div class="flex flex-1 flex-col overflow-hidden">
-        <!-- Header (works on both mobile + desktop) -->
         <app-header (toggleSidebar)="sidebarOpen.set(!sidebarOpen())" />
 
-        <!-- Scrollable content + footer -->
         <div class="flex-1 overflow-y-auto">
-          <main class="mx-auto max-w-7xl p-4 lg:p-8">
+          <main id="main-content" tabindex="-1" class="mx-auto max-w-7xl p-4 lg:p-8 focus:outline-none">
             <router-outlet />
           </main>
           <app-footer />
@@ -167,28 +204,36 @@ interface NavItem {
   `,
 })
 export class ShellComponent {
-  auth = inject(AuthService);
-  lang = inject(LanguageService);
-  sidebarOpen = signal(false);
-
+  readonly auth = inject(AuthService);
+  readonly lang = inject(LanguageService);
+  readonly sidebarOpen = signal(false);
+  readonly showWizard = signal(false);
   readonly year = new Date().getFullYear();
 
   private readonly appUpdate = inject(AppUpdateService);
   private readonly onboarding = inject(OnboardingService);
   private readonly seo = inject(SeoService);
   private readonly router = inject(Router);
+  private readonly platformId = inject(PLATFORM_ID);
 
-  showWizard = signal(false);
+  readonly navItems: NavItem[] = [
+    { labelKey: 'nav.dashboard', path: '/dashboard', icon: 'layout-dashboard' },
+    { labelKey: 'nav.workflows', path: '/workflows', icon: 'workflow' },
+    { labelKey: 'nav.playground', path: '/playground', icon: 'flask' },
+    { labelKey: 'nav.events', path: '/events', icon: 'inbox' },
+    { labelKey: 'nav.community', path: '/community', icon: 'messages' },
+    { labelKey: 'nav.dlq', path: '/dlq', icon: 'alert-triangle' },
+    { labelKey: 'nav.analytics', path: '/analytics', icon: 'trending-up' },
+    { labelKey: 'nav.settings', path: '/settings', icon: 'settings' },
+  ];
 
-  navItems: NavItem[] = [
-    { labelKey: 'nav.dashboard', path: '/dashboard', icon: '📊' },
-    { labelKey: 'nav.workflows', path: '/workflows', icon: '🔄' },
-    { labelKey: 'nav.playground', path: '/playground', icon: '🧪' },
-    { labelKey: 'nav.events', path: '/events', icon: '📨' },
-    { labelKey: 'nav.community', path: '/community', icon: '💬' },
-    { labelKey: 'nav.dlq', path: '/dlq', icon: '⚠️' },
-    { labelKey: 'nav.analytics', path: '/analytics', icon: '📈' },
-    { labelKey: 'nav.settings', path: '/settings', icon: '⚙️' },
+  readonly helpItems: HelpItem[] = [
+    { label: 'Complete guide', path: '/guide', icon: 'book' },
+    { label: 'About', path: '/about', icon: 'info' },
+    { label: 'Privacy', path: '/privacy', icon: 'shield' },
+    { label: 'Terms', path: '/terms', icon: 'external-link' },
+    { label: 'License', path: '/terms', fragment: 'license', icon: 'lock' },
+    { label: 'Contact support', href: 'mailto:hello@relayon.dev', icon: 'mail' },
   ];
 
   constructor() {
@@ -198,7 +243,6 @@ export class ShellComponent {
       console.warn('[Shell] PWA init failed (non-fatal):', err);
     }
 
-    // ⚠️ v3.7 — default SEO for protected pages (noindex)
     this.seo.set({
       title: 'Dashboard',
       description: 'Relayon dashboard',
@@ -206,23 +250,29 @@ export class ShellComponent {
       noindex: true,
     });
 
-    // ⚠️ v3.7 — onboarding wizard on first dashboard visit
+    // Auto-close sidebar on navigation + onboarding check
     this.router.events
       .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd))
       .subscribe((e) => {
+        this.sidebarOpen.set(false);
         if (e.url.includes('/dashboard')) {
           const shouldShow = this.onboarding.check();
           this.showWizard.set(shouldShow);
         }
       });
+
+    // Lock body scroll when mobile drawer is open
+    if (isPlatformBrowser(this.platformId)) {
+      effect(() => {
+        if (typeof document === 'undefined') return;
+        const shouldLock =
+          this.sidebarOpen() && window.matchMedia('(max-width: 1023px)').matches;
+        document.body.style.overflow = shouldLock ? 'hidden' : '';
+      });
+    }
   }
 
-  onLangChange(event: Event): void {
-    const value = (event.target as HTMLSelectElement).value as SupportedLang;
-    this.lang.setLanguage(value);
-  }
-
-  logout(): void {
-    this.auth.logout();
+  closeSidebar(): void {
+    this.sidebarOpen.set(false);
   }
 }

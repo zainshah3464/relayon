@@ -12,7 +12,7 @@
   <meta name="author" content="Zain Shah">
   <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
   <meta name="googlebot" content="index, follow">
-  <meta name="theme-color" content="#0A0A0A">
+  <meta name="theme-color" content="#09090E">
   <link rel="canonical" href="https://relayon.vercel.app/">
 
   <!-- ═══════════════════════════════════════════════════════
@@ -42,27 +42,31 @@
   <meta name="twitter:image" content="https://relayon.vercel.app/assets/og-image.png">
 
   <!-- ═══════════════════════════════════════════════════════
-       PERFORMANCE
+       PERFORMANCE — preconnects (only for API)
   ═══════════════════════════════════════════════════════ -->
   <link rel="preconnect" href="https://relayon-api.vercel.app" crossorigin>
   <link rel="preconnect" href="https://relayon-ingress.vercel.app" crossorigin>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="dns-prefetch" href="https://relayon-api.vercel.app">
   <link rel="dns-prefetch" href="https://relayon-ingress.vercel.app">
 
-  <!-- ═══════════════════════════════════════════════════════
-       FONTS
-  ═══════════════════════════════════════════════════════ -->
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Nastaliq+Urdu:wght@400;600&family=Noto+Sans+Arabic:wght@400;600&display=swap" rel="stylesheet">
+  <!--
+    ⚠️ v4.0 — Fonts are self-hosted via @fontsource-variable/geist
+    (imported in styles.css). No Google Fonts link needed.
+    Noto Nastaliq/Sans Arabic are lazy-loaded only when lang=ur/ar.
+  -->
 
   <!-- ═══════════════════════════════════════════════════════
        FAVICON / PWA
   ═══════════════════════════════════════════════════════ -->
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90' font-family='Inter' font-weight='700' fill='%237C3AED'>R</text></svg>">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/assets/icons/favicon-16x16.png">
   <link rel="apple-touch-icon" href="/assets/icons/icon-192x192.png">
   <link rel="manifest" href="manifest.webmanifest">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=5">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="color-scheme" content="dark">
   <base href="/">
 
   <!-- ═══════════════════════════════════════════════════════
@@ -121,7 +125,8 @@
   }
   </script>
 </head>
-<body class="bg-midnight text-white font-sans antialiased">
+<body class="bg-midnight text-foreground font-sans antialiased">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
   <app-root></app-root>
 </body>
 </html>

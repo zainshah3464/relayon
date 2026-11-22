@@ -1,12 +1,18 @@
 import { Component, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { SeoService } from './core/seo/seo.service';
+import { ToastContainerComponent } from './shared/ui/toast/toast-container.component';
+import { ConfirmDialogComponent } from './shared/ui/confirm/confirm-dialog.component';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet],
-  template: `<router-outlet />`,
+  imports: [RouterOutlet, ToastContainerComponent, ConfirmDialogComponent],
+  template: `
+    <router-outlet />
+    <app-toast-container />
+    <app-confirm-dialog />
+  `,
 })
 export class AppComponent {
   constructor() {

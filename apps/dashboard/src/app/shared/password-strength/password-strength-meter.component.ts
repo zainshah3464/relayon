@@ -25,9 +25,9 @@ interface ZxcvbnResult {
   imports: [CommonModule, TranslocoModule],
   template: `
     @if (password) {
-      <div class="mt-2">
+      <div class="mt-2.5">
         <!-- Bars -->
-        <div class="flex gap-1 mb-1.5">
+        <div class="flex gap-1" role="progressbar" [attr.aria-valuenow]="score + 1" aria-valuemin="1" aria-valuemax="5" aria-label="Password strength">
           @for (i of [0, 1, 2, 3]; track i) {
             <div
               class="h-1 flex-1 rounded-full transition-all duration-200"
@@ -37,12 +37,16 @@ interface ZxcvbnResult {
         </div>
 
         <!-- Label + crack time -->
-        <div class="flex items-center justify-between text-xs">
-          <span [ngClass]="labelClass()" class="font-medium">
+        <div class="mt-2 flex items-center justify-between text-xs">
+          <span
+            [ngClass]="labelClass()"
+            class="font-medium"
+            aria-live="polite"
+          >
             {{ labelKey() | transloco }}
           </span>
           @if (crackTime()) {
-            <span class="text-muted">{{ crackTime() }}</span>
+            <span class="text-muted-2">{{ crackTime() }}</span>
           }
         </div>
 
@@ -77,7 +81,6 @@ export class PasswordStrengthMeterComponent implements OnChanges {
     const raw = zxcvbn(this.password, this.userInputs);
     this.result = raw as unknown as ZxcvbnResult;
 
-    // "Strong enough" for submit — score >= 3 AND length >= 12
     const strong = raw.score >= 3 && this.password.length >= 12;
     this.strengthChange.emit(strong);
   }
@@ -86,7 +89,6 @@ export class PasswordStrengthMeterComponent implements OnChanges {
     return this.result?.score ?? 0;
   }
 
-  // ⚠️ v2.2 — returns translation key instead of hardcoded English string
   labelKey(): string {
     const s = this.score;
     if (s <= 1) return 'passwordStrength.weak';
@@ -99,16 +101,16 @@ export class PasswordStrengthMeterComponent implements OnChanges {
     const s = this.score;
     if (s <= 1) return 'text-signal-rose';
     if (s === 2) return 'text-signal-amber';
-    return 'text-signal-emerald';
+    return 'text-signal-green';
   }
 
   barClass(index: number): string {
-    if (index >= this.score) return 'bg-hairline';
+    if (index >= this.score) return 'bg-surface-3';
 
     const s = this.score;
     if (s <= 1) return 'bg-signal-rose';
     if (s === 2) return 'bg-signal-amber';
-    return 'bg-signal-emerald';
+    return 'bg-signal-green';
   }
 
   warning(): string {
