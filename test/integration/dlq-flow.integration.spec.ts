@@ -69,7 +69,7 @@ describe('DLQ flow (integration)', () => {
         name: 'DLQ User',
         tenantName: `DLQ ${Date.now()}`,
         email: `dlq-test-${Date.now()}@example.com`,
-        password: 'Password123!',
+        password: 'Xk9#mP2$nL7@qR4z',
       })
       .expect(201);
 
@@ -209,7 +209,7 @@ describe('DLQ flow (integration)', () => {
         name: 'Tenant B User',
         tenantName: `Tenant B ${Date.now()}`,
         email: `dlq-test-b-${Date.now()}@example.com`,
-        password: 'Password123!',
+        password: 'Xk9#mP2$nL7@qR4z',
       })
       .expect(201);
 

@@ -44,7 +44,7 @@ describe('Schedules (integration)', () => {
         name: 'Sched User',
         tenantName: `Sched Test ${Date.now()}`,
         email: `sched-test-${Date.now()}@example.com`,
-        password: 'Password123!',
+        password: 'Xk9#mP2$nL7@qR4z',
       })
       .expect(201);
 
@@ -55,8 +55,8 @@ describe('Schedules (integration)', () => {
       .set('Authorization', `Bearer ${token}`)
       .send({
         name: 'Scheduled Flow',
-        sourceType: 'generic',
-        sourceConfig: { secret: 'test-secret' },
+        sourceType: 'stripe',
+        sourceConfig: { secret: 'whsec_test123' },
       })
       .expect(201);
 
@@ -155,7 +155,7 @@ describe('Schedules (integration)', () => {
         name: 'Tenant B User',
         tenantName: `Tenant B ${Date.now()}`,
         email: `sched-test-b-${Date.now()}@example.com`,
-        password: 'Password123!',
+        password: 'Xk9#mP2$nL7@qR4z',
       })
       .expect(201);
 

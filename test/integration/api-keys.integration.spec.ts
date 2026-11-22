@@ -43,7 +43,7 @@ describe('API keys (integration)', () => {
         name: 'Key User',                          // ✅ was 'K' — @MinLength(2) fail
         tenantName: `Key Test ${Date.now()}`,      // ✅ was `K ...`
         email: `api-key-test-${Date.now()}@example.com`,
-        password: 'Password123!',
+        password: 'Xk9#mP2$nL7@qR4z',
       })
       .expect(201);
 

@@ -57,7 +57,7 @@ describe('Version restore (integration)', () => {
         name: 'Version User',
         tenantName: `Version Test ${Date.now()}`,
         email: `ver-restore-${Date.now()}@example.com`,
-        password: 'Password123!',
+        password: 'Xk9#mP2$nL7@qR4z',
       })
       .expect(201);
 

@@ -59,7 +59,7 @@ describe('Quota (integration)', () => {
         name: 'Quota Test',
         tenantName: `Quota ${Date.now()}`,
         email: `quota-test-${Date.now()}@example.com`,
-        password: 'Password123!',
+        password: 'Xk9#mP2$nL7@qR4z',
       })
       .expect(201);
 

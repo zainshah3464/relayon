@@ -56,7 +56,7 @@ describe('Webhook flow (integration)', () => {
         name: 'Flow Test',
         tenantName: `Flow Test ${Date.now()}`,
         email: `wh-flow-test-${Date.now()}@example.com`,
-        password: 'Password123!',
+        password: 'Xk9#mP2$nL7@qR4z',
       })
       .expect(201);
 
@@ -110,7 +110,7 @@ describe('Webhook flow (integration)', () => {
         name: 'Tenant B User', // ← CHANGED: was 'B' (1 char, invalid)
         tenantName: `Tenant B ${Date.now()}`,
         email: `wh-flow-test-b-${Date.now()}@example.com`,
-        password: 'Password123!',
+        password: 'Xk9#mP2$nL7@qR4z',
       })
       .expect(201);
 

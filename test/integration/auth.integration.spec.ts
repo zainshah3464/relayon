@@ -73,7 +73,7 @@ describe('Auth integration', () => {
         name: 'Test User',
         tenantName: `Integration Test Tenant ${suffix}`, // ← unique
         email,
-        password: 'Password123!',
+        password: 'Xk9#mP2$nL7@qR4z',
       })
       .expect(201);
 
@@ -95,7 +95,7 @@ describe('Auth integration', () => {
       name: 'Duplicate Test User', // ← CHANGED: was 'X' (1 char, invalid)
       tenantName: `Tenant X ${suffix}`, // ← unique
       email,
-      password: 'Password123!',
+      password: 'Xk9#mP2$nL7@qR4z',
     };
     await request(app.getHttpServer()).post('/api/auth/signup').send(payload).expect(201);
     await request(app.getHttpServer()).post('/api/auth/signup').send(payload).expect(409);
