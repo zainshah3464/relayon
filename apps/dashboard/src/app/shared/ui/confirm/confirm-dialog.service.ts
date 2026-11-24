@@ -12,7 +12,8 @@ export interface ConfirmOptions {
   icon?: 'alert-triangle' | 'trash' | 'logout' | 'info';
 }
 
-interface ConfirmState extends ConfirmOptions {
+// ⚠️ FIX: exported so the component's `state` property can be typed in .d.ts emit
+export interface ConfirmState extends ConfirmOptions {
   id: number;
   resolve: (value: boolean) => void;
 }

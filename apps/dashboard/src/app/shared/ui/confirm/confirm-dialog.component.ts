@@ -1,6 +1,17 @@
-import { Component, inject, ElementRef, viewChild, AfterViewInit, OnDestroy } from '@angular/core';
+import {
+  Component,
+  inject,
+  ElementRef,
+  viewChild,
+  AfterViewInit,
+  OnDestroy,
+  type Signal,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ConfirmDialogService } from './confirm-dialog.service';
+import {
+  ConfirmDialogService,
+  type ConfirmState,
+} from './confirm-dialog.service';
 import { IconComponent, type IconName } from '../icon/icon.component';
 
 @Component({
@@ -71,7 +82,10 @@ import { IconComponent, type IconName } from '../icon/icon.component';
 })
 export class ConfirmDialogComponent implements AfterViewInit, OnDestroy {
   private readonly service = inject(ConfirmDialogService);
-  readonly state = this.service.state;
+
+  // ⚠️ FIX: explicit type annotation so TS can emit the .d.ts without
+  // needing to infer the (previously non-exported) ConfirmState name.
+  readonly state: Signal<ConfirmState | null> = this.service.state;
 
   private readonly dialogRef = viewChild<ElementRef<HTMLDivElement>>('dialog');
 
