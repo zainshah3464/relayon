@@ -1,0 +1,132 @@
+
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630" role="img" aria-labelledby="og-title og-desc">
+  <title id="og-title">Relayon — Reliable Webhook Infrastructure for the Serverless Era</title>
+  <desc id="og-desc">Relayon serverless-native webhook infrastructure. At-least-once delivery, AI enrichment, and multi-destination support. Built by Zain Shah in Pakistan.</desc>
+
+  <defs>
+    <linearGradient id="og-bg" x1="0" y1="0" x2="1200" y2="630" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#050508"/>
+      <stop offset="0.5" stop-color="#0A0A12"/>
+      <stop offset="1" stop-color="#050508"/>
+    </linearGradient>
+
+    <radialGradient id="og-glow-violet" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(180 100) scale(500)">
+      <stop offset="0" stop-color="#8B5CF6" stop-opacity="0.30"/>
+      <stop offset="0.5" stop-color="#8B5CF6" stop-opacity="0.07"/>
+      <stop offset="1" stop-color="#8B5CF6" stop-opacity="0"/>
+    </radialGradient>
+
+    <radialGradient id="og-glow-cyan" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1080 560) scale(500)">
+      <stop offset="0" stop-color="#06B6D4" stop-opacity="0.25"/>
+      <stop offset="0.5" stop-color="#06B6D4" stop-opacity="0.055"/>
+      <stop offset="1" stop-color="#06B6D4" stop-opacity="0"/>
+    </radialGradient>
+
+    <radialGradient id="og-glow-center" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(600 265) scale(330)">
+      <stop offset="0" stop-color="#6D28D9" stop-opacity="0.13"/>
+      <stop offset="1" stop-color="#6D28D9" stop-opacity="0"/>
+    </radialGradient>
+
+    <linearGradient id="og-brand" x1="0" y1="0" x2="128" y2="128" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#6D28D9"/>
+      <stop offset="0.35" stop-color="#8B5CF6"/>
+      <stop offset="1" stop-color="#06B6D4"/>
+    </linearGradient>
+
+    <linearGradient id="og-depth" x1="64" y1="0" x2="64" y2="128" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#000000" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#000000" stop-opacity="0"/>
+    </linearGradient>
+
+    <linearGradient id="og-rim" x1="64" y1="0" x2="64" y2="20" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.30"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+
+    <linearGradient id="og-top-accent" x1="0" y1="0" x2="1200" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#6D28D9"/>
+      <stop offset="0.5" stop-color="#8B5CF6"/>
+      <stop offset="1" stop-color="#06B6D4"/>
+    </linearGradient>
+
+    <pattern id="og-grid" x="0" y="0" width="60" height="60" patternUnits="userSpaceOnUse">
+      <path d="M 60 0 L 0 0 0 60" fill="none" stroke="#FFFFFF" stroke-width="1" stroke-opacity="0.035"/>
+    </pattern>
+
+    <pattern id="og-dots" x="0" y="0" width="24" height="24" patternUnits="userSpaceOnUse">
+      <circle cx="12" cy="12" r="0.6" fill="#FFFFFF" fill-opacity="0.08"/>
+    </pattern>
+  </defs>
+
+  <!-- Layered background -->
+  <rect width="1200" height="630" fill="url(#og-bg)"/>
+  <rect width="1200" height="630" fill="url(#og-grid)"/>
+  <rect width="1200" height="630" fill="url(#og-dots)" opacity="0.45"/>
+  <rect width="1200" height="630" fill="url(#og-glow-violet)"/>
+  <rect width="1200" height="630" fill="url(#og-glow-cyan)"/>
+  <rect width="1200" height="630" fill="url(#og-glow-center)"/>
+
+  <!-- Top and bottom accent lines -->
+  <rect x="0" y="0" width="1200" height="1.5" fill="url(#og-top-accent)" opacity="0.65"/>
+  <rect x="0" y="628.5" width="1200" height="1.5" fill="url(#og-top-accent)" opacity="0.40"/>
+
+  <!-- Serverless-native pill -->
+  <g transform="translate(490 52)">
+    <rect width="220" height="36" rx="18" fill="#0F0F15" stroke="#8B5CF6" stroke-opacity="0.34" stroke-width="1"/>
+    <circle cx="20" cy="18" r="4" fill="#06B6D4"/>
+    <circle cx="20" cy="18" r="8" fill="#06B6D4" opacity="0.22"/>
+    <text x="36" y="23" font-family="'Geist Mono Variable','JetBrains Mono',monospace" font-size="12" font-weight="600" letter-spacing="2.1" fill="#06B6D4">SERVERLESS-NATIVE</text>
+  </g>
+
+  <!-- Main logo mark, centered -->
+  <g transform="translate(544 112) scale(3.5)">
+    <rect width="32" height="32" rx="6.4" fill="url(#og-brand)"/>
+    <rect width="32" height="32" rx="6.4" fill="url(#og-depth)"/>
+    <path fill="#FFFFFF" fill-rule="evenodd" d="
+      M 10 8 L 10 24 L 13 24 L 13 17 L 19 17 L 22.5 24 L 25.5 24 L 20 15.8
+      C 21.5 15.5 23 14 23 12 C 23 9 20.5 8 18 8 L 13 8 Z
+      M 13 11 L 18 11 C 19 11 20 11.5 20 12.5 C 20 13.5 19 14 18 14 L 13 14 Z
+    "/>
+    <rect width="32" height="24" rx="6.4" fill="url(#og-rim)"/>
+  </g>
+
+  <!-- Wordmark -->
+  <text x="600" y="326" text-anchor="middle" font-family="'Geist Variable','Inter',system-ui,sans-serif" font-size="92" font-weight="700" letter-spacing="-3.2" fill="#F4F4F5">Relayon</text>
+
+  <!-- Version badge -->
+  <g transform="translate(561 352)">
+    <rect width="78" height="28" rx="6" fill="#8B5CF6" fill-opacity="0.15" stroke="#8B5CF6" stroke-opacity="0.42"/>
+    <text x="39" y="19" text-anchor="middle" font-family="'Geist Mono Variable','JetBrains Mono',monospace" font-size="13" font-weight="600" fill="#A78BFA">v3.7.0</text>
+  </g>
+
+  <!-- Tagline -->
+  <g font-family="'Geist Variable','Inter',system-ui,sans-serif" font-size="24" font-weight="400" fill="#A1A1AA" text-anchor="middle">
+    <text x="600" y="424">Reliable webhook infrastructure</text>
+    <text x="600" y="457">for the serverless era</text>
+  </g>
+
+  <!-- Feature chips -->
+  <g transform="translate(359 495)" font-family="'Geist Mono Variable','JetBrains Mono',monospace" font-size="13" font-weight="500">
+    <g>
+      <rect width="142" height="30" rx="7" fill="#FFFFFF" fill-opacity="0.055" stroke="#FFFFFF" stroke-opacity="0.045"/>
+      <circle cx="16" cy="15" r="3" fill="#10B981"/>
+      <text x="28" y="20" fill="#A1A1AA">At-least-once</text>
+    </g>
+    <g transform="translate(154 0)">
+      <rect width="142" height="30" rx="7" fill="#FFFFFF" fill-opacity="0.055" stroke="#FFFFFF" stroke-opacity="0.045"/>
+      <circle cx="16" cy="15" r="3" fill="#8B5CF6"/>
+      <text x="28" y="20" fill="#A1A1AA">AI enrichment</text>
+    </g>
+    <g transform="translate(308 0)">
+      <rect width="174" height="30" rx="7" fill="#FFFFFF" fill-opacity="0.055" stroke="#FFFFFF" stroke-opacity="0.045"/>
+      <circle cx="16" cy="15" r="3" fill="#06B6D4"/>
+      <text x="28" y="20" fill="#A1A1AA">Multi-destination</text>
+    </g>
+  </g>
+
+  <!-- URL and attribution -->
+  <g text-anchor="middle" font-family="'Geist Mono Variable','JetBrains Mono',monospace">
+    <text x="600" y="570" font-size="15" font-weight="500" fill="#858591">relayon.vercel.app</text>
+    <text x="600" y="592" font-size="11" font-weight="500" fill="#62626E" letter-spacing="1.15">BUILT BY ZAIN SHAH · PAKISTAN</text>
+  </g>
+</svg>

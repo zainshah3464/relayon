@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="512" height="512" role="img" aria-label="Relayon">
+  <title>Relayon</title>
+  <defs>
+    <linearGradient id="relayon-tr" x1="10" y1="8" x2="26" y2="24" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#8B5CF6"/>
+      <stop offset="1" stop-color="#06B6D4"/>
+    </linearGradient>
+  </defs>
+  <path fill="url(#relayon-tr)" fill-rule="evenodd" d="
+    M 10 8
+    L 10 24
+    L 13 24
+    L 13 17
+    L 19 17
+    L 22.5 24
+    L 25.5 24
+    L 20 15.8
+    C 21.5 15.5 23 14 23 12
+    C 23 9 20.5 8 18 8
+    L 13 8
+    Z
+    M 13 11
+    L 18 11
+    C 19 11 20 11.5 20 12.5
+    C 20 13.5 19 14 18 14
+    L 13 14
+    Z
+  "/>
+</svg>

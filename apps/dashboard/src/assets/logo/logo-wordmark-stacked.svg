@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 160" width="480" height="320" role="img" aria-label="Relayon">
+  <title>Relayon</title>
+  <defs>
+    <linearGradient id="ws-brand" x1="88" y1="16" x2="152" y2="80" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#6D28D9"/>
+      <stop offset="0.35" stop-color="#8B5CF6"/>
+      <stop offset="1" stop-color="#06B6D4"/>
+    </linearGradient>
+    <linearGradient id="ws-depth" x1="120" y1="16" x2="120" y2="80" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#000000" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#000000" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Mark (2× scale) -->
+  <g transform="translate(88 16) scale(2)">
+    <rect width="32" height="32" rx="6.4" fill="url(#ws-brand)"/>
+    <rect width="32" height="32" rx="6.4" fill="url(#ws-depth)"/>
+    <path fill="#FFFFFF" fill-rule="evenodd" d="
+      M 10 8 L 10 24 L 13 24 L 13 17 L 19 17 L 22.5 24 L 25.5 24 L 20 15.8
+      C 21.5 15.5 23 14 23 12 C 23 9 20.5 8 18 8 L 13 8 Z
+      M 13 11 L 18 11 C 19 11 20 11.5 20 12.5 C 20 13.5 19 14 18 14 L 13 14 Z
+    "/>
+  </g>
+
+  <!-- Wordmark -->
+  <text x="120" y="132" text-anchor="middle" font-family="'Geist Variable','Inter',system-ui,sans-serif" font-size="30" font-weight="700" letter-spacing="-1" fill="#F4F4F5">Relayon</text>
+  <text x="120" y="150" text-anchor="middle" font-family="'Geist Mono Variable','JetBrains Mono',monospace" font-size="8" font-weight="500" letter-spacing="1.5" fill="#71717A">RELIABLE WEBHOOKS</text>
+</svg>

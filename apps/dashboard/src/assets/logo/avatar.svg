@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" width="400" height="400" role="img" aria-label="Relayon">
+  <title>Relayon</title>
+  <defs>
+    <linearGradient id="av-brand" x1="4" y1="4" x2="36" y2="36" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#6D28D9"/>
+      <stop offset="0.35" stop-color="#8B5CF6"/>
+      <stop offset="1" stop-color="#06B6D4"/>
+    </linearGradient>
+    <linearGradient id="av-depth" x1="20" y1="0" x2="20" y2="40" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#000000" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#000000" stop-opacity="0"/>
+    </linearGradient>
+    <clipPath id="av-clip">
+      <circle cx="20" cy="20" r="20"/>
+    </clipPath>
+  </defs>
+  <g clip-path="url(#av-clip)">
+    <rect width="40" height="40" fill="url(#av-brand)"/>
+    <rect width="40" height="40" fill="url(#av-depth)"/>
+    <g transform="translate(4 4)">
+      <path fill="#FFFFFF" fill-rule="evenodd" d="
+        M 10 8 L 10 24 L 13 24 L 13 17 L 19 17 L 22.5 24 L 25.5 24 L 20 15.8
+        C 21.5 15.5 23 14 23 12 C 23 9 20.5 8 18 8 L 13 8 Z
+        M 13 11 L 18 11 C 19 11 20 11.5 20 12.5 C 20 13.5 19 14 18 14 L 13 14 Z
+      "/>
+    </g>
+  </g>
+</svg>

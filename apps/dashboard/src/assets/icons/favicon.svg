@@ -1,25 +1,16 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512"><metadata><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:dc="http://purl.org/dc/elements/1.1/"><rdf:Description><dc:creator>RealFaviconGenerator</dc:creator><dc:source>https://realfavicongenerator.net</dc:source></rdf:Description></rdf:RDF></metadata><defs>
-    <linearGradient id="relayonGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#7C3AED"></stop>
-      <stop offset="100%" stop-color="#06B6D4"></stop>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Relayon">
+  <title>Relayon</title>
+  <defs>
+    <linearGradient id="fav-brand" x1="2" y1="2" x2="30" y2="30" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#6D28D9"/>
+      <stop offset="0.35" stop-color="#8B5CF6"/>
+      <stop offset="1" stop-color="#06B6D4"/>
     </linearGradient>
-  </defs><rect x="0" y="0" width="512" height="512" rx="112" ry="112" fill="url(#relayonGradient)"></rect><path fill="#FFFFFF" fill-rule="evenodd" d="
-    M 168 132
-    L 168 385
-    L 220 385
-    L 220 320
-    L 280 320
-    L 340 385
-    L 395 385
-    L 325 312
-    C 360 295 380 265 380 218
-    C 380 165 340 120 280 120
-    L 168 132
-    Z
-    M 220 170
-    L 280 170
-    C 320 170 330 190 330 218
-    C 330 245 320 270 280 270
-    L 220 270
-    Z
-  "></path></svg>
+  </defs>
+  <rect width="32" height="32" rx="6.4" fill="url(#fav-brand)"/>
+  <path fill="#FFFFFF" fill-rule="evenodd" d="
+    M 10 8 L 10 24 L 13 24 L 13 17 L 19 17 L 22.5 24 L 25.5 24 L 20 15.8
+    C 21.5 15.5 23 14 23 12 C 23 9 20.5 8 18 8 L 13 8 Z
+    M 13 11 L 18 11 C 19 11 20 11.5 20 12.5 C 20 13.5 19 14 18 14 L 13 14 Z
+  "/>
+</svg>
