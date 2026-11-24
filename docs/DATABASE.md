@@ -1,518 +1,477 @@
 # Relayon — Database Design
 
-> **Complete reference for Relayon's data layer — PostgreSQL + MongoDB + Redis.**
+> **Engineering reference for Relayon's persistence layer: PostgreSQL, MongoDB and Redis.**
 >
-> **Current version:** v1.5.0
+> **Documentation target:** v3.7.0  
+> **Schema source audited:** `packages/db/prisma/schema.prisma` on `main`  
+> **Verified migration history:** through `20261118214615_v35_byok_integrations`
 
-Relayon uses **three data stores**, each chosen for a specific workload characteristic:
+This document describes the data model and persistence responsibilities visible in the repository schema. It distinguishes durable relational state from event/delivery documents and ephemeral coordination state. Where provider plans, retention settings or operational guarantees depend on deployment configuration, they are identified as configuration-dependent rather than universal guarantees.
 
-| Store | Purpose | Why this store |
+> **Schema currency note:** The requested documentation target is v3.7.0. The accessible `main`-branch Prisma schema and migration directory expose database additions through v3.5 (BYOK integrations). No v3.6/v3.7 database migration was present in that inspected migration list. Do not infer that later application releases necessarily introduced new database tables.
+
+---
+
+## Contents
+
+- [1. Data architecture](#1-data-architecture)
+- [2. Design principles](#2-design-principles)
+- [3. PostgreSQL](#3-postgresql)
+  - [3.1 Entity relationship overview](#31-entity-relationship-overview)
+  - [3.2 Core identity and tenancy](#32-core-identity-and-tenancy)
+  - [3.3 Workflow configuration](#33-workflow-configuration)
+  - [3.4 Platform operations and metering](#34-platform-operations-and-metering)
+  - [3.5 AI and knowledge data](#35-ai-and-knowledge-data)
+  - [3.6 Analytics, administration and community](#36-analytics-administration-and-community)
+  - [3.7 Webhooks, outbox, flags, tunnels and integrations](#37-webhooks-outbox-flags-tunnels-and-integrations)
+  - [3.8 Enums and indexes](#38-enums-and-indexes)
+  - [3.9 Row-level security](#39-row-level-security)
+- [4. MongoDB](#4-mongodb)
+- [5. Redis](#5-redis)
+- [6. Cross-store data flows](#6-cross-store-data-flows)
+- [7. Migrations and Prisma](#7-migrations-and-prisma)
+- [8. Backup, restore and retention](#8-backup-restore-and-retention)
+- [9. Operational queries](#9-operational-queries)
+- [10. Data ownership and change checklist](#10-data-ownership-and-change-checklist)
+
+---
+
+## 1. Data architecture
+
+Relayon uses three persistence systems with different consistency and lifecycle requirements.
+
+| Store | Primary responsibility | Data characteristics |
 |---|---|---|
-| **PostgreSQL** (Neon) | Transactional, ACID-critical data | Foreign keys, `FOR UPDATE` locks, atomic transactions |
-| **MongoDB** (Atlas M0) | Append-only logs + event payloads | TTL indexes, `Mixed` types for arbitrary payloads |
-| **Redis** (Upstash) | Ephemeral state (queues, cache, rate limits) | Sub-millisecond reads, atomic operations |
+| **PostgreSQL** | Durable platform state | Relational entities, constraints, transactions, tenant ownership, billing and configuration |
+| **MongoDB** | Event and delivery records | Flexible webhook payloads, processing state, delivery attempts and operational history |
+| **Redis** | Coordination and short-lived state | Queues, idempotency, rate-limit counters, cache and circuit-breaker state |
 
----
+```mermaid
+flowchart TB
+    subgraph Services["Relayon services"]
+      API["API"]
+      IN["Ingress"]
+      WORK["Workers"]
+      DASH["Dashboard"]
+      CLI["CLI / tunnel"]
+    end
 
-## Table of Contents
+    subgraph Durable["Durable relational store"]
+      PG[("PostgreSQL")]
+    end
 
-- [Design Principles](#design-principles)
-- [PostgreSQL Schema](#postgresql-schema)
-  - [ERD](#erd)
-  - [Tables](#tables)
-  - [Indexes](#postgresql-indexes)
-  - [Migrations](#migrations)
-  - [Prisma Configuration](#prisma-configuration)
-- [MongoDB Collections](#mongodb-collections)
-  - [events](#events)
-  - [deliveries](#deliveries)
-  - [Indexes and TTL](#mongodb-indexes)
-- [Redis Keys](#redis-keys)
-- [Data Flow Between Stores](#data-flow-between-stores)
-- [Backup Strategy](#backup-strategy)
-- [Common Queries](#common-queries)
+    subgraph Operational["Event and delivery store"]
+      MG[("MongoDB")]
+    end
 
----
+    subgraph Ephemeral["Coordination store"]
+      RD[("Redis")]
+    end
 
-## Design Principles
-
-1. **PostgreSQL is the source of truth for "who/what"** — tenants, users, workflows, destinations, schedules, versions, API keys. If PostgreSQL loses a row, money and trust are lost.
-
-2. **MongoDB is the source of truth for "when/did"** — events, deliveries. If MongoDB loses a row, a dashboard is slightly wrong. Never money.
-
-3. **Redis is the source of truth for "now"** — queue position, rate limit counter, cache. Lost Redis = lost work, but no data corruption (idempotency keys and MongoDB unique constraints prevent duplicates on retry).
-
-4. **No database is a "cache" of another.** There's no join between PostgreSQL and MongoDB. The `workflowId` in an `events` document is a foreign-key-by-convention, not enforced by either database.
-
-5. **Every table/collection has an ownership boundary.** No table is written by two services. `Workflow` is written by the API (via Prisma). `Event` is written by Workers (via Mongoose). The API only **reads** `Event`.
-
----
-
-## PostgreSQL Schema
-
-### ERD
-
-```
-┌────────────────┐
-│    Tenant      │
-│────────────────│
-│ id (PK)        │
-│ name           │
-│ slug (UQ)      │
-│ plan           │
-│ quota_events   │
-│ quota_tokens   │
-└───────┬────────┘
-        │ 1
-        │
-        │ N
-┌───────▼────────┐         ┌───────────────────┐
-│     User       │◄────────│  RefreshToken     │
-│────────────────│  1:N    │───────────────────│
-│ id (PK)        │         │ id (PK)           │
-│ tenant_id (FK) │         │ user_id (FK)      │
-│ email (UQ)     │         │ tenant_id (FK)    │
-│ password_hash  │         │ token_hash (UQ)   │
-│ role           │         │ expires_at        │
-└────────────────┘         │ revoked_at        │
-                           └───────────────────┘
-
-┌────────────────┐
-│   Workflow     │
-│────────────────│
-│ id (PK)        │
-│ tenant_id (FK) │  ◄─── belongs to Tenant
-│ name           │
-│ source_type    │  (enum: stripe | github | shopify | slack | generic)
-│ source_config  │  (JSON: { secret: "enc:v2:..." })
-│ enrichment_*   │
-│ transform_*    │
-│ routing_rules  │  (JSON array — v1.1+)
-│ is_active      │
-└───────┬────────┘
-        │ 1
-        │
-        │ N
-┌───────▼────────┐
-│  Destination   │
-│────────────────│
-│ id (PK)        │
-│ workflow_id(FK)│
-│ type (String)  │  (http | slack | email | sheets | discord |
-│                │   airtable | notion | postgres | mongodb)
-│ name           │
-│ config         │  (JSON: type-specific, secrets enc:v2:)
-│ enabled        │
-│ retry_policy   │  (JSON: { max_attempts, backoff_ms[] })
-└────────────────┘
-
-┌────────────────┐
-│   ApiKey       │  (v1.2+ — full schema with scopes/rotation)
-│────────────────│
-│ id (PK)        │
-│ tenant_id (FK) │
-│ name           │
-│ prefix (UQ)    │
-│ key_hash (UQ)  │
-│ scopes[]       │
-│ environment    │
-│ last_used_at   │
-│ expires_at     │
-│ revoked_at     │
-└────────────────┘
-
-┌────────────────────┐
-│ WorkflowSchedule   │  (v1.3+ — 1:1 with Workflow)
-│────────────────────│
-│ id (PK)            │
-│ workflow_id (FK,UQ)│
-│ cron_expression    │
-│ timezone           │
-│ payload_template   │
-│ is_active          │
-│ last_run_at        │
-│ next_run_at        │
-└────────────────────┘
-
-┌────────────────────┐
-│ WorkflowVersion    │  (v1.3+ — 1:N with Workflow, cap 50)
-│────────────────────│
-│ id (PK)            │
-│ workflow_id (FK)   │
-│ tenant_id (FK)     │
-│ version (int)      │
-│ snapshot (JSON)    │
-│ message            │
-│ created_by         │
-└────────────────────┘
+    API <--> PG
+    IN --> PG
+    WORK <--> PG
+    DASH --> API
+    CLI <--> API
+    IN <--> RD
+    WORK <--> RD
+    WORK <--> MG
+    API <--> MG
 ```
 
----
+The diagram is a responsibility map, not a claim that every service performs every operation. Concrete read/write ownership is described below.
 
-### Tables
+### Consistency boundaries
 
-#### `tenants`
-
-| Column | Type | Constraints | Notes |
-|---|---|---|---|
-| `id` | `uuid` | PK | `gen_random_uuid()` |
-| `name` | `text` | NOT NULL | Display name |
-| `slug` | `text` | UNIQUE | URL-safe; auto-generated from `name` at signup; conflicts get random suffix |
-| `plan` | `text` | NOT NULL | `free` (default) — `pro`/`enterprise` reserved for future |
-| `quota_events_per_month` | `int4` | NOT NULL | Default 10000 (free tier) |
-| `quota_ai_tokens_per_month` | `int4` | NOT NULL | Default 100000 |
-| `current_period_start` | `timestamptz` | NOT NULL | Billing period start |
-| `created_at` | `timestamptz` | NOT NULL | `now()` |
-| `updated_at` | `timestamptz` | NOT NULL | Auto-managed |
-
-**Why `slug`:** Exposed in dashboard for human identification. The webhook URL uses UUID, but slug is friendlier in logs.
+- PostgreSQL constraints and transactions govern relational records within PostgreSQL.
+- MongoDB documents are not protected by PostgreSQL foreign keys. IDs such as `tenantId`, `workflowId`, `eventId` and `destinationId` are cross-store references maintained by application logic.
+- Redis does not participate in a distributed transaction with either database.
+- A successful write to one store does not imply an atomic commit across all three stores. Retry, idempotency, recovery and reconciliation behavior must be designed at the workflow boundary.
 
 ---
 
-#### `users`
+## 2. Design principles
 
-| Column | Type | Constraints | Notes |
-|---|---|---|---|
-| `id` | `uuid` | PK | |
-| `tenant_id` | `uuid` | FK → tenants CASCADE | |
-| `email` | `text` | UNIQUE, NOT NULL | |
-| `password_hash` | `text` | NOT NULL | bcrypt cost 12 |
-| `name` | `text` | NOT NULL | |
-| `role` | `text` | NOT NULL | `owner` (default) — `admin`/`viewer` reserved |
-| `last_login_at` | `timestamptz` | NULL | Updated on login |
-| `created_at`, `updated_at` | `timestamptz` | NOT NULL | |
-
-**Why `email` is globally unique:** Not per-tenant. One email = one account. Simpler login flow (no tenant selection at login). Multi-tenant-per-user is deferred to v2.0 (`tenant_members` table).
+1. **PostgreSQL owns durable platform configuration.** Tenant, user, workflow, destination, credential-integration metadata, usage and platform-management records belong here.
+2. **MongoDB owns event-processing records.** Webhook event payloads and delivery lifecycle documents are modeled for flexible payloads and operational querying.
+3. **Redis coordinates work; it is not the durable business ledger.** Queue and cache state can be rebuilt only where the corresponding source record and recovery path exist.
+4. **Cross-store references are conventions, not foreign keys.** Validate tenant ownership and referenced entity state in application code.
+5. **Tenant context is a security boundary.** Tenant-scoped reads and writes must consistently carry tenant identity; database RLS is an additional control where a policy exists, not a substitute for application authorization.
+6. **Schema is the contract.** The Prisma schema and checked-in SQL migrations take precedence over old diagrams, release notes or copied examples.
+7. **Retention is explicit.** TTL cleanup is asynchronous and must not be treated as a precise deletion deadline.
+8. **Avoid unsupported guarantees.** Provider backup tiers, Redis durability, MongoDB retention and production RPO/RTO depend on the actual deployed plans and configuration.
 
 ---
 
-#### `refresh_tokens`
+## 3. PostgreSQL
 
-| Column | Type | Constraints | Notes |
-|---|---|---|---|
-| `id` | `uuid` | PK | |
-| `user_id` | `uuid` | FK → users CASCADE | |
-| `tenant_id` | `uuid` | FK → tenants CASCADE | Denormalized for tenant-scoped revocation queries |
-| `token_hash` | `text` | UNIQUE | SHA-256 of raw token (raw never stored) |
-| `expires_at` | `timestamptz` | NOT NULL | 7 days after creation |
-| `revoked_at` | `timestamptz` | NULL | Set on rotation or logout |
-| `created_at` | `timestamptz` | NOT NULL | |
+PostgreSQL is accessed through Prisma. The current schema contains the following model groups.
 
-**Why hash, not raw:** If the database is compromised, raw refresh tokens can't be reused. Compromised hashes are useless.
+### 3.1 Entity relationship overview
 
-**Why rotation:** Every refresh call revokes the old token and issues a new one. If a stolen token is reused, the second use fails (it was already revoked).
+The diagram below is intentionally a domain-level overview. It omits scalar columns and some optional relations to remain readable.
 
----
+```mermaid
+erDiagram
+    Tenant ||--o{ User : contains
+    Tenant ||--o{ Workflow : owns
+    Tenant ||--o{ ApiKey : owns
+    Tenant ||--o{ RefreshToken : scopes
+    Tenant ||--o{ UsageCounter : meters
+    Tenant ||--o{ TenantIntegration : configures
+    Tenant ||--o{ WebhookEndpoint : registers
+    Tenant ||--o{ TunnelSession : opens
 
-#### `workflows`
+    User ||--o{ RefreshToken : receives
+    User ||--o{ EmailVerification : verifies
+    User ||--o{ PasswordReset : resets
+    User ||--o{ ChatSession : starts
 
-| Column | Type | Constraints | Notes |
-|---|---|---|---|
-| `id` | `uuid` | PK | |
-| `tenant_id` | `uuid` | FK → tenants CASCADE | |
-| `name` | `text` | NOT NULL | |
-| `source_type` | `enum` | NOT NULL | `stripe` \| `github` \| `shopify` \| `slack` \| `generic` |
-| `source_config` | `jsonb` | NOT NULL, default `{}` | Type-specific config; `secret` encrypted as `enc:v2:...` |
-| `enrichment_enabled` | `bool` | NOT NULL | Default `false` |
-| `enrichment_prompt` | `text` | NULL | Custom LLM prompt |
-| `transform_expression` | `text` | NULL | JSONata expression (2s timeout at runtime) |
-| `routing_rules` | `jsonb` | NOT NULL, default `[]` | **v1.1+** — array of `{ when: string, destinationIds: string[] }` |
-| `is_active` | `bool` | NOT NULL | Default `true` |
-| `created_at`, `updated_at` | `timestamptz` | NOT NULL | |
+    Workflow ||--o{ Destination : routes_to
+    Workflow ||--o| WorkflowSchedule : schedules
+    Workflow ||--o{ WorkflowVersion : versions
 
-**`source_config` shape per type:**
-```json
-// stripe, github, shopify, slack
-{ "secret": "enc:v2:key-2026-10:..." }
+    ChatSession ||--o{ ChatMessage : contains
+    Tenant ||--o{ KnowledgeChunk : indexes
+    CommunityPost ||--o{ CommunityReply : receives
+    CommunityPost ||--o{ CommunityLike : liked_by
+    CommunityReply ||--o{ CommunityLike : liked_by
+    CommunityPost ||--o{ CommunityFlag : flagged_by
+    CommunityReply ||--o{ CommunityFlag : flagged_by
 
-// generic
-{ "secret": "enc:v2:...", "header": "x-webhook-signature", "encoding": "hex" | "base64" }
+    Tenant ||--o{ ApiKeyRotation : audits
+    Tenant ||--o{ OutboxEvent : emits
 ```
 
-**`routing_rules` shape (v1.1+):**
-```json
-[
-  { "when": "$exists(data.amount) and data.amount > 100", "destinationIds": ["dest-uuid-1"] },
-  { "when": "type = 'payment_intent.succeeded'", "destinationIds": ["dest-uuid-2"] }
-]
-```
-Empty array = route to all destinations. First matching rule wins.
+The schema also contains platform-level records that do not have a direct tenant foreign key, including `PageEvent`, `AdminAuditLog`, `ModerationAction`, `AnnouncementShare` and `FeatureFlag`.
 
----
+### 3.2 Core identity and tenancy
 
-#### `destinations`
+#### `Tenant` → `tenants`
 
-| Column | Type | Constraints | Notes |
-|---|---|---|---|
-| `id` | `uuid` | PK | |
-| `workflow_id` | `uuid` | FK → workflows CASCADE | |
-| `type` | `text` | NOT NULL | **Not enum** — see note below |
-| `name` | `text` | NOT NULL | |
-| `config` | `jsonb` | NOT NULL, default `{}` | Type-specific; secret fields `enc:v2:...` |
-| `enabled` | `bool` | NOT NULL | Default `true` |
-| `retry_policy` | `jsonb` | NOT NULL | `{ max_attempts, backoff_ms[] }` |
-| `created_at`, `updated_at` | `timestamptz` | NOT NULL | |
+The tenant is the main ownership boundary for customer data.
 
-**Why `type` is `text` not `enum` (v1.5 reality):** Each version added new adapters — Discord (v1.2), Airtable/Notion (v1.3), Postgres/MongoDB (v1.4). An enum would mean a migration per adapter. As `String`, new adapters register via `@DestinationAdapter` decorator with zero DB change. API DTO enforces `@IsIn(DESTINATION_TYPES)` at the boundary.
-
-**Valid `type` values (v1.5):**
-`http` · `slack` · `email` · `sheets` · `discord` · `airtable` · `notion` · `postgres` · `mongodb`
-
-**Default `retry_policy`:**
-```json
-{
-  "max_attempts": 5,
-  "backoff_ms": [10000, 30000, 60000, 300000, 900000]
-}
-```
-
-**`config` shape per type (v1.5 — 9 adapters):**
-```json
-// http
-{ "url": "https://...", "method": "POST", "headers": {...} }
-
-// slack / discord
-{ "webhookUrl": "enc:v2:key-2026-10:..." }
-
-// email (Resend)
-{ "apiKey": "enc:v2:...", "to": ["a@x.com"], "from": "Relayon <noreply@y.com>" }
-
-// sheets (service account)
-{
-  "spreadsheetId": "1abc...",
-  "range": "Sheet1!A:Z",
-  "serviceAccountEmail": "xxx@xxx.iam.gserviceaccount.com",
-  "privateKey": "enc:v2:..."
-}
-
-// airtable (v1.3+)
-{
-  "apiKey": "enc:v2:...",
-  "baseId": "appXXXXXXXXXXXXXX",
-  "tableName": "Leads",
-  "typecast": true
-}
-
-// notion (v1.3+)
-{
-  "apiKey": "enc:v2:...",
-  "dataSourceId": "uuid",
-  "titleProperty": "Name"
-}
-
-// postgres (v1.4+)
-{
-  "connectionString": "enc:v2:...",
-  "table": "events",
-  "columns": { "type": "event_type", "data.amount": "amount_cents" },
-  "onConflict": "id",
-  "ssl": true
-}
-
-// mongodb (v1.4+)
-{
-  "connectionString": "enc:v2:...",
-  "database": "mydb",
-  "collection": "events",
-  "upsertKey": "orderId"
-}
-```
-
-**Encryption scope:** Only keys in `SECRET_CONFIG_KEYS` (`secret`, `apiKey`, `privateKey`, `webhookUrl`, `connectionString`, etc.) are encrypted by default. Setting `FULL_CONFIG_ENCRYPTION=true` on the API switches to `encryptConfigAll` — every non-metadata field encrypted. See [SECURITY.md](./SECURITY.md).
-
----
-
-#### `api_keys` (v1.2 — full schema with scopes + rotation)
-
-| Column | Type | Constraints | Notes |
-|---|---|---|---|
-| `id` | `uuid` | PK | |
-| `tenant_id` | `uuid` | FK → tenants CASCADE | |
-| `name` | `text` | NOT NULL | e.g., "CI pipeline" |
-| `prefix` | `text` | UNIQUE, NOT NULL | e.g., `rlk_live_ab12cd34` — O(1) lookup at verify time |
-| `key_hash` | `text` | UNIQUE, NOT NULL | SHA-256 of `{PEPPER}:{rawKey}` |
-| `scopes` | `text[]` | NOT NULL, default `[]` | Postgres array — e.g., `["events:read","workflows:read"]` |
-| `environment` | `text` | NOT NULL, default `'live'` | `live` \| `test` |
-| `last_used_at` | `timestamptz` | NULL | Updated on every successful verify (fire-and-forget) |
-| `expires_at` | `timestamptz` | NULL | NULL = no expiry (`neverExpires: true`) |
-| `revoked_at` | `timestamptz` | NULL | Set on revoke; verify rejects revoked keys |
-| `created_at` | `timestamptz` | NOT NULL | |
-
-**Valid scopes (v1.5):**
-`events:read` · `workflows:read` · `workflows:write` · `destinations:read` · `destinations:write` · `dlq:read` · `dlq:write` · `analytics:read`
-
-**Key format:** `rlk_<live|test>_<8-hex-prefix>_<48-hex-secret>` — Stripe-style. Raw key returned **once** at creation. Never retrievable again.
-
-**Rotation (v1.5):** `POST /api/api-keys/:id/rotate` creates a new key and caps the old key's `expiresAt` at `now + 24h`. Both keys work during the grace window.
-
-**Why pepper + SHA-256, not bcrypt:** bcrypt is ~100ms — too slow for API auth on every request. SHA-256 of a high-entropy key (~1μs) is secure because the key itself has 384 bits of entropy. Pepper defends against rainbow tables if the DB leaks. See [SECURITY.md](./SECURITY.md) for details.
-
----
-
-#### `workflow_schedules` (v1.3)
-
-| Column | Type | Constraints | Notes |
-|---|---|---|---|
-| `id` | `uuid` | PK | |
-| `workflow_id` | `uuid` | FK → workflows CASCADE, UNIQUE | 1:1 with workflow |
-| `cron_expression` | `text` | NOT NULL | 5-field; digits + `*`,`,`,`-`,`/`, space only |
-| `timezone` | `text` | NOT NULL, default `'UTC'` | IANA tz name |
-| `payload_template` | `jsonb` | NOT NULL, default `{}` | Injected as `rawPayload.data` in synthetic event |
-| `is_active` | `bool` | NOT NULL, default `true` | Pausable without deleting |
-| `last_run_at` | `timestamptz` | NULL | Updated on each tick enqueue |
-| `next_run_at` | `timestamptz` | NOT NULL | Indexed with `is_active` — the atomic claim predicate |
-| `created_at`, `updated_at` | `timestamptz` | NOT NULL | |
-
-**Atomic claim query (serverless-safe):**
-```typescript
-await prisma.workflowSchedule.updateMany({
-  where: { id: schedule.id, nextRunAt: { lte: now } },
-  data: { lastRunAt: now, nextRunAt: computedFuture },
-});
-```
-If `count !== 1`, another worker already advanced this row → skip.
-
-**Why DB-backed, not in-memory:** Vercel functions are stateless — `@nestjs/schedule` loses its registry on every cold start. See [ARCHITECTURE.md § Scheduled Workflows](./ARCHITECTURE.md#scheduled-workflows).
-
----
-
-#### `workflow_versions` (v1.3)
-
-| Column | Type | Constraints | Notes |
-|---|---|---|---|
-| `id` | `uuid` | PK | |
-| `workflow_id` | `uuid` | FK → workflows CASCADE | |
-| `tenant_id` | `uuid` | FK → tenants CASCADE | Denormalized for tenant-scoped queries |
-| `version` | `int4` | NOT NULL | Sequential, starts at 1 |
-| `snapshot` | `jsonb` | NOT NULL | Full workflow + destinations snapshot (encrypted configs inside) |
-| `message` | `text` | NULL | Human label — `"Initial version"`, `"Configuration updated"`, `"Restored from vN"`, `"Imported from YAML"` |
-| `created_by` | `uuid` | NULL | Actor user ID |
-| `created_at` | `timestamptz` | NOT NULL | |
-
-**Unique constraint:** `@@unique([workflowId, version])` — protects against duplicate version numbers under concurrent writes.
-
-**Cap:** 50 versions per workflow. Older versions trimmed after each capture (query: `findMany({ orderBy: { version: 'desc' }, skip: 50 }).deleteMany()`).
-
-**Restore semantics:** Destinations are deleted and recreated — their UUIDs are **not** stable across versions. The restore itself produces a new version (`"Restored from vN"`), so history stays linear — never branches.
-
----
-
-### PostgreSQL Indexes
-
-| Table | Index | Columns | Why |
-|---|---|---|---|
-| `users` | `users_tenant_id_idx` | `tenant_id` | Fast tenant→users join |
-| `refresh_tokens` | `refresh_tokens_user_id_idx` | `user_id` | List user's sessions |
-| `refresh_tokens` | `refresh_tokens_expires_at_idx` | `expires_at` | Cleanup expired tokens |
-| `workflows` | `workflows_tenant_id_idx` | `tenant_id` | List tenant's workflows |
-| `destinations` | `destinations_workflow_id_idx` | `workflow_id` | List workflow's destinations |
-| `api_keys` | `api_keys_tenant_id_idx` | `tenant_id` | List tenant's keys |
-| `api_keys` | `api_keys_prefix_key` | `prefix` (UNIQUE) | Fast lookup at verify — this is the hot path |
-| `api_keys` | `api_keys_key_hash_key` | `key_hash` (UNIQUE) | Defense-in-depth (timing-safe compare after prefix lookup) |
-| `workflow_schedules` | `workflow_schedules_is_active_next_run_at_idx` | `(is_active, next_run_at)` | **Hot path** — atomic claim query |
-| `workflow_schedules` | `workflow_schedules_workflow_id_key` | `workflow_id` (UNIQUE) | 1:1 enforcement |
-| `workflow_versions` | `workflow_versions_workflow_id_version_key` | `(workflow_id, version)` (UNIQUE) | Duplicate version guard + ordered listing |
-| `workflow_versions` | `workflow_versions_tenant_id_workflow_id_version_idx` | `(tenant_id, workflow_id, version)` | Tenant-scoped version list |
-
----
-
-### Migrations
-
-Relayon uses **Prisma Migrate** — versioned SQL migrations stored in `packages/db/prisma/migrations/`.
-
-**Current migrations (v1.5):**
-
-| Migration | Version | Change |
+| Field | Prisma type | Purpose |
 |---|---|---|
-| `20261018152226_init` | v1.0 | Initial schema — `Tenant`, `User`, `Workflow`, `Destination`, `RefreshToken`, `ApiKey` (basic), all enums |
-| `add_routing_rules` | v1.1 | Adds `workflows.routing_rules` JSONB column (default `[]`) |
-| `api_keys_scopes` | v1.2 | Rebuilds `api_keys`: adds `prefix`, `scopes[]`, `environment`, `revoked_at`; renames `key` → `key_hash` |
-| `v13_schedules_and_versions` | v1.3 | Adds `workflow_schedules` + `workflow_versions` tables |
-| *(none)* | v1.4 | No migration — PG/MongoDB adapters + `enc:v2:` envelope are data-layer changes only |
-| *(none)* | v1.5 | No migration — validation, dry-run, `encryptConfigAll`, api-key rotate, bulk schedules are code-only |
+| `id` | `String` | UUID primary key |
+| `name`, `slug` | `String` | Display identity; slug is unique |
+| `plan` | `Plan` | `free`, `pro` or `enterprise` |
+| `quotaEventsPerMonth` | `Int` | Event quota |
+| `quotaAiTokensPerMonth` | `Int` | AI token quota |
+| `quotaMode` | `String` | Quota enforcement mode; default `hard` |
+| `currentPeriodStart` | `DateTime` | Current usage/billing period start |
+| `stripeCustomerId` | `String?` | Optional Stripe customer reference |
+| `stripeSubscriptionId` | `String?` | Optional subscription reference |
+| `stripePriceId` | `String?` | Optional price reference |
+| `subscriptionStatus` | `String` | Subscription lifecycle marker; default `none` |
+| `currentPeriodEnd` | `DateTime?` | Optional period end |
+| `createdAt`, `updatedAt` | `DateTime` | Record timestamps |
 
-**Commands:**
+Relations include users, workflows, refresh tokens, API keys, API-key rotation history, usage counters, chat sessions, knowledge chunks, community posts, outbound webhook endpoints, tunnel sessions and tenant integrations.
 
-```bash
-# Create a new migration (dev only)
-cd packages/db
-npx prisma migrate dev --name add_xyz
+#### `User` → `users`
 
-# Apply pending migrations (production — safe, idempotent)
-cd packages/db
-DATABASE_URL="postgresql://...neon...?sslmode=require" npx prisma migrate deploy
-cd ../..
+| Field | Purpose |
+|---|---|
+| `id`, `tenantId` | User identity and tenant association |
+| `email` | Globally unique email address |
+| `passwordHash` | Nullable to support OAuth-only accounts |
+| `name`, `role` | Profile and `UserRole` |
+| `emailVerified` | Email verification state |
+| `googleId`, `githubId` | Optional unique OAuth provider identifiers |
+| `locale` | Preferred locale; default `en` |
+| `isSuperAdmin` | Platform-level administrative flag |
+| `lastLoginAt` | Last successful login timestamp |
+| `createdAt`, `updatedAt` | Record timestamps |
 
-# Reset database (dev only — DESTRUCTIVE)
-cd packages/db
-npx prisma migrate reset --force
+The schema makes `email` unique globally, not as a `(tenantId, email)` pair. A user is associated with one tenant in this schema; do not document multi-tenant membership unless a corresponding model is added.
 
-# Visual schema explorer
-npx prisma studio
-```
+#### Authentication lifecycle records
 
-**Migration workflow:**
-1. Edit `packages/db/prisma/schema.prisma`
-2. Run `npm run db:migrate` (creates + applies migration in dev)
-3. Commit the new migration file to Git
-4. `npm run db:deploy` runs on next production deploy (via Vercel build, before API starts)
+| Model | Table | Purpose | Important fields |
+|---|---|---|---|
+| `RefreshToken` | `refresh_tokens` | Refresh-session tracking | `userId`, `tenantId`, unique `tokenHash`, `expiresAt`, `revokedAt` |
+| `EmailVerification` | `email_verifications` | Email ownership verification | `userId`, unique `tokenHash`, `expiresAt`, `usedAt` |
+| `PasswordReset` | `password_resets` | Password reset flow | `userId`, unique `tokenHash`, `expiresAt`, `usedAt` |
 
-**Idempotency:** All migrations are wrapped in transactions. `prisma migrate deploy` is safe to run multiple times.
+The schema stores token hashes rather than requiring raw verification/reset tokens to be persisted. Expiry and one-time-use enforcement must also be applied by the service layer.
 
-**⚠️ Rule:** Never run `prisma migrate dev` (generates files) on production. Always `prisma migrate deploy` (applies only). Always `pg_dump` before `db:deploy` on production.
+### 3.3 Workflow configuration
+
+#### `Workflow` → `workflows`
+
+| Field | Purpose |
+|---|---|
+| `id`, `tenantId` | Identity and tenant ownership |
+| `name` | Workflow display name |
+| `sourceType` | `SourceType` enum |
+| `sourceConfig` | JSON source configuration |
+| `enrichmentEnabled` | Whether AI enrichment is enabled |
+| `enrichmentPrompt` | Optional custom prompt |
+| `transformExpression` | Optional transformation expression |
+| `routingRules` | JSON routing-rule collection; default `[]` |
+| `isActive` | Workflow activation flag |
+| `createdAt`, `updatedAt` | Record timestamps |
+
+`Workflow` relates to its tenant, destinations, optional schedule and version history.
+
+#### `Destination` → `destinations`
+
+| Field | Purpose |
+|---|---|
+| `id`, `workflowId`, `tenantId` | Identity, workflow and tenant association |
+| `type` | `DestinationType` enum in the current Prisma schema |
+| `name` | Display name |
+| `config` | JSON destination configuration |
+| `enabled` | Delivery enablement |
+| `retryPolicy` | JSON retry configuration |
+| `lastValidatedAt` | Last validation timestamp |
+| `lastValidationOk` | Nullable validation result |
+| `lastValidationError` | Optional validation error |
+| `createdAt`, `updatedAt` | Record timestamps |
+
+**Important correction from the v1.5 document:** The current schema declares `DestinationType` as a Prisma enum. Do not carry forward the old statement that `destinations.type` is a free-form `String`. The enum currently contains `http`, `slack`, `sheets`, `email`, `discord`, `airtable`, `notion`, `postgres` and `mongodb`.
+
+#### `WorkflowSchedule` → `workflow_schedules`
+
+A schedule is optional and one-to-one with a workflow (`workflowId` is unique).
+
+| Field | Purpose |
+|---|---|
+| `workflowId`, `tenantId` | Workflow and tenant ownership |
+| `cronExpression`, `timezone` | Schedule definition |
+| `payloadTemplate` | JSON payload template |
+| `isActive` | Pause/resume state |
+| `lastRunAt`, `nextRunAt` | Execution bookkeeping |
+| `createdAt`, `updatedAt` | Record timestamps |
+
+The schema indexes `(isActive, nextRunAt)` and `tenantId`. Schedule claiming and enqueue semantics are application-level behavior; do not treat a due-row query alone as proof that a job was successfully delivered.
+
+#### `WorkflowVersion` → `workflow_versions`
+
+Stores workflow snapshots and a per-workflow version sequence.
+
+| Field | Purpose |
+|---|---|
+| `workflowId`, `tenantId` | Workflow and tenant ownership |
+| `version` | Version number |
+| `snapshot` | JSON snapshot |
+| `message` | Optional human-readable change label |
+| `createdBy` | Optional actor identifier |
+| `createdAt` | Creation time |
+
+The schema has a unique constraint on `(workflowId, version)` and an index on `(tenantId, workflowId, version)`.
+
+### 3.4 Platform operations and metering
+
+#### `ApiKey` → `api_keys`
+
+| Field | Purpose |
+|---|---|
+| `id`, `tenantId`, `name` | Identity, ownership and label |
+| `prefix` | Unique lookup prefix |
+| `keyHash` | Unique stored key hash |
+| `scopes` | String-array permissions |
+| `environment` | Environment label; default `live` |
+| `lastUsedAt` | Last successful use |
+| `expiresAt`, `revokedAt` | Expiry and revocation state |
+| `createdAt` | Creation timestamp |
+
+#### `ApiKeyRotation` → `api_key_rotations`
+
+Records rotation lineage/audit metadata: `tenantId`, `oldKeyId`, `newKeyId`, optional `rotatedBy`, `graceUntil` and `createdAt`. The schema indexes `(tenantId, createdAt)`.
+
+#### `UsageCounter` → `usage_counters`
+
+Composite primary key: `(tenantId, period, metric)`.
+
+| Field | Purpose |
+|---|---|
+| `tenantId` | Tenant owner |
+| `period` | Usage period identifier |
+| `metric` | Meter name |
+| `count` | `BigInt` accumulated value |
+| `updatedAt` | Last update |
+
+The composite key prevents multiple counter rows for the same tenant/period/metric tuple. Atomic increment behavior belongs to the service/database operation, not merely the Prisma model declaration.
+
+### 3.5 AI and knowledge data
+
+#### `ChatSession` → `chat_sessions`
+
+Stores a tenant/user-owned chat session with `title`, `createdAt` and `updatedAt`. It relates to `ChatMessage[]` and has an index on `(tenantId, userId, updatedAt)`.
+
+#### `ChatMessage` → `chat_messages`
+
+Stores a message within a session:
+
+- `sessionId`
+- `role`
+- `content`
+- optional JSON `toolCalls`
+- optional `toolName`
+- `createdAt`
+
+An index on `(sessionId, createdAt)` supports chronological session retrieval.
+
+#### `KnowledgeChunk` → `knowledge_chunks`
+
+Stores searchable knowledge content:
+
+- optional `tenantId` (nullable for non-tenant/global content)
+- `sourceType`, `sourceId`
+- `title`, `content`
+- JSON `metadata`
+- `createdAt`
+
+Indexes: `(tenantId, sourceType)` and `sourceId`.
+
+**Search implementation note:** The Prisma schema explicitly documents that this model does not contain a vector column; the repository uses PostgreSQL full-text search rather than assuming a pgvector embedding column.
+
+### 3.6 Analytics, administration and community
+
+#### `PageEvent` → `page_events`
+
+Analytics/event tracking model with an auto-incrementing `BigInt` ID. Fields include optional `tenantId`, `path`, `referrer`, `ipHash`, browser/OS/device/country metadata, `sessionId`, `eventType`, optional `eventName`, JSON `properties` and `createdAt`.
+
+Indexes: `createdAt`, `(path, createdAt)`, `(sessionId, createdAt)` and `(tenantId, createdAt)`.
+
+#### `AdminAuditLog` → `admin_audit_logs`
+
+Administrative activity record with `adminId`, `action`, optional target type/ID, JSON metadata, optional `ipHash`, impersonation-related fields (`impersonatedTenantId`, `sessionToken`, `expiresAt`) and `createdAt`.
+
+Indexes include `(adminId, createdAt)`, `(action, createdAt)` and `impersonatedTenantId`.
+
+#### Community and moderation models
+
+| Model | Table | Role |
+|---|---|---|
+| `CommunityPost` | `community_posts` | Community post, author/tenant references, slug, tags, status, counters and moderation state |
+| `CommunityReply` | `community_replies` | Replies and nested reply hierarchy, solution marker and moderation state |
+| `CommunityLike` | `community_likes` | User likes attached to a post or reply |
+| `CommunityFlag` | `community_flags` | User-submitted reports, status and resolution metadata |
+| `ModerationAction` | `moderation_actions` | Administrative moderation action history |
+| `AnnouncementShare` | `announcement_shares` | Announcement publication/share status and external reference |
+
+Notable constraints and indexes visible in the schema:
+
+- `CommunityPost.slug` is unique.
+- Community post listing index: `(type, status, createdAt)`.
+- Community posts have a GIN index on `tags`.
+- Replies index `(postId, createdAt)` and `parentId`.
+- Likes have unique constraints on `(postId, userId)` and `(replyId, userId)`.
+- Flags index `(status, createdAt)`.
+
+Application validation should ensure that a like/flag references the intended target and that the caller is authorized. Nullable `postId`/`replyId` columns alone do not enforce exactly-one-target semantics.
+
+### 3.7 Webhooks, outbox, flags, tunnels and integrations
+
+#### `WebhookEndpoint` → `webhook_endpoints`
+
+Tenant-owned outbound webhook configuration. Fields include `url`, `secret`, optional `description`, `eventTypes`, `isActive`, `consecutiveFailures`, `lastSuccessAt`, `lastFailureAt` and timestamps.
+
+#### `OutboxEvent` → `outbox_events`
+
+Durable outbound event record with `tenantId`, `eventType`, JSON `payload`, `status`, `attemptCount`, `nextAttemptAt`, optional `lastError`, `deliveredAt`, `expiresAt` and timestamps.
+
+The outbox table gives the application a durable place to track outbound work. Actual delivery guarantees depend on the dispatcher, claim/update strategy, retries and idempotent receiver behavior.
+
+#### `FeatureFlag` → `feature_flags`
+
+Platform feature configuration keyed by `key`, with `description`, `isEnabled`, `rolloutPct`, JSON `tenantOverrides` and timestamps. The key is the model's primary key.
+
+#### `TunnelSession` → `tunnel_sessions`
+
+Tenant-owned CLI tunnel session metadata: `sessionId`, `targetPort`, optional `label`, `isActive`, `lastSeenAt`, `expiresAt` and timestamps.
+
+#### `TenantIntegration` → `tenant_integrations`
+
+Tenant-owned BYOK/provider integration metadata: `provider`, `encryptedKey`, optional `model`, `isActive`, validation fields (`lastValidatedAt`, `lastValidationOk`, `validationError`), `lastUsedAt` and timestamps.
+
+The field name `encryptedKey` indicates the intended storage representation; encryption/decryption behavior and key management are defined by application crypto code and deployment configuration, not by the Prisma type alone.
+
+### 3.8 Enums and indexes
+
+#### Current Prisma enums
+
+| Enum | Values |
+|---|---|
+| `Plan` | `free`, `pro`, `enterprise` |
+| `UserRole` | `owner`, `admin`, `viewer` |
+| `SourceType` | `stripe`, `github`, `shopify`, `slack`, `generic` |
+| `DestinationType` | `http`, `slack`, `sheets`, `email`, `discord`, `airtable`, `notion`, `postgres`, `mongodb` |
+
+#### Index inventory
+
+The Prisma schema defines indexes across identity, workflow, usage, chat, knowledge, analytics, community and operational tables. High-value examples include:
+
+| Table | Index / constraint | Access pattern |
+|---|---|---|
+| `users` | `tenantId` | Tenant user lookup |
+| `email_verifications` | `userId`, `expiresAt` | Verification lookup and expiry cleanup |
+| `password_resets` | `userId`, `expiresAt` | Reset lookup and expiry cleanup |
+| `refresh_tokens` | `userId`, `expiresAt` | Session lookup and expiry cleanup |
+| `workflows` | `tenantId` | Tenant workflow listing |
+| `destinations` | `workflowId`, `tenantId` | Workflow and tenant destination lookup |
+| `api_keys` | unique `prefix`, unique `keyHash`; `tenantId` | Key verification and tenant listing |
+| `workflow_schedules` | unique `workflowId`; `(isActive, nextRunAt)`; `tenantId` | One-to-one schedule and due-work scan |
+| `workflow_versions` | unique `(workflowId, version)`; `(tenantId, workflowId, version)` | Version integrity and history |
+| `usage_counters` | PK `(tenantId, period, metric)`; `(tenantId, period)` | Usage aggregation |
+| `chat_sessions` | `(tenantId, userId, updatedAt)` | Recent user sessions |
+| `chat_messages` | `(sessionId, createdAt)` | Message chronology |
+| `knowledge_chunks` | `(tenantId, sourceType)`, `sourceId` | Knowledge filtering |
+| `page_events` | `createdAt`, `(path, createdAt)`, `(sessionId, createdAt)`, `(tenantId, createdAt)` | Analytics queries |
+| `admin_audit_logs` | `(adminId, createdAt)`, `(action, createdAt)`, `impersonatedTenantId` | Admin audit retrieval |
+| `community_posts` | `(type, status, createdAt)`, `authorId/createdAt`, GIN `tags` | Feed, author and tag search |
+| `community_replies` | `(postId, createdAt)`, `parentId` | Thread retrieval |
+| `community_likes` | unique `(postId, userId)`, unique `(replyId, userId)` | Duplicate-like prevention |
+| `community_flags` | `(status, createdAt)` | Moderation queue |
+| `api_key_rotations` | `(tenantId, createdAt)` | Rotation audit |
+| `tunnel_sessions` | tenant/session lookup indexes as declared in schema | Tunnel session operations |
+| `tenant_integrations` | tenant/provider lookup indexes as declared in schema | BYOK integration management |
+
+For exact SQL names, operator classes and partial-index behavior, inspect the checked-in migration SQL. Prisma model declarations are the source for logical constraints; the generated database is the source for deployed physical state.
+
+### 3.9 Row-level security
+
+The repository contains a PostgreSQL RLS migration and application tenant-context/RLS helpers. RLS is an additional database boundary for the tables explicitly covered by the migration.
+
+**Do not describe RLS as universal coverage.** A table is protected by RLS only if its migration defines the policy and the runtime connection sets the expected tenant context. Background jobs, administrative paths and intentional tenantless operations require separate review.
+
+Operational requirements:
+
+- Set tenant context on the same database connection/transaction used for the protected query.
+- Never assume a pooled connection retains the correct tenant context across requests.
+- Review the database role's privileges and RLS bypass behavior.
+- Test cross-tenant reads and writes for every tenant-owned model.
+- Keep application authorization checks even when RLS is enabled.
+- Re-audit policy coverage whenever a new tenant-owned model is added.
 
 ---
 
-### Prisma Configuration
+## 4. MongoDB
 
-**Generator block (v1.5 — critical for Vercel):**
+MongoDB stores webhook event and delivery lifecycle documents. The v1.5 design describes the `events` and `deliveries` collections; the current Prisma schema does not replace these collections.
 
-```prisma
-generator client {
-  provider      = "prisma-client-js"
-  binaryTargets = ["native", "rhel-openssl-3.0.x"]
-}
-```
+### 4.1 `events`
 
-**Why `rhel-openssl-3.0.x`:** Vercel's Node runtime is Amazon Linux 2023. Without this target, the Prisma query engine binary is missing at runtime → every request fails with `PrismaClientInitializationError: Query engine library not found`.
+One document represents a received webhook and its processing lifecycle.
 
-**Why `native`:** Local dev (Windows/Mac/Linux) needs its own target to run migrations and queries without a Docker container.
+Representative document shape:
 
-**Version pinning (v1.5 — exact, not caret):**
-
-- Root `dependencies.prisma`: **`6.19.3`** (exact)
-- `@prisma/client`: `^6.2.0` in api/workers/ingress workspaces
-
-**Generate command (CI and Vercel build):**
-
-```bash
-node ./node_modules/prisma/build/index.js generate --schema=./packages/db/prisma/schema.prisma
-```
-
-**Never use `npx prisma generate`.** During early v1.0 deployment, `npx` couldn't find the local binary (workspace `.bin` not in PATH), so it fetched `prisma@latest` — which was `8.0.0-rc.x`, a new CLI that removed the `generate` command. Build failed with `CLI.UNKNOWN_COMMAND`. The absolute-path invocation is the fix.
-
----
-
-## MongoDB Collections
-
-### `events`
-
-One document per received webhook, capturing the full processing lifecycle.
-
-**Schema:**
 ```typescript
 {
   _id: ObjectId,
-  correlationId: string,          // unique, indexed
-  tenantId: string,               // indexed
-  workflowId: string,             // indexed
+  correlationId: string,
+  tenantId: string,
+  workflowId: string,
   sourceType: string,
-  rawPayload: unknown,            // original webhook body
-  headers: Record<string, string>,// sanitized (auth headers removed)
-  ipHash: string | null,          // SHA-256(salt + IP)
+  rawPayload: unknown,
+  headers: Record<string, string>,
+  ipHash: string | null,
   userAgent: string | null,
   idempotencyKey: string | null,
-  receivedAt: Date,               // indexed (compound)
+  receivedAt: Date,
   processedAt: Date | null,
   enrichedPayload: unknown | null,
   transformedPayload: unknown | null,
@@ -523,43 +482,33 @@ One document per received webhook, capturing the full processing lifecycle.
     durationMs: number,
     error: string | null
   } | null,
-  status: 'received' | 'processing' | 'processed' | 'failed',  // indexed
+  status: "received" | "processing" | "processed" | "failed",
   error: { stage: string, code: string, message: string } | null,
-  ttlExpiresAt: Date              // indexed with TTL
+  ttlExpiresAt: Date
 }
 ```
 
-**Write path:** Only Workers writes. API reads.
-**Retention:** 30 days via `ttlExpiresAt` TTL index.
+The event record carries cross-store identifiers as values; there is no PostgreSQL foreign key from this document to `Tenant` or `Workflow`.
 
-**`rawPayload.type` markers:**
-- `'relayon.schedule.trigger'` — fired by cron tick (v1.3)
-- `'relayon.schedule.manual'` — fired by Run-now button (v1.4)
-- `'relayon.dry_run'` — sent during `/internal/egress/dry-run` (never persisted) (v1.5)
-- Anything else — real webhook from source
+### 4.2 `deliveries`
 
----
+One document represents the delivery of an event to a destination.
 
-### `deliveries`
-
-One document per (event, destination) pair. Tracks attempt history and current state.
-
-**Schema:**
 ```typescript
 {
   _id: ObjectId,
-  tenantId: string,               // indexed
-  eventId: string,                // indexed (references events._id)
-  correlationId: string,          // indexed
-  destinationId: string,          // indexed
+  tenantId: string,
+  eventId: string,
+  correlationId: string,
+  destinationId: string,
   destinationType: string,
-  status: 'pending' | 'delivering' | 'delivered' | 'dlq',  // indexed
+  status: "pending" | "delivering" | "delivered" | "dlq",
   attemptCount: number,
-  nextAttemptAt: Date,            // indexed (for delayed queue scan)
+  nextAttemptAt: Date,
   lastAttemptAt: Date | null,
   lastResponse: {
     statusCode: number,
-    bodySnippet: string,          // first 500 chars
+    bodySnippet: string,
     latencyMs: number
   } | null,
   attempts: Array<{
@@ -573,287 +522,429 @@ One document per (event, destination) pair. Tracks attempt history and current s
   dlqAt: Date | null,
   createdAt: Date,
   deliveredAt: Date | null,
-  ttlExpiresAt: Date              // indexed with TTL
+  ttlExpiresAt: Date
 }
 ```
 
-**Write path:** Workers writes. API reads + updates (replay, bulk replay, bulk discard — the only API-writes-to-MongoDB exception, documented in [ARCHITECTURE.md](./ARCHITECTURE.md)).
+### 4.3 Index and retention notes
 
-**Retention:** 30 days via TTL.
+The earlier collection design documents the following access patterns:
 
----
+**`events`**
+- Unique `correlationId`
+- `(tenantId, receivedAt desc)` for tenant event history
+- `(workflowId, receivedAt desc)` for workflow filtering
+- `(tenantId, status)` for status filtering
+- TTL index on `ttlExpiresAt`
 
-### MongoDB Indexes
+**`deliveries`**
+- `(tenantId, status)` for tenant delivery/DLQ listing
+- `(destinationId, status)` for destination health
+- `(status, lastAttemptAt)` for stuck-delivery recovery
+- `(status, nextAttemptAt)` for delayed retry recovery
+- TTL index on `ttlExpiresAt`
 
-**`events`:**
-```javascript
-{ correlationId: 1 }              // unique
-{ tenantId: 1, receivedAt: -1 }   // tenant event listing
-{ workflowId: 1, receivedAt: -1 } // workflow filtering
-{ tenantId: 1, status: 1 }        // status filtering
-{ ttlExpiresAt: 1 }               // TTL: expire after 0s
-```
+The v1.5 document described a 30-day TTL policy. Treat this as the documented design default, not a guarantee that every deployment has the same TTL index or retention setting. Verify the actual MongoDB indexes and document expiry values in the target environment.
 
-**`deliveries`:**
-```javascript
-{ tenantId: 1, status: 1 }        // DLQ listing
-{ destinationId: 1, status: 1 }   // destination health
-{ status: 1, lastAttemptAt: 1 }   // stuck recovery scan
-{ status: 1, nextAttemptAt: 1 }   // delayed queue recovery scan
-{ ttlExpiresAt: 1 }               // TTL: expire after 0s
-```
-
-**TTL behavior:** MongoDB runs a background thread every 60s. Expired documents are deleted lazily. This is **not** immediate — a document with `ttlExpiresAt = T` may live up to `T + 60s`.
+MongoDB TTL deletion is asynchronous. An expired document can remain queryable after its expiry timestamp until the TTL monitor removes it. TTL is not a real-time scheduler or compliance-grade deletion deadline.
 
 ---
 
-## Redis Keys
+## 5. Redis
 
-All keys are prefixed by purpose. Namespacing prevents collisions.
+Redis is used for coordination and short-lived operational state. The earlier documented key families are:
 
-| Pattern | Type | TTL | Written By | Read By |
-|---|---|---|---|---|
-| `queue:events:incoming` | List | None | Ingress, Workers (schedule) | Workers |
-| `queue:events:processing` | List | None | Workers | Workers |
-| `queue:egress:pending` | List | None | Workers | Workers |
-| `queue:egress:delayed` | ZSet | None | Workers | Workers |
-| `idempotency:{workflowId}:{key}` | String | 86400s | Ingress | Ingress |
-| `ratelimit:{workflowId}:{bucket}` | String | 120s | Ingress | Ingress |
-| `circuit:dest:{destinationId}` | String | 300s | Workers | Workers |
-| `groq:enrich:{hash}` | String | 3600s | Workers | Workers |
+| Key pattern | Type | Purpose |
+|---|---|---|
+| `queue:events:incoming` | List | Incoming event work |
+| `queue:events:processing` | List | In-progress event work |
+| `queue:egress:pending` | List | Pending delivery work |
+| `queue:egress:delayed` | Sorted set | Delayed retry scheduling |
+| `idempotency:{workflowId}:{key}` | String | Duplicate event suppression |
+| `ratelimit:{workflowId}:{bucket}` | String | Ingress rate-limit counter |
+| `circuit:dest:{destinationId}` | String | Destination circuit-breaker state |
+| `groq:enrich:{hash}` | String | Enrichment response cache |
 
-**`{key}` in idempotency:** Either `X-Event-Id` header or `sha256(body)`. `SET NX EX 86400` — if key exists, webhook is a duplicate.
+Key names, TTLs and queue commands are implementation details and can evolve. Confirm them against the current Redis key helpers and queue/worker implementations before using this table as a runbook.
 
-**`{bucket}` in ratelimit:** `Math.floor(Date.now() / 60000)` — auto-rolls every minute. `INCR` per request, reject at 300.
+### Operational semantics
 
-**`{hash}` in groq:enrich:** `sha256(payload + prompt)` — prompt change naturally invalidates cache.
+- **Idempotency:** A Redis idempotency key reduces duplicate enqueueing within its configured lifetime. It is not a replacement for durable uniqueness or idempotency at downstream destinations.
+- **Rate limiting:** Counters and bucket expiration define the effective rate-limit window. Clock boundaries and atomic increment/expiry behavior matter.
+- **Queues:** A queue item can be lost or become stranded if the process crashes between Redis and MongoDB state transitions unless the queue protocol includes recovery.
+- **Delayed retries:** The sorted-set score convention and promotion loop must agree. Do not manually edit scores without understanding the worker scheduler.
+- **Cache:** Cache eviction or expiry must not corrupt the durable workflow or event record.
+- **Circuit breaker:** Redis state is operational protection, not a durable record of delivery success.
 
-**Memory footprint estimate:**
-- 1000 events in-flight × 2 KB avg = 2 MB
-- 100 cached enrichments × 500 bytes = 50 KB
-- Rate limit + idempotency keys: 1 KB × active workflows
-
-Upstash free tier (256 MB, 10K commands/day) is enough for **~50K daily events** with conservative headroom.
-
----
-
-## Data Flow Between Stores
-
-### Webhook path (v1.0)
-
-```
-┌──────────┐
-│ Ingress  │
-└────┬─────┘
-     │ 1. Read workflow (Prisma → PostgreSQL)
-     │ 2. Check idempotency (Redis GET)
-     │ 3. Check rate limit (Redis INCR)
-     │ 4. Write event to queue (Redis LPUSH)
-     ▼
-┌──────────┐
-│ Workers  │
-└────┬─────┘
-     │ 5. Pop from queue (Redis RPOPLPUSH)
-     │ 6. Read workflow config (Prisma → PostgreSQL, batched)
-     │ 7. Groq enrichment (HTTP, cache in Redis)
-     │ 8. Write Event doc (Mongoose → MongoDB)
-     │ 9. Write Delivery docs (Mongoose → MongoDB)
-     │10. Push egress job (Redis LPUSH)
-     ▼
-┌──────────┐
-│  Egress  │
-└────┬─────┘
-     │11. Pop from queue (Redis RPOP)
-     │12. Atomic claim Delivery (Mongoose findOneAndUpdate)
-     │13. Read destination config (Prisma → PostgreSQL)
-     │14. Decrypt credentials (crypto-box → decryptConfig)
-     │15. Call adapter (HTTP/Slack/Email/Sheets/Discord/Airtable/Notion/PG/Mongo)
-     │16. Update Delivery status (Mongoose)
-     │17. ZADD to delayed queue on retry (Redis)
-     ▼
-┌──────────┐
-│Dashboard │
-└──────────┘
-     │18. Read events (API → MongoDB)
-     │19. Read deliveries (API → MongoDB)
-     │20. Replay DLQ (API → MongoDB update)
-     │21. Read workflows (API → PostgreSQL)
-```
-
-### Scheduled workflow path (v1.3+)
-
-```
-┌──────────────┐
-│ External Cron│ (cron-job.org, every 5 min)
-└──────┬───────┘
-       │ POST /internal/schedule/tick
-       ▼
-┌──────────┐
-│ Workers  │
-└────┬─────┘
-     │ 1. SELECT due schedules (Prisma → PostgreSQL)
-     │ 2. Atomic claim via updateMany (nextRunAt guard)
-     │ 3. Compute nextRunAt (cron-parser)
-     │ 4. LPUSH synthetic event → queue:events:incoming
-     ▼
-   (same pipeline as webhook — enrichment, transform, routing, delivery)
-```
-
-### Manual run-now path (v1.4+)
-
-```
-┌──────────┐
-│Dashboard │ → click "Run now" → POST /api/workflows/:id/schedule/run-now
-└────┬─────┘
-     │
-     ▼
-┌──────────┐
-│   API    │ → forward to workers POST /internal/schedule/run-now
-└────┬─────┘
-     │
-     ▼
-┌──────────┐
-│ Workers  │ → LPUSH synthetic event (type: 'relayon.schedule.manual')
-└──────────┘ → API updates lastRunAt (nextRunAt untouched)
-```
-
-### Destination dry-run path (v1.5+)
-
-```
-┌──────────┐
-│Dashboard │ → click "Test connection" → POST /api/destinations/validate { dryRun: true }
-└────┬─────┘
-     │
-     ▼
-┌──────────┐
-│   API    │ → schema check → forward to workers POST /internal/egress/dry-run
-└────┬─────┘
-     │
-     ▼
-┌──────────┐
-│ Workers  │ → load adapter → add __dryRun: true → adapter.send()
-└──────────┘    → safe probe per adapter (HEAD / auth check / SELECT 1 / ping)
-                → NO writes to the destination
-```
-
-**Key insight:** Every read for a write happens via the **owning service's database**. The API never writes events (only Workers does). The API **does** write to MongoDB for DLQ replay/bulk-discard and schedule run-now signals — the only exceptions, documented.
+Do not infer a guaranteed daily throughput or provider free-tier capacity from key count alone. Capacity depends on payload size, command volume, queue depth, retention, concurrency and provider limits.
 
 ---
 
-## Backup Strategy
+## 6. Cross-store data flows
 
-### Free tier limitations
+### 6.1 Webhook intake and processing
 
-- **Neon Free:** No automatic backups. Manual `pg_dump` required.
-- **MongoDB Atlas M0:** No automated backups. Manual `mongodump` required.
-- **Upstash Free:** No backups. Ephemeral by design.
+```mermaid
+sequenceDiagram
+    participant Source as Webhook source
+    participant Ingress
+    participant PG as PostgreSQL
+    participant R as Redis
+    participant W as Workers
+    participant M as MongoDB
 
-### Recommended manual backup (weekly)
+    Source->>Ingress: Webhook request
+    Ingress->>PG: Resolve workflow and tenant configuration
+    Ingress->>R: Idempotency / rate-limit checks
+    Ingress->>R: Enqueue accepted work
+    R->>W: Worker claims incoming work
+    W->>PG: Load workflow and destination configuration
+    W->>M: Persist event and delivery lifecycle records
+    W->>R: Enqueue egress work
+```
 
-**PostgreSQL:**
+The sequence is conceptual. Exact ordering, transaction boundaries, queue commands and recovery behavior must be checked in the active ingress/worker implementation.
+
+### 6.2 Egress and retries
+
+```mermaid
+flowchart TD
+    Q["Pending egress work"] --> CLAIM["Claim delivery record"]
+    CLAIM --> CONFIG["Load destination configuration"]
+    CONFIG --> DECRYPT["Resolve/decrypt credentials"]
+    DECRYPT --> SEND["Execute destination adapter"]
+    SEND -->|Success| DONE["Persist delivered state"]
+    SEND -->|Retryable failure| DELAY["Persist attempt and schedule retry"]
+    SEND -->|Terminal / exhausted| DLQ["Persist DLQ state"]
+    DELAY --> REDIS["Delayed queue coordination"]
+    REDIS --> Q
+```
+
+The database update and Redis queue operation are separate persistence actions. The implementation must handle crashes between them through claim leases, recovery scans, idempotent operations or equivalent safeguards.
+
+### 6.3 Durable outbound webhooks and outbox
+
+The schema contains `WebhookEndpoint` and `OutboxEvent`. This establishes durable endpoint configuration and an outbox record model. It does not, by itself, prove exactly-once delivery. A dispatcher should be designed for retryable, at-least-once behavior, with stable event identifiers and receiver-side deduplication where needed.
+
+### 6.4 AI and BYOK data
+
+- Chat session and message history are stored in PostgreSQL.
+- Knowledge chunks are stored in PostgreSQL and indexed for the repository's documented full-text search path.
+- Tenant provider credentials are represented by `TenantIntegration.encryptedKey`.
+- The exact encryption envelope, key identifiers, rotation and redaction behavior must be read from the current crypto implementation and `SECURITY.md`; do not infer these from the column name alone.
+
+---
+
+## 7. Migrations and Prisma
+
+### 7.1 Schema location
+
+```text
+packages/
+  db/
+    prisma/
+      schema.prisma
+      migrations/
+        <timestamped_migration>/
+          migration.sql
+```
+
+Prisma schema changes and SQL migration files must be committed together.
+
+### 7.2 Verified migration history
+
+The inspected migration directory contains these migrations:
+
+| Migration | Documented domain |
+|---|---|
+| `20261018152226_init` | Initial relational schema |
+| `20261023141425_int` | Intermediate schema evolution |
+| `20261023164434_api_keys_scopes` | API-key scope schema |
+| `20261023210702_v13_schedules_and_versions` | Schedules and workflow versions |
+| `20261027112140_v16_destination_type_fix_validation_and_rotation_audit` | Destination type/validation and rotation audit changes |
+| `20261031115812_v18_usage_counters` | Usage counters |
+| `20261101000000_v19_quota_mode_and_tenant_id` | Quota mode and tenant ownership fields |
+| `20261103190720_v20_billing_fields` | Billing fields |
+| `20261109145700_v21_oauth_and_verification` | OAuth and email verification |
+| `20261110140818_v22_user_locale` | User locale |
+| `20261112094033_v23_ai_assistant` | Chat and knowledge models |
+| `20261113215335_v26_phase_a_tracking_admin` | Page tracking and admin audit |
+| `20261114093429_v27_community_marketplace` | Community marketplace |
+| `20261114114834_v28_moderation_social` | Moderation and social fields |
+| `20261114180854_v29_impersonation_fields` | Impersonation audit fields |
+| `20261116163324_v30_standard_webhooks_outbox` | Outbound webhooks and outbox |
+| `20261116171812_v30_feature_flags` | Feature flags |
+| `20261116183821_v31_tunnel` | CLI tunnel sessions |
+| `20261118214615_v35_byok_integrations` | Tenant BYOK integrations |
+
+Migration labels are historical release identifiers and are not guaranteed to be a contiguous sequence. The checked-in directory does not show a v3.6 or v3.7 migration in the inspected `main` snapshot.
+
+### 7.3 Commands
+
+Run commands from the repository root unless the workspace script requires otherwise.
+
+```bash
+# Generate Prisma Client
+npm run db:generate
+
+# Create/apply a development migration
+npm run db:migrate -- --name add_feature
+
+# Apply committed migrations to a deployment database
+npm run db:deploy
+
+# Open Prisma Studio
+npm run db:studio
+
+# Development-only destructive reset
+npm run db:reset
+```
+
+Use the repository's pinned Prisma CLI and scripts. Do not let `npx` download an unpinned CLI during production builds.
+
+### 7.4 Safe migration workflow
+
+1. Update `packages/db/prisma/schema.prisma`.
+2. Generate a migration in a disposable/development database.
+3. Review the generated SQL, especially destructive changes, defaults, locks and data backfills.
+4. Test both a fresh database and an upgrade from a representative prior schema.
+5. Regenerate Prisma Client and run typecheck/tests.
+6. Commit schema and migration files together.
+7. Back up production data according to the deployment's recovery policy.
+8. Apply committed migrations using `prisma migrate deploy` / `npm run db:deploy`.
+9. Verify application health and critical tenant-scoped queries after deployment.
+
+Never use `migrate reset` against production. Do not assume every migration is transaction-wrapped; inspect the actual SQL and Prisma migration behavior before relying on transactional rollback.
+
+### 7.5 Prisma client targets
+
+The current generator declares these binary targets:
+
+```prisma
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = [
+    "native",
+    "rhel-openssl-3.0.x",
+    "linux-musl-arm64-openssl-3.0.x",
+    "linux-arm64-openssl-3.0.x",
+    "linux-musl-openssl-3.0.x",
+    "debian-openssl-3.0.x"
+  ]
+}
+```
+
+The targets cover local development and multiple Linux deployment environments documented in the schema comments. Keep the list aligned with actual build and runtime targets; adding a target increases generated client artifacts and should be intentional.
+
+The root package currently pins Prisma and `@prisma/client` to `6.19.3`. Confirm workspace dependency alignment before upgrading Prisma.
+
+---
+
+## 8. Backup, restore and retention
+
+Backup policy is a production-operating decision, not a property guaranteed by the Prisma schema.
+
+### PostgreSQL
+
+Example logical backup:
+
 ```bash
 pg_dump "$DATABASE_URL" \
-  --no-owner --no-acl --format=custom \
-  --file="relayon-pg-$(date +%Y%m%d).dump"
+  --no-owner \
+  --no-acl \
+  --format=custom \
+  --file="relayon-postgres-$(date +%Y%m%d-%H%M%S).dump"
 ```
 
-**MongoDB:**
+Example restore to a prepared target database:
+
 ```bash
-mongodump --uri="$MONGODB_URI" --out="relayon-mongo-$(date +%Y%m%d)"
+pg_restore \
+  --dbname="$RESTORE_DATABASE_URL" \
+  --no-owner \
+  --no-acl \
+  relayon-postgres-YYYYMMDD-HHMMSS.dump
 ```
 
-**Restore:**
+For managed PostgreSQL, evaluate provider PITR, retention windows, branch/restore capabilities and point-in-time recovery procedures. A successful dump is not a verified backup until a restore has been tested.
+
+### MongoDB
+
+Example dump:
+
 ```bash
-pg_restore --dbname="$DATABASE_URL" relayon-pg-20261022.dump
-mongorestore --uri="$MONGODB_URI" relayon-mongo-20261022/
+mongodump \
+  --uri="$MONGODB_URI" \
+  --out="relayon-mongodb-$(date +%Y%m%d-%H%M%S)"
 ```
 
-### Production upgrades
+Example restore:
 
-- **Neon Pro** ($19/mo): 7-day PITR, daily backups
-- **MongoDB M2** ($9/mo): Daily snapshots, 7-day retention
-- **Upstash Pro**: Not needed (Redis is ephemeral)
+```bash
+mongorestore \
+  --uri="$MONGODB_RESTORE_URI" \
+  relayon-mongodb-YYYYMMDD-HHMMSS/
+```
+
+Review whether indexes, TTL definitions, users/roles and collection options are restored as expected. Validate document counts and representative event/delivery records after restore.
+
+### Redis
+
+Redis is used for operational coordination and short-lived state. Its persistence/backup configuration must be assessed separately. A Redis snapshot alone is not a substitute for PostgreSQL or MongoDB backups. Recovery may require queue reconstruction or replay from durable event/delivery records, depending on the failure point and implementation.
+
+### Recovery objectives
+
+Define and test:
+
+- **RPO:** Maximum acceptable data loss.
+- **RTO:** Maximum acceptable service recovery time.
+- Restore ordering and connection-string cutover.
+- Credential/key availability during restore.
+- Queue draining, replay and duplicate-delivery controls.
+- Tenant isolation after recovery.
+
+Do not publish a fixed RPO/RTO unless it is measured and supported by the deployed provider plan and tested runbook.
 
 ---
 
-## Common Queries
+## 9. Operational queries
 
-### Find all pending deliveries for a tenant
+Use tenant-scoped filters in production operations. The examples below are templates; adapt field names to the actual MongoDB model and SQL schema.
+
+### MongoDB: pending deliveries for a tenant
 
 ```javascript
 db.deliveries
-  .find({ tenantId: "tenant-uuid", status: "pending" })
+  .find({ tenantId: "<tenant-id>", status: "pending" })
   .sort({ nextAttemptAt: 1 })
   .limit(100);
 ```
 
-### Count events by status in the last 24h
+### MongoDB: events by status over a time window
 
 ```javascript
 db.events.aggregate([
-  { $match: {
-      tenantId: "tenant-uuid",
-      receivedAt: { $gte: new Date(Date.now() - 86400000) }
-  }},
+  {
+    $match: {
+      tenantId: "<tenant-id>",
+      receivedAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) }
+    }
+  },
   { $group: { _id: "$status", count: { $sum: 1 } } }
 ]);
 ```
 
-### Find stuck deliveries (in `delivering` > 5 min)
+### MongoDB: potentially stuck deliveries
 
 ```javascript
 db.deliveries.find({
+  tenantId: "<tenant-id>",
   status: "delivering",
-  lastAttemptAt: { $lt: new Date(Date.now() - 300000) }
+  lastAttemptAt: { $lt: new Date(Date.now() - 5 * 60 * 1000) }
 });
 ```
 
-### Top destinations by success rate (24h)
+A result is a recovery candidate, not proof that the worker is dead. Check active claims, leases and worker state before replaying.
 
-```javascript
-db.deliveries.aggregate([
-  { $match: { tenantId: "tenant-uuid",
-              createdAt: { $gte: new Date(Date.now() - 86400000) } } },
-  { $group: {
-      _id: "$destinationId",
-      total: { $sum: 1 },
-      delivered: { $sum: { $cond: [{ $eq: ["$status", "delivered"] }, 1, 0] } }
-  }},
-  { $addFields: {
-      successRate: { $divide: ["$delivered", "$total"] }
-  }},
-  { $sort: { successRate: -1 } }
-]);
+### PostgreSQL: usage counters for a tenant
+
+```sql
+SELECT period, metric, count, updated_at
+FROM usage_counters
+WHERE tenant_id = $1
+ORDER BY period DESC, metric;
 ```
 
-### Find due schedules (v1.3+ — the atomic claim query)
+### PostgreSQL: workflow version history
+
+```sql
+SELECT version, message, created_by, created_at
+FROM workflow_versions
+WHERE tenant_id = $1
+  AND workflow_id = $2
+ORDER BY version DESC
+LIMIT 50;
+```
+
+### PostgreSQL: due schedules
 
 ```sql
 SELECT id, workflow_id, cron_expression, timezone, next_run_at
 FROM workflow_schedules
-WHERE is_active = true
+WHERE tenant_id = $1
+  AND is_active = true
   AND next_run_at <= NOW()
 ORDER BY next_run_at
 LIMIT 25;
 ```
 
-### Version history for a workflow (v1.3+)
+The query lists due schedules. A worker must still perform the repository's atomic claim procedure before enqueueing work.
+
+### PostgreSQL: recent outbound outbox records
 
 ```sql
-SELECT version, message, created_by, created_at
-FROM workflow_versions
-WHERE tenant_id = $1 AND workflow_id = $2
-ORDER BY version DESC
-LIMIT 50;
+SELECT id, event_type, status, attempt_count,
+       next_attempt_at, last_error, created_at
+FROM outbox_events
+WHERE tenant_id = $1
+ORDER BY created_at DESC
+LIMIT 100;
 ```
+
+### PostgreSQL: BYOK integrations for a tenant
+
+```sql
+SELECT id, provider, model, is_active,
+       last_validated_at, last_validation_ok,
+       last_used_at, created_at
+FROM tenant_integrations
+WHERE tenant_id = $1
+ORDER BY created_at DESC;
+```
+
+Do not select `encrypted_key` into logs or support output.
+
+---
+
+## 10. Data ownership and change checklist
+
+### Ownership boundaries
+
+| Data domain | Primary store | Change owner |
+|---|---|---|
+| Tenants, users, auth records | PostgreSQL | API/auth services |
+| Workflows, destinations, schedules, versions | PostgreSQL | API/workflow services |
+| API keys, rotations, usage counters | PostgreSQL | API/platform services |
+| Chat, messages, knowledge chunks | PostgreSQL | AI/assistant services |
+| Analytics and admin audit | PostgreSQL | Tracking/admin services |
+| Community and moderation | PostgreSQL | Community/admin services |
+| Outbound webhook endpoints and outbox | PostgreSQL | API/outbound dispatcher |
+| Tunnel sessions and BYOK integration metadata | PostgreSQL | CLI/integration services |
+| Webhook events and delivery attempts | MongoDB | Ingress/worker processing path; API operational actions where implemented |
+| Queue, idempotency, rate-limit and cache state | Redis | Ingress/workers |
+
+This table describes domain ownership, not an assertion that only one process can ever issue a write. Verify exceptional API operations and worker recovery paths in the implementation.
+
+### Before adding a new persistent field or model
+
+- [ ] Is the data relational configuration, event history or ephemeral coordination state?
+- [ ] Is the owning tenant explicit? Can the record be global or tenantless?
+- [ ] Are tenant-scoped indexes and authorization checks present?
+- [ ] Does the model need a foreign key, unique constraint, composite key or check constraint?
+- [ ] Are nullable fields and deletion semantics intentional?
+- [ ] Does the change require a backfill or data migration?
+- [ ] Is the new table included in RLS policy review where appropriate?
+- [ ] Are secrets encrypted, redacted from logs and excluded from API responses?
+- [ ] Are retention, TTL and deletion semantics documented?
+- [ ] Are retry, idempotency and crash-recovery behavior defined across stores?
+- [ ] Are backup and restore procedures still valid?
+- [ ] Are integration tests covering both a clean install and an upgrade path?
+- [ ] Has the schema, migration, API contract and operational documentation been updated together?
 
 ---
 
 ## Conclusion
 
-Relayon's data layer is **boring by design**. Three well-understood stores, each doing one job well. No ORM gymnastics, no dual-write transactions, no event sourcing ceremony. The complexity is in the **operational guarantees** (TTL, unique constraints, atomic claims), not the data model.
+Relayon's persistence architecture separates durable platform state, event-processing history and operational coordination. PostgreSQL provides relational integrity for platform domains; MongoDB holds flexible event and delivery records; Redis coordinates short-lived work. Reliability depends on the boundaries between those systems: tenant context, explicit ownership, migration discipline, idempotency, recovery and tested backups.
 
-For schema changes or migration issues, open an issue at [github.com/zainshah3464/relayon](https://github.com/zainshah3464/relayon).
-```
-
----
+For exact deployed behavior, inspect the Prisma schema, SQL migrations, MongoDB model/index definitions, Redis key helpers and the service code that reads or writes them. This document should be updated whenever those sources change.

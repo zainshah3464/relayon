@@ -1,765 +1,932 @@
+# Relayon — Frequently Asked Questions
 
-# Relayon — FAQ
-
-> **Frequently asked questions — honestly answered.**
+> **Straight answers about the product, implementation, security, operations and current limitations.**
 >
-> **Current version:** v1.5.0
+> **Current project version:** `v3.7.0`  
+> **Source snapshot:** `f4dd930eafd2ab61381bc1c049bb6cdbb7480235`  
+> **Audit date:** 24 November 2026  
+> **Repository:** [github.com/zainshah3464/relayon](https://github.com/zainshah3464/relayon)
 
-Every answer here reflects the **actual v1.5.0 production state** as of 2026-10-26. No marketing speak. No promises about features that don't exist.
-
-**Note on this update:** The original v1.0 FAQ said credentials were stored as plaintext and that Relayon only had 4 destination adapters. Both are now outdated — credentials have been **encrypted at rest since v1.3**, and Relayon now supports **9 adapters** (v1.5). See the "Security" section for the current reality.
+This FAQ describes the audited `v3.7.0` source snapshot. It replaces the previous v1.5-era answers. Where behavior depends on the deployment, provider plan, environment variables or external service, that dependency is stated rather than presented as a universal guarantee.
 
 ---
 
 ## Table of Contents
 
 - [General](#general)
-- [Comparison](#comparison)
+- [Product Capabilities](#product-capabilities)
 - [Getting Started](#getting-started)
-- [Pricing & Limits](#pricing--limits)
-- [Technical](#technical)
-- [Security](#security)
-- [New in v1.1-v1.5](#new-in-v11-v15)
+- [Workflows, Events and Deliveries](#workflows-events-and-deliveries)
+- [Sources and Destinations](#sources-and-destinations)
+- [AI, RAG and BYOK](#ai-rag-and-byok)
+- [Schedules, Versions and Configuration](#schedules-versions-and-configuration)
+- [SDK, CLI, Playground and Tunnels](#sdk-cli-playground-and-tunnels)
+- [Dashboard, PWA and Community](#dashboard-pwa-and-community)
+- [Authentication and Security](#authentication-and-security)
+- [Data, Reliability and Performance](#data-reliability-and-performance)
+- [Deployment and Operations](#deployment-and-operations)
+- [Testing and Development](#testing-and-development)
+- [Pricing, Limits and Licensing](#pricing-limits-and-licensing)
 - [Troubleshooting](#troubleshooting)
-- [Product & Roadmap](#product--roadmap)
-- [Contributing](#contributing)
+- [Roadmap and Project Status](#roadmap-and-project-status)
+- [Contributing and Support](#contributing-and-support)
+- [Technical References](#technical-references)
 
 ---
 
 ## General
 
-### What is Relayon, in one sentence?
+### What is Relayon?
 
-**Relayon is a webhook relay platform** — it receives webhooks from sources like Stripe, GitHub, Shopify, and Slack, enriches them with AI, transforms them, and delivers them to any destination reliably.
+**Relayon is a webhook relay and integration automation platform.** It receives events from external services, verifies incoming requests, optionally enriches and transforms payloads, applies routing rules, and delivers events to configured destinations with retry and failure-management facilities.
+
+A workflow is the configured pipeline connecting one incoming source to one or more destinations. A workflow can also be triggered by a database-backed schedule.
 
 ### What problem does Relayon solve?
 
-Every SaaS company writes the same integration code over and over:
-- Stripe webhook → Slack
-- Shopify order → Google Sheets
-- GitHub PR → Jira
-- Support ticket → CRM
+Teams repeatedly implement the same integration plumbing:
 
-This is repetitive, error-prone, and expensive. Relayon turns it into **configuration, not code**.
+- Receive webhooks and verify signatures.
+- Prevent duplicate event ingestion.
+- Transform payloads into the shape a destination expects.
+- Route events to one or more systems.
+- Retry transient delivery failures.
+- Inspect failed deliveries and replay them.
+- Track events and operational activity.
+
+Relayon centralizes those responsibilities so integrations can be configured and operated without building a separate webhook service for every connection.
+
+### Is Relayon only a webhook forwarder?
+
+No. The platform includes the core relay pipeline plus workflow scheduling and version history, AI enrichment and an AI assistant, tenant integrations/BYOK, outbound customer webhooks, API keys, a TypeScript SDK, a CLI tunnel, a request playground, analytics, community features and platform administration.
+
+These capabilities are not all part of the same execution path. For example, the inbound webhook pipeline is separate from the customer-facing outbound webhook outbox.
 
 ### Is Relayon production-ready?
 
-**Yes, but with honest caveats.** v1.5.0 is deployed and functional at `https://relayon.vercel.app`. It handles real webhooks, real AI enrichment, real deliveries, real retries, real DLQs, **encrypted credentials at rest**, and **scheduled workflows**. **However:**
+The repository contains production-oriented mechanisms: signature verification, atomic ingest coordination, tenant-aware access controls, encrypted credentials, retry and DLQ handling, operational health endpoints, CI workflows, integration tests and a container deployment path.
 
-- No SOC 2 / HIPAA / GDPR certification yet
-- No SLA guarantee
-- No automated backups on free tier
-- **No unit tests yet** — 5 versions shipped without any (v2.0 is where this stops)
-- No MFA/TOTP for dashboard login
-- Solo-maintained (24-72h response time)
+That does **not** mean every deployment is automatically production-safe. Production readiness still depends on correct secret management, database and Redis availability, backups, monitoring, provider limits, network controls, deployment configuration and operational response. A passing CI run is not a certification or a guarantee that every third-party integration will always succeed.
 
-**What got better since v1.0:**
-- ✅ Credentials now encrypted at rest (v1.3)
-- ✅ 9 adapters instead of 4 (v1.5)
-- ✅ Scheduled workflows (v1.3)
-- ✅ Workflow versioning + diff (v1.3-v1.5)
-- ✅ API keys with scopes (v1.2)
-- ✅ Destination validation with dry-run (v1.5)
+### Is Relayon a hosted product or self-hostable software?
 
-If you need enterprise compliance today, use Zapier/Make. If you want a working free-tier platform you can inspect, fork, and extend — Relayon works.
+Both deployment paths are represented in the repository:
 
-### Is this a real product or a portfolio project?
+- A split Vercel/serverless deployment for the dashboard, API, ingress and workers.
+- A Docker Compose deployment path for operators who prefer containerized, long-running services.
 
-**Both.** It's a real deployed product (nobody stops you from using it), and it's designed as a portfolio piece to demonstrate senior-level engineering. The architecture, testing, documentation, and deployment discipline are all production-grade.
+Self-hosting still requires the operator to supply and maintain the required databases, Redis, secrets, storage, backups, TLS/networking and monitoring.
 
-### Who is it for?
+### Who is Relayon for?
 
-- **Indie developers** who want to integrate Stripe/GitHub/Shopify without writing glue code
-- **Small teams** who need webhook reliability but can't afford Zapier ($200-500/month)
-- **Engineers** who want to self-host or fork a webhook platform
-- **Recruiters** evaluating a candidate's systems engineering work
+- Developers who need to receive and route webhook events.
+- Small teams building internal integrations.
+- Operators who need delivery history, retries and dead-letter recovery.
+- Teams that want scheduled workflows or AI-assisted event handling.
+- Developers who want a typed SDK or a local webhook tunnel.
+- Operators who want to inspect and deploy the source themselves, subject to the repository license.
+
+### What is Relayon not?
+
+Relayon is not the system of record for a customer's payments, orders, CRM or other business domain. It transports and processes integration events. A successful adapter response does not prove that the destination's downstream business process completed correctly.
+
+Relayon also does not claim globally exactly-once delivery, full offline application behavior, a hardened operating-system sandbox for arbitrary adapters, or active-active multi-region processing.
 
 ---
 
-## Comparison
+## Product Capabilities
 
-### How is Relayon different from Zapier?
+### What are the main platform components?
 
-| Aspect | Zapier | Relayon |
-|---|---|---|
-| **Pricing** | $20–500/month | Free tier ($0) |
-| **Auth** | OAuth to 6000+ apps | Webhooks only (5 sources) |
-| **AI enrichment** | Newer, paid add-on | Built-in, free (Groq) |
-| **Self-hosted** | No | Fork and deploy anywhere |
-| **Data ownership** | Your data on Zapier servers | Your data on your Neon/Atlas |
-| **Vendor lock-in** | Workflows can't be exported | Full source code, MIT license |
-| **App count** | 6000+ integrations | **9 destinations** (HTTP, Slack, Email, Sheets, Discord, Airtable, Notion, PostgreSQL, MongoDB) |
-| **Scheduling** | Yes, built-in | Yes (v1.3+) — DB-backed cron, run-now |
-| **Versioning** | No | Yes (v1.3+) — snapshot, restore, diff |
-| **Reliability** | Enterprise SLA | Best-effort, DLQ-based |
+Relayon is organized as a monorepo with four application workspaces and shared packages:
 
-**When to use Zapier:** You need 6000+ app integrations, OAuth, and enterprise SLAs.
+| Component | Main responsibility |
+|---|---|
+| **Dashboard** | Angular user interface, authentication flows, workflow controls, event and delivery views, settings and product features. |
+| **API** | NestJS control plane for identity, tenants, workflows, destinations, API keys, schedules, versions, integrations, AI, admin and other product modules. |
+| **Ingress** | Express public event edge. Resolves workflows, verifies signatures, applies ingest controls and queues accepted events. |
+| **Workers** | Background processing, AI enrichment, transformations, routing, destination adapters, retries, schedules and recovery. |
 
-**When to use Relayon:** You have webhooks, need AI enrichment, want to keep your own data, and don't want to pay $200/month for glue code.
+The four applications communicate through HTTP and shared infrastructure where appropriate. They are separate runtime boundaries, not one monolithic process.
 
-### How is Relayon different from Make (Integromat)?
+### Which major capabilities exist in v3.7.0?
 
-Same answer as Zapier. Make is more visual, more app integrations, more expensive. Relayon is API-first, self-hostable, free.
+The audited source includes:
 
-### How is Relayon different from n8n?
+- Multi-tenant identity and authentication.
+- Workflow and destination management.
+- Five incoming signature-verification source types.
+- Event ingest, idempotency, rate/quota controls and asynchronous processing.
+- JSONata transformation and conditional routing.
+- Destination adapter registry and external adapter loading.
+- Retry handling, circuit breaker behavior and DLQ operations.
+- Scheduled workflow triggers and workflow version history.
+- Encrypted connector/provider credentials and tenant BYOK integrations.
+- AI event enrichment and an AI assistant with tool support.
+- PostgreSQL full-text-search-based knowledge retrieval.
+- Customer-facing outbound webhooks backed by a transactional outbox.
+- API keys, scoped access and OAuth/email account flows.
+- Usage/billing groundwork and tenant quota controls.
+- Analytics, tracking/presence and platform administration.
+- Community posts/replies, reactions, moderation and templates.
+- Request playground and local CLI tunnel.
+- OpenAPI documentation and a typed TypeScript SDK.
+- PWA-related install/update/network behavior, localization and SEO/SSR-related support.
+- Docker Compose deployment support.
 
-**n8n** is closer to Relayon than Zapier — both are self-hostable, both are open-source-ish. Differences:
+The existence of a module does not imply every feature is enabled on every hosted plan or deployment.
 
-- **n8n** requires a **persistent server** (Node process running 24/7). Relayon is **serverless** (Vercel functions).
-- **n8n** is visual workflow builder. Relayon is config-based (no visual builder).
-- **n8n** costs $0 self-hosted but needs $5-20/month server. Relayon is $0 on Vercel Hobby.
-- **n8n** has 400+ integration nodes. Relayon has **9 adapters** (v1.5). Different scope — Relayon bets on 9 well-tested adapters instead of 400 shallow ones.
+### Does Relayon have a visual workflow builder like Zapier?
 
-**When to use n8n:** You want visual workflows, 400+ app integrations, and don't mind paying for a server.
+The dashboard provides workflow configuration and management. The product's workflow model is configuration-oriented; do not assume it offers the same canvas-style visual automation editor or breadth of app integrations as large automation marketplaces.
 
-**When to use Relayon:** You want serverless, config-based, Vercel-native with AI enrichment built in.
+### Can Relayon replace Zapier, Make or n8n?
 
-### How is Relayon different from Hookdeck, Svix, or Convoy?
+That depends on the integration set and operational requirements. Relayon focuses on webhook ingestion, processing, routing and delivery, with the platform capabilities listed above. Products such as Zapier, Make and n8n have different integration catalogs, execution models, user experiences and commercial terms. Compare the exact connectors, triggers, limits, hosting requirements and support model before migrating a production workflow.
 
-These are **webhook infrastructure** platforms (receive, queue, retry, forward). Relayon overlaps:
+### How is Relayon different from a webhook inspector?
 
-| Feature | Hookdeck/Svix/Convoy | Relayon |
-|---|---|---|
-| **Webhook reception** | ✅ | ✅ |
-| **Retry + DLQ** | ✅ | ✅ |
-| **AI enrichment** | ❌ | ✅ (Groq) |
-| **Transform (JSONata)** | ❌ | ✅ |
-| **Conditional routing** | ⚠️ Limited | ✅ (JSONata rules) |
-| **Scheduling (cron trigger)** | ⚠️ Some | ✅ (DB-backed) |
-| **Workflow versioning** | ❌ | ✅ |
-| **Self-hostable on free tier** | ❌ | ✅ (Vercel Hobby) |
-| **Pricing** | $20-500/month | $0 |
-
-**The differentiator:** Relayon combines webhook relay **with** AI enrichment **with** scheduling **with** versioning — all on free tier. Nobody else in this space has all four.
-
-### How is Relayon different from webhook.site?
-
-**webhook.site** is a debugging tool — it captures webhooks and shows you the payload. It doesn't deliver them anywhere.
-
-**Relayon** is a delivery platform — it takes webhooks and routes them to real destinations with retries, DLQ, and AI enrichment.
+A webhook inspector primarily captures and displays requests for debugging. Relayon's core purpose is to process events and deliver them to configured destinations, while also providing retries, delivery records, routing and operational controls. The playground is a debugging feature within the broader platform; it is not the whole product.
 
 ---
 
 ## Getting Started
 
-### What's the fastest way to try Relayon?
+### Where can I open the hosted dashboard?
 
-1. Open `https://relayon.vercel.app`
-2. Sign up (email + password)
-3. Create a workflow (name + source type + signing secret)
-4. Add a destination (e.g., `https://httpbin.org/post`)
-5. **Click "Test connection"** — v1.5 verifies it works without sending real data
-6. Copy the webhook URL
-7. Send a webhook → check the Events page
+The project documentation identifies the hosted dashboard at:
 
-**Time to first delivery:** ~3 minutes.
+- [https://relayon.vercel.app](https://relayon.vercel.app)
 
-### How do I send my first test webhook?
+Availability and functionality depend on the current hosted deployment. The source snapshot in this FAQ is not a live uptime guarantee.
 
-The dashboard shows the webhook URL after you create a workflow:
+### What are the service health URLs?
+
+The audited project guide lists these hosted endpoints:
+
+| Service | Health URL |
+|---|---|
+| Dashboard | [relayon.vercel.app](https://relayon.vercel.app) |
+| API | [relayon-api.vercel.app/api/health](https://relayon-api.vercel.app/api/health) |
+| Ingress | [relayon-ingress.vercel.app/health](https://relayon-ingress.vercel.app/health) |
+| Workers | [relayon-workers.vercel.app/internal/health](https://relayon-workers.vercel.app/internal/health) |
+
+A health response is a point-in-time check. It does not prove that every external provider, queue, destination or background schedule is healthy.
+
+### How do I create my first workflow?
+
+1. Sign in to the dashboard.
+2. Open **Workflows** and create a workflow.
+3. Choose the source type and configure its signing secret.
+4. Add one or more destinations and configure their connection details.
+5. Save the workflow and copy its ingress endpoint.
+6. Register that endpoint with the source provider.
+7. Send a provider test event or use the playground.
+8. Inspect the event and its individual deliveries in the dashboard.
+
+The exact fields shown depend on the selected source and destination adapter.
+
+### What does the webhook endpoint look like?
+
+The ingress route uses this shape:
+
+```text
+POST https://<your-ingress-host>/webhook/{tenantId}/{workflowId}
 ```
-https://relayon-ingress.vercel.app/webhook/{tenantId}/{workflowId}
-```
 
-**To send it:**
-```bash
-curl -X POST https://relayon-ingress.vercel.app/webhook/{tenantId}/{workflowId} \
-  -H "Content-Type: application/json" \
-  -H "Stripe-Signature: t=...,v1=..." \
-  -d '{"event":"test"}'
-```
+The hosted ingress host documented for the current deployment is `relayon-ingress.vercel.app`. Self-hosted deployments must use their own ingress hostname.
 
-The signature must be **HMAC-SHA256** of `{timestamp}.{body}` using your workflow's signing secret. See `docs/API_REFERENCE.md` for per-source signature details.
+### How do I test a workflow safely?
 
-### Why do webhooks take 2 hours to deliver?
+Use the playground or the source provider's test-event feature to exercise the incoming path. Destination validation can perform schema checks and, where an adapter supports a safe probe, a dry-run check. A dry-run is not the same as sending a real delivery payload; see [Sources and Destinations](#sources-and-destinations).
 
-**Because Vercel Hobby's cron limitation.** Vercel Hobby allows only **1 cron per project, once per day**. So we use **external cron** (GitHub Actions, cron-job.org, or Upstash QStash) to trigger `/internal/process` and `/internal/deliver` on a schedule.
+### Where is the API documentation?
 
-**You can trigger them manually** at any time for immediate processing:
-```bash
-curl -X POST https://relayon-workers.vercel.app/internal/process \
-  -H "X-Cron-Secret: <your-secret>"
-```
+The API bootstrap exposes Swagger/OpenAPI. The audited project guide lists:
 
-**To get 2-minute delivery instead of 2-hour:** Use Upstash QStash (free tier, 1-minute intervals) — see `DEPLOYMENT.md` for setup.
+- [Swagger UI](https://relayon-api.vercel.app/api/docs)
+- [OpenAPI JSON](https://relayon-api.vercel.app/api/openapi.json)
 
-### What signing secret do I use for Stripe?
-
-Stripe gives you a **webhook signing secret** (starts with `whsec_`). It's different from your API key. Find it at:
-- Stripe Dashboard → Developers → Webhooks → your endpoint → **Signing secret**
-
-Paste that into Relayon's workflow creation form. **It gets encrypted at rest (v1.3+)** — you won't see it as plaintext in the DB or API responses.
-
-### Can I use Relayon without a signing secret?
-
-**No.** Signature verification is mandatory for all sources. A workflow with no secret rejects **all** webhooks. This is deliberate — fail-closed rather than fail-open.
+For an exhaustive and current route list, use the OpenAPI document and the controllers in the same source revision as the deployment. A hand-maintained API reference may lag behind newly added modules.
 
 ---
 
-## Pricing & Limits
+## Workflows, Events and Deliveries
 
-### Is Relayon really free?
+### What is a workflow?
 
-**Yes, for the free tier.** The full stack runs on:
+A workflow is the central configuration object. It identifies the incoming source and signing secret, optional AI enrichment settings, a transform expression, routing rules, active state and attached destinations.
 
-- **Vercel Hobby** — $0 (100GB bandwidth)
-- **Neon** — $0 (0.5GB storage)
-- **MongoDB Atlas M0** — $0 (512MB)
-- **Upstash Redis** — $0 (10K commands/day)
-- **Groq** — $0 (14,400 requests/day)
-- **Sentry** — $0 (5K errors/month)
+### What happens when a webhook arrives?
 
-**Total: $0/month.**
+At a high level:
 
-### What are the free tier limits?
+1. Ingress resolves the tenant and workflow.
+2. It preserves the original request body bytes for signature verification.
+3. It verifies the source signature.
+4. It applies tenant quota and ingest controls.
+5. It atomically coordinates idempotency, rate limiting and queue acceptance through Redis.
+6. It returns an acknowledgement after the event is accepted into the queue.
+7. Workers consume the event and apply optional enrichment, transformation and routing.
+8. The event is persisted and selected destination deliveries are created.
+9. Workers invoke destination adapters and update delivery state.
+10. Failed retryable deliveries are delayed and retried; exhausted deliveries can move to the DLQ.
 
-| Service | Free Tier | Hit When |
-|---|---|---|
-| **Vercel** | 100GB bandwidth, 100GB-hours | ~50K monthly visitors |
-| **Neon** | 0.5GB storage, 191 compute hrs | ~50K events, 10K tenants |
-| **MongoDB M0** | 512MB storage | ~500K events (30-day TTL) |
-| **Upstash Redis** | 10K commands/day | ~3K events/day (v1.0-v1.2), ~2K events/day (v1.3+ — schedules + versioning add commands) |
-| **Groq** | 14,400 requests/day | ~10K enriched events/day |
-| **Sentry** | 5K errors/month | Small team usage |
+The API/dashboard then expose the resulting event and delivery information.
 
-**Rule of thumb:** Relayon is free for **up to ~2-3K events/day** (v1.5 — v1.3+ added scheduled workflow overhead on Redis).
+### Does Ingress perform the whole workflow synchronously?
 
-### When should I upgrade?
+No. Ingress is designed as a fast acceptance boundary. It verifies and queues accepted events; Workers perform the slower processing and outbound delivery work. This separation helps prevent a slow destination or AI provider from holding the original webhook request open.
 
-| Trigger | Upgrade | Cost |
-|---|---|---|
-| **>2K events/day** (v1.5) | Upstash Pro | $5/mo |
-| **>10K enriched events/day** | Groq paid tier | ~$0.05/1K requests |
-| **>500K events stored** | MongoDB M2 | $9/mo |
-| **>50K monthly visitors** | Vercel Pro | $20/mo |
-| **Commercial use** | Vercel Pro | $20/mo (Hobby forbids commercial) |
-| **Enterprise compliance** | Vercel Enterprise + Neon Scale | Contact sales |
+### What is the difference between an event and a delivery?
 
-### Does Vercel Hobby forbid commercial use?
+An **event** represents one inbound webhook or scheduled trigger. A **delivery** represents sending that event to one particular destination.
 
-**Yes.** Vercel's [Fair Use Policy](https://vercel.com/docs/limits/fair-use-policy) says Hobby is for **non-commercial** use. If you use Relayon for a business, upgrade to Vercel Pro ($20/mo). The code doesn't care — this is a Vercel ToS issue, not a Relayon one.
+One event can have multiple deliveries. Its processing state and each destination's delivery state are separate. An event can be processed even when one delivery is pending, retrying, delivered or in the DLQ.
 
----
+### Does Relayon guarantee exactly-once delivery?
 
-## Technical
+No. The system is designed around deduplication and at-least-once-style processing behavior, but it does not provide a global exactly-once guarantee across Redis, MongoDB, PostgreSQL and third-party providers.
 
-### Why 4 separate apps instead of 1 monolith?
+A worker crash, network timeout or provider ambiguity can create cases where an operation may be attempted again. Destinations should be made idempotent where possible.
 
-**Serverless constraints require it.** Vercel functions have:
-- 10s (Hobby) function duration
-- Stateless execution (no shared memory)
-- Cold starts (200-1500ms per invocation)
+### How does duplicate prevention work?
 
-A monolith would need to:
-- Load ALL dependencies for every request (slow cold start)
-- Handle webhook parsing AND AI AND delivery in one invocation (10s timeout)
+Ingress uses Redis-backed idempotency coordination. The current implementation can use an `X-Idempotency-Key` header or a request-derived correlation identifier as part of its idempotency handling. The atomic Redis operation also coordinates rate limiting and queue insertion.
 
-Splitting into 4 apps:
-- **Ingress** has only Express + ioredis → fast cold start (~500ms)
-- **API** has NestJS + Prisma → medium cold start (~800ms)
-- **Workers** has full AI stack + 9 adapters → slow cold start (~1200ms), but batching amortizes it
+This prevents many duplicate ingests, but consumers should not treat it as a universal exactly-once guarantee. Provider retries, key choice and retention windows matter.
 
-**Result:** Each app is optimized for its workload.
+### What happens when a worker crashes?
 
-### Why PostgreSQL **and** MongoDB?
+Work is coordinated through persistent infrastructure rather than only in-process memory. The worker and queue recovery design handles interrupted work and retries, but recovery is bounded by the state still available in Redis and the databases. Operators should monitor queue age, pending work and worker health.
 
-**Different workloads, different databases.**
+### What is the retry policy?
 
-**PostgreSQL (ACID-critical):**
-- Tenants, users, workflows, destinations, schedules, versions, API keys
-- Foreign keys, transactions, `FOR UPDATE` locks
-- **Rule:** If losing a row breaks money or trust, it goes here.
+Deliveries use destination retry configuration and delayed retry scheduling. The worker classifies failures and schedules retryable deliveries; repeated failures can exhaust the configured attempts and move the delivery to the DLQ.
 
-**MongoDB (append-only):**
-- Events, deliveries
-- 30-day TTL indexes (auto-delete)
-- `Mixed` types for arbitrary payloads
-- **Rule:** If losing a row just makes a dashboard slightly wrong, it goes here.
+Do not assume every error is retryable or that all destinations have identical provider rate limits. Inspect the destination's retry policy and the worker's current error classification.
 
-Two databases = two connection pools = higher cold start. But separating them means a MongoDB write failure doesn't corrupt transactional state.
+### What is the Dead Letter Queue?
 
-### Why Redis instead of Kafka/RabbitMQ/SQS?
+The DLQ holds deliveries that exhausted their retry path or otherwise reached a terminal failure state. Operators can inspect the error, correct destination configuration or permissions, and replay the delivery where supported. Replaying a delivery can cause the destination to receive it again; use idempotency at the destination when duplicate side effects would be harmful.
 
-**Cost.** Kafka/RabbitMQ start at $20-50/month. Upstash Redis is **free** for 10K commands/day.
+### What is the circuit breaker?
 
-**Redis covers everything we need:**
-- `LPUSH`/`RPOP` → FIFO queue
-- `RPOPLPUSH` → atomic move (at-least-once)
-- `ZADD`/`ZRANGEBYSCORE` → scheduled retries
-- `SET NX EX` → idempotency
-- `INCR` → rate limiting
-- `GET`/`SET` → cache
+The delivery layer includes circuit-breaker behavior intended to stop repeatedly calling an unhealthy destination. It is a protection mechanism, not a replacement for fixing the destination or monitoring its state. Consult the current worker implementation and operational logs for the exact thresholds in the deployed revision.
 
-**Redis doesn't cover:** durability guarantees. If Upstash loses an `LPUSH` before persisting, the event is lost. **Mitigation:** Ingress returns `500` on `LPUSH` failure — source retries.
+### Does a successful HTTP 2xx mean the business operation completed?
 
-### How does at-least-once delivery work?
-
-Every event is **guaranteed to be delivered at least once**, possibly more:
-
-1. Ingress `LPUSH` event to `queue:events:incoming`
-2. Worker `RPOPLPUSH` event to `queue:events:processing` (**atomic move**)
-3. Worker processes event → writes to MongoDB
-4. Worker `LREM` event from `queue:events:processing` (**ack**)
-
-**If worker crashes between steps 2 and 4**, the event stays in `processing` queue. A recovery scan re-queues events stuck >5 minutes.
-
-**Duplicate prevention:**
-- MongoDB `correlationId` is **unique** — duplicate insert fails
-- HTTP adapter sends `Idempotency-Key: {eventId}:{destinationId}` header
-- Ingress Redis idempotency `SET NX` on body-hash prevents source duplicates
-
-**Result:** Duplicates possible but rare, and every layer has a dedup mechanism.
-
-### Why do cold starts take 3-8 seconds?
-
-Vercel's serverless functions are **not** always running. After ~15 minutes of inactivity, Vercel kills the function. The next request:
-
-1. Starts a new Node.js process (~1s)
-2. Loads `node_modules` (~1-3s)
-3. Initializes Prisma, Mongoose, Config (~1-2s)
-4. Boots NestJS (~500ms)
-
-**Total: ~3-8 seconds** for the first request.
-
-**Subsequent requests** are **100-200ms** (warm).
-
-**Mitigations:**
-- **Keep-alive ping** every 12 hours (already in GitHub Actions)
-- **Batch larger** (`BATCH_SIZE=3` to 10) to amortize cold start across more events
-- **Upgrade to Vercel Pro** (keeps functions warm longer)
-
-### Can I run Relayon without Vercel?
-
-**Yes.** All 4 apps are standard Node.js:
-- **Dashboard** — Static Angular build → any CDN
-- **API / Ingress / Workers** — NestJS/Express → any Node.js host (Fly.io, Railway, Render, self-hosted VPS)
-
-See `DEPLOYMENT.md` for the VPS deployment section. Self-hosted Docker option is planned for v3.0 (conditional on enterprise demand).
-
-### Can I use a different AI provider instead of Groq?
-
-**Yes.** The `GroqService` is a thin wrapper around `groq-sdk`. Swap it for:
-- **OpenAI SDK** — same interface, different provider
-- **Anthropic SDK** — different interface, need refactor
-- **Ollama** — local LLM, free but needs GPU
-- **WebLLM** — browser-based, no server
-
-**Effort:** ~2 hours to swap the provider in `workers/src/modules/processing/groq.service.ts`.
+No. It means the destination adapter received a successful HTTP response according to its contract. The destination may still queue, reject later, or fail its own downstream processing.
 
 ---
 
-## Security
+## Sources and Destinations
 
-### Is my data safe?
+### Which incoming sources are supported for signature verification?
 
-**Mostly, with honest caveats.**
+The audited ingress implementation documents five source types:
 
-**What's covered (v1.5):**
-- ✅ Multi-tenant isolation (application + database layer)
-- ✅ JWT auth with refresh rotation
-- ✅ **API key auth with scopes** (v1.2+)
-- ✅ HMAC signature verification (timing-safe)
-- ✅ Encrypted connections (HTTPS, `rediss://`, `sslmode=require`)
-- ✅ Rate limiting on all endpoints
-- ✅ Secrets in Vercel environment variables (encrypted at rest)
-- ✅ IP hashing (raw IPs never stored)
-- ✅ **Credential encryption at rest** — AES-256-GCM + HKDF per-tenant keys (v1.3+)
-- ✅ **Zero-downtime key rotation** — multi-key keyring, `enc:v2:<kid>` (v1.4+)
-- ✅ **Optional full-config encryption** — `FULL_CONFIG_ENCRYPTION=true` (v1.5+)
-- ✅ **Dry-run safety** — validation never writes to destination (v1.5+)
+- Stripe
+- GitHub
+- Shopify
+- Slack
+- Generic HMAC
 
-**What's NOT covered (v1.5):**
-- ❌ **Webhook payloads stored plaintext in MongoDB** — anyone with DB access sees raw payloads. Encryption covers *credentials*, not payloads. This is by design — the server needs to read payloads to transform and deliver them.
-- ❌ **No MFA/TOTP** for dashboard login. Password-only.
-- ❌ **No SOC 2 / HIPAA / GDPR certification.**
-- ❌ **No automated backups** on free tier.
-- ❌ **No persistent audit log table** — console logs only (v2.0 planned).
-- ❌ **`API_KEY_PEPPER` rotation is breaking** — no migration path yet (v2.0 planned).
+The verifier uses timing-safe comparison. Timestamp-based checks apply to source formats that provide timestamps, with a documented default tolerance of 300 seconds. Exact header formats and verification rules are source-specific.
 
-See `docs/SECURITY.md` for the full threat model.
+### Can I receive a webhook from a provider that is not in that list?
 
-### Where are my secrets stored?
+The generic HMAC source type provides a general signed-webhook path. It does not automatically implement every vendor's proprietary signature scheme. If a provider uses a different authentication protocol, verify whether the current ingress source supports it before relying on it.
 
-**Three places, all with different protections:**
+### Which built-in destination adapters are included?
 
-1. **Infrastructure secrets** (JWT_SECRET, DATABASE_URL, GROQ_API_KEY, CONNECTOR_ENCRYPTION_KEYS) → Vercel environment variables (encrypted at rest, AES-256)
+The current core adapter catalogue documented in the source includes nine built-in adapters:
 
-2. **Per-workflow secrets** (Stripe/GitHub HMAC secret) → PostgreSQL `workflows.source_config`. **Encrypted as `enc:v2:<kid>:...` (v1.3+).** Not plaintext, not ciphertext-visible via API — only `••••••••` returned to client.
+1. HTTP
+2. Slack
+3. Email (Resend)
+4. Google Sheets
+5. Discord
+6. Airtable
+7. Notion
+8. PostgreSQL
+9. MongoDB
 
-3. **Per-destination secrets** (Slack webhook URL, Resend API key, Sheets private key, PG/Mongo connection string) → PostgreSQL `destinations.config`. **Encrypted as `enc:v2:<kid>:...` (v1.3+).** Same client-side redaction.
+The repository also contains an external adapter loading mechanism. Do not count an externally supplied adapter as a built-in provider integration.
 
-**What this means for a DB dump:** An attacker with only a DB dump gets ciphertext. They need the master keyring (in Vercel env vars) to decrypt. **Compromise of both = full credential exposure.**
+### Can I add a custom destination adapter?
 
-**What it does NOT cover:** Webhook payloads (stored plaintext in MongoDB). The server has to read them to deliver them. This is documented in `SECURITY.md`.
+The worker adapter registry and external adapter loader provide extension points. Adapter code must follow the expected adapter contract and error behavior. It must also honor the dry-run contract: validation must not accidentally send a real message, email, insert or other side effect.
 
-**v1.0 → v1.5 upgrade:** The plaintext gap in v1.0's FAQ is **closed**. See `CHANGELOG.md` v1.3 section.
+The external adapter execution controls include worker-thread/time and memory boundaries. They should not be described as a hardened OS/container security sandbox. Only load code you trust and apply deployment-level isolation appropriate to your threat model.
 
-### Can someone replay my webhooks?
+### Does “Test connection” send a real message or write a record?
 
-**Depends on the source:**
+The destination validation path has schema validation and optional worker-side dry-run behavior. The dry-run contract is designed to avoid real destination writes. The probe depends on adapter type:
 
-- **Stripe, Slack** — No, they include timestamps. Requests outside 300s window are rejected.
-- **GitHub, Shopify, Generic** — Yes, if attacker captures a valid request. No timestamp in signature. **Mitigation:** Provide `X-Event-Id` header for idempotency. Duplicates are deduped but the first one still processes.
+- HTTP uses a request without a delivery body (documented as a `HEAD` probe).
+- Email uses a provider authentication/API check rather than sending an email.
+- Google Sheets checks spreadsheet metadata rather than appending a row.
+- Airtable checks base/table metadata rather than creating a record.
+- Notion checks data-source metadata rather than creating a page.
+- PostgreSQL uses a read-only connectivity check such as `SELECT 1`.
+- MongoDB uses a ping rather than inserting a document.
+- Slack and Discord webhook URLs cannot be safely verified with a real message-free webhook request; validation can report configuration shape without proving the webhook will accept a message.
 
-**Fix (planned v2.0):** Optional timestamp header for all sources.
+Adapter probe details can change with provider APIs. Verify the adapter implementation in the deployed revision before treating a validation result as a full end-to-end test.
 
-### What happens if my JWT_SECRET leaks?
+### Does a green dry-run guarantee the real delivery will work?
 
-**Attackers can forge tokens for any user.** Mitigation:
+No. A dry-run validates configuration shape and, where possible, basic reachability or authentication. It does not test the actual payload mapping, destination-side business rules, real message delivery, provider rate limits at send time or downstream processing.
 
-1. Rotate `JWT_SECRET` in Vercel env vars
-2. Redeploy API
-3. All existing access tokens become invalid immediately
-4. All refresh tokens also invalid (they're hashed with `JWT_REFRESH_SECRET`, which should also be rotated)
-5. All users must re-login
+Always perform a controlled end-to-end test before relying on a new destination in production.
 
-**Time to remediate:** ~5 minutes (rotate both secrets, redeploy).
+### Does Relayon support custom JSON transformations?
 
-### What happens if my CONNECTOR_ENCRYPTION_KEYS leak?
+Yes. The event pipeline supports JSONata-based transformation. The expression is evaluated by the worker processing path with bounded execution behavior. A transform error should be inspected in the event/worker logs; it does not mean the original source payload was malformed.
 
-**Worse than a JWT_SECRET leak.** Attacker can decrypt all credentials in the DB.
+### Can I route events conditionally?
 
-**If leak is passive (attacker has read access to env):**
-1. Rotate keys (add new key, run rotation script, remove old key) — see `TROUBLESHOOTING.md` "Key Rotation"
-2. Then **regenerate every credential at the destination** — Slack webhooks, Resend keys, PG/Mongo connection strings, Sheets service account keys
-3. Old credentials are compromised even if ciphertext was protected
-
-**If leak is active (attacker is using keys to decrypt in real-time):**
-1. Rotate immediately
-2. Regenerate every credential
-3. Audit `audit_logs` (v2.0) or Vercel logs for suspicious access
-
-**This is why the encryption master key is treated as the highest-severity secret in the system.**
-
-### Is the AI prompt injection vulnerable?
-
-**Partially mitigated.**
-
-- Users can customize `enrichmentPrompt` per workflow
-- A malicious prompt could trick the LLM into returning unexpected JSON
-- **Mitigation:** The enriched payload is stored as-is. It's the user's own prompt — their problem if they craft it badly.
-- **Not a multi-tenant risk:** Each tenant's enrichment is scoped to their own workflows.
-
-**For external-facing LLM endpoints:** add prompt injection guard. Relayon doesn't have one because it's not a user-facing AI chat — it's a batch enrichment pipeline.
+Yes. Workflow routing rules can evaluate JSONata expressions and select destination IDs. If no routing rule matches, the event may be processed without creating deliveries for destinations. Review the workflow's rules and event processing details when an event has no expected deliveries.
 
 ---
 
-## New in v1.1-v1.5
+## AI, RAG and BYOK
 
-### Can I schedule workflows instead of waiting for webhooks?
+### What AI features exist?
 
-**Yes — since v1.3.** Scheduled workflows fire on a cron expression, generating synthetic events that flow through the same pipeline (AI → transform → routing → delivery).
+The source includes AI event enrichment and a separate AI assistant. Event enrichment operates in the workflow processing pipeline. The assistant supports conversational help and registered tool actions. They are different features with different permissions and execution paths.
 
-**How:**
-1. Workflow detail → Scheduled trigger card → + Add schedule
-2. Choose a preset (every 15 min, hourly, daily at 9 AM) or write a custom cron
-3. Set timezone
-4. Save
+### Which AI providers can tenants connect?
 
-**v1.4 added:** "Run now" button — trigger immediately without waiting for the next cron tick.
+The tenant integration provider types documented in the current source include:
 
-**v1.5 added:** Bulk pause-all / resume-all for all tenant schedules.
+- Groq
+- OpenAI
+- Anthropic
+- Resend (email provider integration)
 
-**Limitations:**
-- External cron required (Vercel Hobby allows 1 cron/day) — see "Why do webhooks take 2 hours" above
-- Cron expression format: 5-field only, no named days (`MON`, `JAN` not supported) — reduces parser surface
-- Timezone must be a valid IANA name (`Asia/Karachi`, `America/New_York`)
+Provider support and the operations available for each provider are not necessarily identical. The provider resolver and validators define the current behavior.
 
-### Can I see what changed between two workflow versions?
+### What does BYOK mean?
 
-**Yes — since v1.5 (diff) and v1.3 (versioning).**
+BYOK means **Bring Your Own Key**. A tenant can save its own supported provider key so eligible features use that provider account rather than relying only on the platform-level environment key.
 
-**How:**
-1. Workflow detail → Version history button (top right)
-2. Version drawer shows all snapshots (v1, v2, v3, ...)
-3. Select 2 versions → "Compute diff"
-4. See line-level colored diff (green `+`, red `-`, cyan `@@`)
+BYOK provider keys are different from destination credentials. For example, an OpenAI key used for AI features is not the same thing as a Slack webhook URL used by a workflow destination.
 
-**What it captures:** Every workflow create, update, import, and restore produces a new immutable version. Capped at 50 per workflow.
+### How does provider key selection work?
 
-**Restore:** Click "Restore" on any version — destinations are recreated from snapshot, a new version is captured (history stays linear, never branches).
+The audited resolver follows this general order:
 
-### What are API keys for and how do I use them?
+1. Look for an active integration key for the current tenant and provider.
+2. Decrypt the tenant key in the tenant context.
+3. If no usable tenant key exists, fall back to the platform environment key for that provider.
+4. Cache the resolved result briefly (documented as 60 seconds) and invalidate it when integration settings change.
 
-**API keys let external programs call your Relayon API without needing a JWT** (which expires in 15 minutes). Useful for:
-- CI/CD pipelines that manage workflows
-- Scripts that query events
-- Third-party tools that sync data
+Provider key validation calls the provider's API with a bounded timeout and returns a validation result. Only authorized tenant roles (owner/admin) can manage integration keys through the integration controller.
 
-**Format:** `rlk_<live|test>_<8hex-prefix>_<48hex-secret>` — Stripe-style.
+### Does the AI assistant use vector embeddings?
 
-**How to create:**
-1. Settings → API Keys tab → + New key
-2. Select scopes (e.g., `events:read`, `workflows:read`)
-3. **Copy the raw key immediately** — it's shown only once
-4. Use it: `X-API-Key: rlk_live_...` header
+Do not describe the audited RAG implementation as vector or embedding similarity search. The current `RagService` uses **PostgreSQL full-text search** with fallback tiers:
 
-**v1.5 added rotation:** Click "Rotate" on an existing key → new key created, old key keeps working for 24 hours (grace window) → old key auto-expires.
+1. `websearch_to_tsquery`
+2. `plainto_tsquery`
+3. Keyword OR matching
+4. Full-phrase `ILIKE`
 
-**Security:** Raw key is never stored. Only `SHA-256(PEPPER:rawKey)` is stored. If lost, revoke and create a new one.
+Knowledge retrieval applies tenant-aware filtering so shared knowledge and tenant-specific knowledge are searched under the current access condition. The inspected implementation does not use an embedding database for this retrieval path.
 
-### What is "Test connection" on destinations?
+### Can AI output be trusted as authoritative data?
 
-**It's a validation endpoint (v1.5) that lets you verify a destination works without sending real data.**
+No. AI output is probabilistic and may be incomplete or incorrect. Validate AI-derived fields before using them for financial, security-sensitive or irreversible actions. The workflow's source payload remains the authoritative input from the source provider.
 
-**How:**
-1. Open destination modal → "Test connection" button
-2. Relayon runs a **safe probe** on the destination:
-   - HTTP → `HEAD` request (no body)
-   - Slack/Discord → URL format check only (cannot test without sending)
-   - Email → `GET /api-keys` (auth check, no email)
-   - Sheets → `GET spreadsheet metadata` (no row append)
-   - Airtable → `GET base tables` (no record)
-   - Notion → `GET data source` (no page)
-   - PostgreSQL → `SELECT 1` (no INSERT)
-   - MongoDB → `ping` (no insert)
-3. Green ✓ if valid, red ✗ with error if not
+### What happens if an AI provider is unavailable?
 
-**Critical safety:** `__dryRun` flag is honored by **all 9 adapters**. Testing a destination **never sends a real message, email, or DB insert** — only safe probes.
+Provider availability, tenant key validity, platform fallback configuration, rate limits and provider quotas all affect AI operations. AI enrichment has graceful-degradation behavior in the processing path, but do not assume every assistant action or provider-dependent feature can complete without the provider. Check worker/API logs and the integration validation result.
 
-**What it doesn't test:** Whether the actual delivery payload will succeed. Only that the config is valid and (for most adapters) reachable.
+### Is prompt injection completely solved?
 
-### What does "encrypted at rest" mean?
+No system should claim that. Workflow prompts and retrieved or event-provided content can influence model output. Treat AI output as untrusted input, restrict tool permissions, validate structured outputs and do not let model-generated text bypass normal authorization or business validation.
 
-**It means credentials are stored as ciphertext in the database, not plaintext.**
+---
 
-**Before v1.3:** DB dump = all credentials in plaintext. Anyone with DB access had everything.
+## Schedules, Versions and Configuration
 
-**Since v1.3:** Credentials are stored as `enc:v2:<kid>:<iv>:<tag>:<ciphertext>` — AES-256-GCM encrypted with a per-tenant key derived via HKDF from a master keyring.
+### Can a workflow run without an incoming webhook?
 
-**What it means practically:**
-- DB dump without the master keyring = useless ciphertext
-- Attacker needs both DB access AND `CONNECTOR_ENCRYPTION_KEYS` from Vercel env
-- Deleting one row doesn't leak that row's secret to neighboring rows (each has its own IV)
+Yes. A workflow can be triggered by a database-backed schedule. The schedule stores a cron expression, timezone, payload template, active state and next/last run timestamps. The generated event then enters the normal processing pipeline.
 
-**What it does NOT mean:**
-- Not E2E encryption — server sees plaintext during delivery
-- Not per-tenant DB partitions — all ciphertext is in the same tables, but derived keys are cryptographically separated per tenant
-- Not payload encryption — webhook payloads in MongoDB are still plaintext (by design)
+### Are schedules stored in process memory?
 
-### Why are there still no unit tests after 5 versions?
+No. The schedule state is persisted in PostgreSQL. Workers claim due schedules using database coordination so multiple ticks do not simply rely on a local in-memory timer.
 
-**Honest answer: every version prioritized shipping the next feature over building test infrastructure.**
+### Can I trigger a scheduled workflow immediately?
 
-**What actually happened:**
-- v1.0 shipped with smoke test only (10 checks)
-- v1.1 added bulk DLQ, YAML, cost analytics, routing — no unit tests
-- v1.2 added adapter SDK, charts, API keys — no unit tests
-- v1.3 added schedules, versioning, encryption — no unit tests
-- v1.4 added PG/Mongo adapters, key rotation — no unit tests
-- v1.5 added validation, dry-run, diff, key rotation — no unit tests
+The product includes a run-now operation. It triggers a schedule without waiting for its next cron time. The normal scheduled cadence is maintained separately from the manual trigger.
 
-**What was tested instead:**
-- Smoke test (10 checks against production) — still only covers v1.0 features
-- Manual feature checklists per release (~25 checks across v1.1-v1.5) — documented in `TESTING.md`
-- CI typecheck + builds (catches compile errors, not runtime bugs)
+### What timezone format is used?
 
-**The tradeoff:** Adding 50 unit tests to a 20,000-line codebase would take 2 weeks and catch maybe 5 bugs. Adding the smoke test took 2 hours and catches every production regression. **The smoke test won.**
+Schedules use IANA timezone identifiers, for example `Asia/Karachi` or `America/New_York`. Use a valid IANA name rather than a numeric offset if the schedule needs daylight-saving-aware behavior.
 
-**v2.0 is where this stops.** Testing is the **non-negotiable P0 blocker** for v2.0. No v2.0 feature ships before unit tests are complete. See `ROADMAP.md`.
+### Does the scheduler run by itself on every deployment?
+
+The scheduler requires the appropriate worker tick to be invoked. In serverless deployments this generally means a configured external scheduler/cron invoking the internal schedule route. In the Docker Compose deployment, the cron sidecar invokes the worker operations on a loop. If the tick is not running, due schedules will not execute merely because their database rows exist.
+
+### Does Relayon keep workflow history?
+
+Yes. Workflow versioning stores immutable configuration snapshots for supported create/update/import/restore operations. The dashboard can show history and compare versions. A restore creates a new version rather than rewriting the historical sequence.
+
+### Is version diff semantic?
+
+No. The documented diff is line-based. Whitespace or formatting changes can appear even when the effective configuration behavior is equivalent.
+
+### Can workflows be imported or synchronized as YAML/Git configuration?
+
+The project history and source include workflow YAML/Git sync functionality. Exact commands, schema and supported synchronization modes should be taken from the current CLI/docs in the same source revision; do not assume every dashboard setting is represented in the YAML format.
+
+### Is time-travel a database point-in-time restore?
+
+No. The platform's time-travel feature should not be confused with a complete PostgreSQL/MongoDB point-in-time recovery system. It is a product-level historical/inspection capability with the limits of the data and snapshots it records.
+
+---
+
+## SDK, CLI, Playground and Tunnels
+
+### Is there a TypeScript SDK?
+
+Yes. The repository contains `packages/sdk`, a typed TypeScript SDK generated from the OpenAPI specification. Use the SDK version compatible with the API deployment. If routes or response schemas have changed, regenerate or update the SDK from the matching OpenAPI document.
+
+### Is there a CLI?
+
+Yes. The repository contains `packages/cli`. One of its documented developer capabilities is opening a tunnel so a hosted ingress endpoint can forward test webhooks to a local development service.
+
+### What is the tunnel used for?
+
+A tunnel lets a developer test local webhook handling without deploying the local application publicly. The CLI establishes the session and the platform's ingress/tunnel components coordinate request forwarding. Tunnel URLs and sessions should be treated as temporary development access, not permanent production ingress endpoints.
+
+### What is the playground?
+
+The playground captures requests for debugging and exposes them through the dashboard's playground experience. It is useful for inspecting request shape and testing integrations. It is not a substitute for signature verification and end-to-end tests against the actual source provider.
+
+### Are SDK and CLI licenses the same as MIT?
+
+Do not infer licensing from old badges or metadata. The audited repository contains a proprietary source-visible license, and copies of that license are present in the SDK and CLI packages. Read the checked-in `LICENSE` and the package-specific notices before using, modifying, redistributing or embedding these packages.
+
+---
+
+## Dashboard, PWA and Community
+
+### What can I manage from the dashboard?
+
+The audited dashboard includes feature areas for workflows, events, destinations, schedules, workflow versions, DLQ, analytics, settings, AI assistant, community, playground and platform administration. The exact menu items depend on role, feature flags and deployment configuration.
+
+### Does Relayon have an admin console?
+
+Yes. The repository includes platform administration UI and API modules. The audited feature map includes platform overview, tenants, users, health/traffic, audit-related views, moderation, impersonation, feature flags and time-travel tools. These are privileged capabilities and must be restricted to authorized platform administrators.
+
+### Does Relayon have community features?
+
+The source includes community posts, replies, solution marking, likes, flags, moderation actions, announcement sharing and template import-related functionality. Availability and moderation behavior depend on the deployed feature configuration.
+
+### Does Relayon support multiple languages?
+
+The audited dashboard translation bundle includes English, Urdu and Arabic dictionaries. Urdu and Arabic views support right-to-left presentation where configured. Do not claim that every page, server message or third-party provider response is fully localized.
+
+### Is Relayon a native mobile app?
+
+No native iOS or Android application is established by the audited source. The dashboard includes PWA-related support such as install prompts, update notifications, network status/offline messaging and service-worker caching behavior.
+
+### Does PWA support mean the entire dashboard works offline?
+
+No. Installability and selected offline/network behaviors do not imply full offline operation. Authenticated data, API actions, event processing and provider calls still require their relevant services.
+
+### Does the dashboard use server-side rendering?
+
+The repository contains SSR/prerender and SEO-related dashboard files and services. That does not mean every authenticated dashboard route is server-rendered. Check the route/render configuration for the specific page.
+
+---
+
+## Authentication and Security
+
+### Which authentication methods exist?
+
+The audited source includes password-based authentication, refresh-token handling, Google/GitHub OAuth-related flows, email verification and password recovery. API keys provide programmatic access with scopes. Exact login options depend on environment configuration and the enabled provider credentials.
+
+### Are API keys supported?
+
+Yes. API keys are stored with metadata such as environment, scopes, expiry/revocation and rotation lineage. The raw secret is not intended to be retrievable after creation. Copy it when it is issued and store it in a secret manager.
+
+### Are API keys equivalent to user passwords?
+
+No. API keys are programmatic credentials with their own scopes and lifecycle. Use the narrowest scopes required, protect the raw key and revoke/rotate it if exposed.
+
+### Are credentials encrypted at rest?
+
+The project implements credential encryption using AES-256-GCM and tenant-derived keys via HKDF, with key identifiers to support keyring-based rotation. This protection applies to supported persisted credential values. It does not mean the server never sees plaintext: the service must decrypt a credential when it uses that credential to call a provider.
+
+### Are webhook payloads end-to-end encrypted?
+
+Do not claim end-to-end encryption. Relayon processes payloads, transforms them and delivers them, so the runtime must be able to read the data. Database encryption-at-rest and transport encryption are different from end-to-end encryption.
+
+### Is every database table protected by PostgreSQL RLS?
+
+No. The repository contains explicit PostgreSQL RLS policies and an apply script, but the audited policy coverage is not universal across every table. RLS is one layer of defense in depth; tenant-scoped application queries and authorization checks remain essential. Do not describe the database as having blanket RLS coverage.
+
+### Is tenant isolation guaranteed by RLS alone?
+
+No. Tenant isolation combines application-level tenant scoping, authorization and selected database RLS policies. Privileged admin paths require especially careful authorization. RLS should not be treated as a substitute for checking the caller's role and tenant context.
+
+### Is the external adapter loader a hardened sandbox?
+
+No. The audited controls include worker-thread execution and time/memory boundaries. These are useful execution controls but are not equivalent to an OS-level container/VM sandbox. Only load trusted adapter code and apply additional isolation for untrusted workloads.
+
+### Does Relayon have SOC 2, HIPAA or GDPR certification?
+
+The audited source snapshot does not establish SOC 2 or HIPAA certification. GDPR compliance is not something that can be inferred from the presence of privacy pages or security controls. Compliance requires organizational processes, contracts, policies, operational evidence and, where applicable, independent assessment. Do not treat this FAQ as a compliance attestation.
+
+### Does Relayon guarantee an SLA?
+
+No SLA is established by this source snapshot. Hosted service availability and response commitments should be taken only from an explicit current service agreement.
+
+### What should I do if a credential or encryption key is exposed?
+
+Treat the incident as a secret compromise:
+
+1. Restrict access and stop further exposure.
+2. Rotate the affected platform/provider credential using the provider's own controls.
+3. Update the Relayon environment or tenant integration value.
+4. If an encryption keyring key was exposed, preserve required old key material long enough to decrypt existing ciphertext, then follow the controlled re-encryption/rotation procedure.
+5. Regenerate destination credentials that may have been decrypted by an attacker.
+6. Review access, application and provider logs for suspicious use.
+7. Document the incident and verify that all services use the intended keyring.
+
+Do not remove an old encryption key before confirming that all ciphertext encrypted under its key ID has been migrated or is no longer needed.
+
+---
+
+## Data, Reliability and Performance
+
+### Which databases does Relayon use?
+
+The audited architecture uses three main stores:
+
+| Store | Primary responsibility |
+|---|---|
+| PostgreSQL | Transactional/control-plane records such as tenants, users, workflows, destinations, schedules, versions, API keys, integrations, outbox and product metadata. |
+| MongoDB | Flexible event and delivery documents, including payload-oriented records. |
+| Redis | Queues, idempotency/rate-limit coordination, caches, streams and short-lived operational state. |
+
+They are separate systems with different data ownership and failure modes. They are not interchangeable replicas.
+
+### Why use both PostgreSQL and MongoDB?
+
+PostgreSQL handles relational ownership, constraints and transactional state. MongoDB handles flexible event/delivery documents and variable payload shapes. The split avoids forcing every source payload into a rigid relational schema, but it introduces cross-store coordination and operational complexity.
+
+### Is Redis the permanent source of truth for workflows?
+
+No. Workflow configuration and other durable control-plane records are stored in PostgreSQL. Redis is used for queues and coordination. Redis persistence and recovery still matter because queued work and ephemeral coordination state can be affected by Redis availability and configuration.
+
+### What happens if Redis is unavailable?
+
+Ingress cannot safely complete the normal atomic queue-acceptance path. Requests may be rejected rather than acknowledged as accepted. Workers also depend on Redis for queue coordination. Restore Redis connectivity and inspect source-provider retries and queue state before assuming every event was accepted.
+
+### What happens if MongoDB is unavailable?
+
+Event and delivery persistence can fail even if an event was accepted into Redis. Check worker errors and queue recovery behavior. Do not manually discard queued work until you understand whether the event was persisted and whether reprocessing could duplicate side effects.
+
+### What happens if PostgreSQL is unavailable?
+
+Control-plane operations that need tenant/workflow/destination/schedule data can fail. Workers may also need PostgreSQL to load current configuration or claim schedules. Restore database availability and validate migrations/connection limits before resuming normal traffic.
+
+### Does Relayon support multi-region active-active processing?
+
+The audited v3.7.0 source describes a single-region deployment. It does not establish a globally coordinated active-active architecture with cross-region queues and replicated state. Treat multi-region as future infrastructure work unless a later implementation explicitly documents and tests it.
+
+### Does the platform have unlimited event retention?
+
+No. Event retention and analytics depend on the MongoDB configuration and retention policy, along with the capacity and backup plan of the deployment. MongoDB TTL behavior is not a long-term analytics warehouse. Export or archive data separately if long-term retention is required.
+
+### How should I think about throughput?
+
+Throughput depends on worker invocation frequency, batch/time budgets, Redis and database capacity, provider latency, rate limits, payload size and concurrency. Increasing batch size can improve throughput but also increases memory/network use and the risk of exhausting an invocation budget. Tune using observed queue age, worker duration, error rates and provider latency rather than a fixed events-per-day claim.
+
+### Does a delivery response prove the destination stored the data?
+
+No. It proves only what the adapter can observe from the destination response. If the destination asynchronously processes requests, a later failure may not be visible to Relayon.
+
+---
+
+## Deployment and Operations
+
+### What deployment options are documented?
+
+The source supports two broad deployment models:
+
+- **Split serverless deployment:** dashboard, API, ingress and workers deployed as separate services/functions.
+- **Docker Compose:** containerized application services with supporting infrastructure and a cron sidecar to invoke worker operations.
+
+The Docker path is a real repository deployment option; do not describe self-hosted Docker as merely planned.
+
+### Does the serverless deployment need cron?
+
+Yes. Background processing and scheduled workflows require the worker operations to be invoked. Serverless functions do not remain alive as permanent background daemons. Configure an external scheduler for the required internal worker routes and protect them with the configured cron secret.
+
+### Which worker routes are important operationally?
+
+The audited architecture identifies these worker operations:
+
+- `POST /internal/process`
+- `POST /internal/deliver`
+- `POST /internal/schedule/tick`
+- `POST /internal/schedule/run-now`
+- `POST /internal/egress/dry-run`
+
+The API also has an outbox tick route for customer-facing webhook delivery. Verify exact route paths and authorization requirements against the deployed controllers/OpenAPI before configuring an external scheduler.
+
+### What does the Docker Compose cron sidecar do?
+
+The audited Compose deployment uses a cron sidecar to invoke recurring internal operations, including event processing, delivery, schedule ticks and the API outbox tick. This is how the container deployment keeps background work moving without depending on serverless invocation schedules.
+
+### Which services need the encryption keyring?
+
+The API and Workers must be configured consistently with the encryption key material needed to read and write encrypted credentials. A mismatch can make previously stored credentials unreadable. Keep keyring values in a secret manager and deploy coordinated changes.
+
+### What should I monitor?
+
+At minimum:
+
+- Dashboard, API, ingress and worker health.
+- PostgreSQL, MongoDB and Redis connectivity.
+- Incoming queue depth and oldest queued-event age.
+- Pending/delayed delivery counts and retry backlog.
+- DLQ count and oldest DLQ age.
+- Worker duration, failures and timeouts.
+- Schedule tick freshness and overdue schedules.
+- Outbox backlog and oldest pending outbox event.
+- AI provider validation, quota and rate-limit failures.
+- Destination provider errors and circuit-breaker state.
+- Database connection pressure, storage and backup status.
+- Secret/keyring consistency across API and Workers.
+
+### Are health endpoints enough for monitoring?
+
+No. Health endpoints are useful checks, but queue age, DLQ growth, schedule freshness, outbox backlog and provider-specific errors require application-level monitoring. A service can be reachable while its background work is stalled.
+
+### Do I need backups?
+
+Yes. The operator is responsible for backup and restore planning appropriate to the chosen infrastructure. Back up PostgreSQL and MongoDB, and plan Redis persistence/recovery based on the role of Redis in the deployment. Test restoration procedures; a backup that has never been restored is not a verified recovery plan.
+
+---
+
+## Testing and Development
+
+### Does the project have unit tests?
+
+The v3.7.0 repository contains test/spec files and a Tests workflow. The old FAQ statement that the project had zero unit tests is stale and must not be carried forward.
+
+The existence of tests does not mean every module or edge case is covered. Review the current test suite, CI output and coverage reports for the exact tested areas.
+
+### What does CI test?
+
+The audited repository's Tests workflow includes unit/coverage, integration and RLS-related jobs. Other CI workflows handle build/typecheck or repository validation tasks. Exact job names and gates can change; inspect `.github/workflows/` at the target commit.
+
+### Does a passing CI run prove production correctness?
+
+No. CI validates the test cases and build checks that are actually configured. It cannot guarantee every third-party provider behavior, production secret, DNS/network path, deployment setting or customer payload.
+
+### How do I run the project locally?
+
+The repository is an npm-workspaces monorepo. Use the root package scripts and workspace-specific instructions from the checked-out source revision. A typical local setup requires:
+
+- A supported Node.js runtime and npm.
+- PostgreSQL with the current Prisma migrations applied.
+- MongoDB.
+- Redis.
+- Required environment variables and provider credentials for the features being tested.
+- Dashboard/API/Ingress/Workers workspace processes as needed.
+
+Do not copy old version-specific commands blindly; check the current root `package.json`, app package manifests and deployment docs.
+
+### Which Node.js version should I use?
+
+Use the version declared by the current repository toolchain and CI configuration. The audited source contains Node 20 Docker base images and Node 22 CI usage; check the current Dockerfiles, workflow files and package engine constraints before selecting a local runtime. These version declarations serve different environments and should not be silently conflated.
+
+### Where should I report a bug?
+
+Open an issue in the repository with a minimal reproduction, expected behavior, actual behavior, relevant version/commit, logs with secrets removed and steps to reproduce. Never attach live API keys, signing secrets, database URLs or customer payloads containing sensitive data.
+
+---
+
+## Pricing, Limits and Licensing
+
+### Is Relayon free?
+
+The source repository is available for inspection, but hosted infrastructure costs depend on the provider plans and usage chosen by the operator. The older FAQ's blanket `$0/month` statement and fixed free-tier capacity estimates are not reliable guarantees for v3.7.0.
+
+Check the current Vercel, database, Redis, AI-provider, email-provider and monitoring plan terms directly. Free tiers can change, enforce fair-use restrictions or stop being suitable as traffic grows.
+
+### Are there fixed event-per-day limits?
+
+Do not rely on a universal event-per-day number. Effective capacity depends on deployment resources, queue invocation frequency, worker batch/time budgets, database connection limits, Redis quotas, payload size and third-party provider limits. Tenant quotas may also apply according to the deployed configuration.
+
+### Does Relayon include an SLA?
+
+No SLA should be inferred from the source code or from a hosted demo URL. Only a current written service agreement can establish an SLA.
+
+### What license applies to the repository?
+
+The audited root `LICENSE` is titled **Relayon Proprietary Source-Visible License v1.0**, effective 20 November 2026. It is not the MIT license. The license grants the permissions and imposes the restrictions written in that file. Read the actual license before copying, modifying, redistributing, offering derivative hosted services or using the code in another product.
+
+### Why do some files still say MIT?
+
+The audit found stale MIT labels in some project metadata, including the root README badge and Swagger/OpenAPI metadata, even though the checked-in `LICENSE` is proprietary source-visible. Treat the actual checked-in license text as the governing repository license and flag the metadata inconsistency for correction. Do not rely on an old badge as a grant of rights.
+
+### Can I commercially use or redistribute Relayon?
+
+Do not assume the old MIT-era FAQ permission still applies. The current proprietary source-visible license contains specific terms and restrictions. Read it carefully and obtain legal advice if your intended use involves commercial hosting, modification, redistribution, derivative works or competing services.
 
 ---
 
 ## Troubleshooting
 
-### Webhooks return 401 "invalid signature"
+### Webhooks return `401` or signature verification fails
 
-**Most common causes (in order):**
+Check:
 
-1. **Wrong secret** — you're using Stripe's API key instead of the webhook signing secret
-2. **Wrong signature format** — Stripe uses `t=...,v1=...`; GitHub uses `sha256=...`
-3. **Body was modified** — proxies or middleware that mutate the body break HMAC
-4. **Timestamp outside tolerance** — for Stripe/Slack, if server clock is off by >300s
+1. The workflow uses the correct source type.
+2. The configured secret is the provider's webhook signing secret, not an unrelated API key.
+3. The expected signature header and format match that provider.
+4. The original request body bytes are preserved by any proxy/middleware.
+5. Timestamp tolerance and server clock are correct for timestamped signatures.
+6. The secret has not been rotated at the provider without updating the workflow.
 
-**Debug:**
-```bash
-# Verify your secret with a manual signature
-node -e "
-const crypto = require('crypto');
-const body = '{\"test\":1}';
-const secret = 'whsec_your_secret';
-const timestamp = Math.floor(Date.now() / 1000);
-const signed = timestamp + '.' + body;
-const sig = crypto.createHmac('sha256', secret).update(signed).digest('hex');
-console.log('t=' + timestamp + ',v1=' + sig);
-"
-```
+Inspect ingress logs with the correlation/request ID. Never log or paste the signing secret.
 
-Paste the output as `Stripe-Signature` header and send the exact body. If it works manually but fails from the source, the source is sending something different.
+### The source receives an error instead of an acknowledgement
 
-### Delivery is stuck in "pending" forever
+Check workflow lookup, signature verification, tenant quota, rate limiting and Redis connectivity. Ingress only acknowledges after its queue-acceptance path succeeds. If Redis is unavailable or the atomic ingest operation fails, the source should not be told the event was accepted.
 
-**Cause:** `/internal/deliver` cron isn't running.
+### Events are accepted but not processed
 
-**Fix:**
-```bash
-# Manually trigger
-curl -X POST https://relayon-workers.vercel.app/internal/deliver \
-  -H "X-Cron-Secret: <your-secret>"
-```
+Check:
 
-**Prevent:** Set up GitHub Actions cron (see `DEPLOYMENT.md`). Vercel Hobby's built-in cron only runs **once per day** — not enough for prompt delivery.
+- Workers health and deployment status.
+- Whether `POST /internal/process` is being invoked.
+- Redis incoming/processing queue depth and oldest age.
+- PostgreSQL/MongoDB connectivity.
+- `CRON_SECRET` and scheduler configuration.
+- Worker logs for processing errors and time-budget exhaustion.
 
-### "Max retries exhausted" but I want to keep trying
+### Deliveries remain pending
 
-**Fix:** Increase `max_attempts` in destination's `retryPolicy`:
-```json
-{
-  "max_attempts": 10,
-  "backoff_ms": [10000, 30000, 60000, 300000, 900000, 1800000, 3600000]
-}
-```
+Check whether the delivery worker route is being invoked, whether the egress queue is draining, and whether the destination adapter is blocked by provider errors or circuit-breaker behavior. Confirm the worker service can reach the destination host.
 
-**Or:** Manually replay from DLQ — resets `attemptCount` to 0.
+### A delivery repeatedly fails
 
-### Cold starts are killing my latency
+Inspect the adapter error, credentials, endpoint URL, provider permissions, request/payload mapping, provider rate limits and retry classification. Correct the underlying issue before replaying. Replays can cause repeated side effects.
 
-**Fixes (in order of impact):**
+### Deliveries appear in the DLQ
 
-1. **Upgrade to Vercel Pro** ($20/mo) — keeps functions warm longer
-2. **Keep-alive cron** every 12 hours — pings `/api/health` to prevent suspension
-3. **Accept it** — real users see this only on first request of the day
+The configured retry path has been exhausted or the delivery reached a terminal failure. Inspect the error and destination configuration, fix the cause, then replay only when it is safe to do so. Consider destination-side idempotency for duplicate protection.
 
-### Enrichment is slow (>5s)
+### Scheduled workflows do not fire
 
-**Cause:** Groq free tier queues requests under load.
+Check:
 
-**Fixes:**
-- Increase Redis cache TTL (default 1h → 6h)
-- Batch more events per call (`BATCH_SIZE` 3 → 10)
-- Reduce `GROQ_MAX_TOKENS` (1024 → 512)
-- Upgrade to Groq paid tier ($0.05/1K requests)
+1. The schedule is active.
+2. The workflow is active.
+3. The cron expression and IANA timezone are valid.
+4. `nextRunAt` is due.
+5. The schedule tick route is invoked by external cron or the Compose cron sidecar.
+6. The worker has database and Redis connectivity.
+7. The cron secret matches.
 
-### Scheduled workflow never fires
+A schedule row by itself does not run a background timer in a serverless process.
 
-**Common causes:**
-1. Schedule `isActive: false` — check dashboard
-2. Workflow `isActive: false` — check dashboard
-3. External cron not hitting `/internal/schedule/tick` — check cron-job.org
-4. `nextRunAt` is in the future — normal, wait for it
+### AI enrichment or assistant calls fail
 
-**Force a test:**
-```sql
--- In Prisma Studio
-UPDATE workflow_schedules
-SET next_run_at = NOW() - INTERVAL '1 minute'
-WHERE workflow_id = 'YOUR_WORKFLOW_ID';
-```
-Then hit `/internal/schedule/tick`. Should return `{enqueued: 1}`.
+Check the tenant BYOK key, provider validation result, platform fallback key, provider quota/rate limit, selected model and API/worker logs. Remember that event enrichment and the assistant are separate features and may use different code paths.
 
-### "Test connection" shows green but delivery fails
+### A stored credential cannot be decrypted
 
-**Test connection only validates config shape and (for most adapters) reachability.** It does NOT test whether the actual delivery payload will succeed.
+Check that API and Workers have the correct encryption keyring and that every required key ID remains available. Do not delete an old key merely because a new key has been added. Restore the missing key material or follow the controlled re-encryption process before removing old key IDs.
 
-**Common causes of post-green failure:**
-- Destination requires authentication not tested by dry-run (e.g., Slack webhook doesn't exist, only URL format was valid)
-- Payload shape mismatch (Airtable columns, Notion properties)
-- Rate limit hit on the destination during real delivery
+### RAG does not return an expected result
 
-**Always do a real end-to-end test with a real webhook after validating.**
+The audited retrieval path uses PostgreSQL full-text search with keyword and phrase fallbacks, not vector embeddings. Check that the knowledge chunk exists, its tenant visibility is correct, the content is indexed and the query terms match the stored text.
 
-**See:** `docs/TROUBLESHOOTING.md` for 40+ more issues including encryption, key rotation, and adapter-specific cases.
+### A custom adapter times out or is terminated
+
+Check the adapter contract, execution duration, memory use and worker logs. The external loader has bounded execution controls, but those controls are not a full OS sandbox. Test the adapter in an isolated development environment and avoid loading untrusted code.
+
+### PWA says offline but the dashboard action fails
+
+PWA network/offline messaging and service-worker caching do not make all authenticated features available offline. Restore network connectivity and retry the action after confirming whether it was already submitted.
 
 ---
 
-## Product & Roadmap
+## Roadmap and Project Status
 
-### What's on the roadmap?
+### What is the current version?
 
-See `docs/ROADMAP.md` for the full list. Summary:
+The audited project snapshot is **v3.7.0**, associated with commit `f4dd930eafd2ab61381bc1c049bb6cdbb7480235` on 24 November 2026.
 
-**v1.0-v1.5 (shipped):** MVP + reliability + extensibility + scheduling/versioning/encryption + DB adapters + validation/diff
+### Why does the old documentation still say v1.5.0?
 
-**v2.0 (planned):** Unit tests (blocking P0), persistent audit log, MFA/TOTP, `API_KEY_PEPPER` rotation, smoke test expansion, 3 more adapters (Linear, PagerDuty, Opsgenie)
+Several documentation files were last comprehensively updated during the v1.5 era, even though the repository history and code continued through later v2.x and v3.x tags. This FAQ is intended to replace the old v1.5 product-state answers with the audited v3.7.0 scope.
 
-**v3.0 (conditional):** SAML SSO, row-level security, SOC 2, multi-region, self-hosted Docker — only if v2.0 succeeds and enterprise demand exists
+### Is v3.7.0 the final project version?
 
-### What's NOT on the roadmap?
+The audited project notes describe v3.7.0 as the project's completed/final snapshot as of 24 November 2026. That is a statement about the audited project state, not a promise that no future maintenance, fixes or releases can ever occur.
 
-- Zapier-style visual builder
-- Mobile apps
-- Blockchain / NFT features
-- Custom LLM fine-tuning
-- Real-time WebSocket updates
-- Custom domain / white-label
-- E2E encrypted payloads (breaks core functionality by design)
+### Are there future feature commitments?
 
-See `docs/ROADMAP.md` for reasoning on each.
-
-### Can I suggest a feature?
-
-**Yes.** Open an issue at [github.com/zainshah3464/relayon/issues](https://github.com/zainshah3464/relayon/issues) with:
-- Problem statement
-- Proposed solution
-- Alternatives considered
-- Success criteria
-
-Vague proposals get closed. Specific proposals get prioritized.
-
-### When will [feature X] be added?
-
-**Honest answer:** When either (a) I have time, or (b) someone sponsors it, or (c) enough users request it.
-
-**v2.0 is different:** Testing is a hard commitment, not a "when I have time." Everything else stays in the "when requested" bucket.
-
-This is a solo-maintained project. No roadmap commitment beyond what's documented in `docs/ROADMAP.md`.
+Do not treat older v2.0/v3.0 roadmap bullets as current commitments. The old roadmap predates many shipped features and is stale relative to the v3.7.0 source. Any future work should be confirmed through current repository issues, tags and maintainer statements.
 
 ---
 
-## Contributing
+## Contributing and Support
 
-### Can I contribute?
+### Can I report bugs or request features?
 
-**Yes.** See `docs/CONTRIBUTING.md` for the full guide. Summary:
+Use the repository's issue tracker:
 
-**High-value contributions (v1.5 → v2.0):**
-- **Unit tests — any test, any file.** Top priority until v2.0 testing goal is met.
-- New destination adapters (Linear, PagerDuty, Opsgenie)
-- New signature verifiers (Twilio, SendGrid)
-- Documentation improvements
-- Bug reports with reproduction steps
+- [GitHub Issues](https://github.com/zainshah3464/relayon/issues)
+- [GitHub Discussions](https://github.com/zainshah3464/relayon/discussions)
 
-**How to start:** Look for issues labeled `good first issue`.
+Include the version/commit, a concise problem statement, reproduction steps and sanitized logs. Feature requests are easier to evaluate when they explain the user problem, proposed behavior, alternatives and acceptance criteria.
 
-### Do you accept AI-generated PRs?
+### Can I submit AI-generated code?
 
-**Yes, but you own them.** If you submit it, you must understand every line. AI-generated PRs that break things or introduce subtle bugs will be rejected, same as any other bad PR.
+A contributor is responsible for understanding, testing and maintaining every submitted line, regardless of how it was written. Adapter contributions must honor the adapter contract and must never perform real destination writes during a dry-run validation.
 
-**Special note:** AI-generated PRs that don't honor `__dryRun` in new adapters are rejected regardless of quality — the safety rule is not negotiable.
+### How should I report a security issue?
 
-### How fast do PRs get reviewed?
+Do not publish credentials, exploit details or customer data in a public issue. Use the repository's current private security-reporting process or the maintainer's verified security contact. Confirm the contact address from the current repository before sending sensitive details.
 
-**48 hours.** Usually faster. Solo maintainer, best-effort.
+### What information should never be included in a support request?
 
-### Can I fork and use Relayon commercially?
+Do not include:
 
-**Yes.** It's MIT licensed. You can:
-- Fork it
-- Modify it
-- Sell it as a service
-- Use it for your company
+- Passwords or refresh tokens.
+- Raw API keys or provider keys.
+- Webhook signing secrets.
+- Encryption keyring values.
+- Database connection strings.
+- Private customer payloads or personal data.
+- Unredacted authorization headers.
 
-**Attribution appreciated but not required** (that's what MIT means).
-
-**However:** If you use Vercel Hobby for commercial purposes, you violate Vercel's ToS. Upgrade to Vercel Pro if you go commercial.
+Use placeholders and redact tenant/user identifiers where they are not necessary for debugging.
 
 ---
 
-## Still Have Questions?
+## Technical References
 
-- **Bugs:** [github.com/zainshah3464/relayon/issues](https://github.com/zainshah3464/relayon/issues)
-- **Questions:** [github.com/zainshah3464/relayon/discussions](https://github.com/zainshah3464/relayon/discussions)
-- **Security:** `zainshahzs110@gmail.com` (do not open public issue)
-- **Everything else:** `zainshahzs110@gmail.com`
+The following links are pinned to the audited source snapshot where practical. If a deployment is running a different commit, inspect that commit rather than assuming the same implementation.
 
-**Response time:** 24-72 hours for non-urgent, 24 hours for security.
+### Product and live endpoints
+
+- [GitHub repository](https://github.com/zainshah3464/relayon)
+- [Audited source commit](https://github.com/zainshah3464/relayon/commit/f4dd930eafd2ab61381bc1c049bb6cdbb7480235)
+- [Hosted dashboard](https://relayon.vercel.app)
+- [API health](https://relayon-api.vercel.app/api/health)
+- [Ingress health](https://relayon-ingress.vercel.app/health)
+- [Workers health](https://relayon-workers.vercel.app/internal/health)
+- [Swagger UI](https://relayon-api.vercel.app/api/docs)
+- [OpenAPI JSON](https://relayon-api.vercel.app/api/openapi.json)
+
+### Core documentation
+
+- [Architecture](https://github.com/zainshah3464/relayon/blob/f4dd930eafd2ab61381bc1c049bb6cdbb7480235/docs/ARCHITECTURE.md)
+- [API reference](https://github.com/zainshah3464/relayon/blob/f4dd930eafd2ab61381bc1c049bb6cdbb7480235/docs/API_REFERENCE.md)
+- [Database guide](https://github.com/zainshah3464/relayon/blob/f4dd930eafd2ab61381bc1c049bb6cdbb7480235/docs/DATABASE.md)
+- [Security guide](https://github.com/zainshah3464/relayon/blob/f4dd930eafd2ab61381bc1c049bb6cdbb7480235/docs/SECURITY.md)
+- [Deployment guide](https://github.com/zainshah3464/relayon/blob/f4dd930eafd2ab61381bc1c049bb6cdbb7480235/DEPLOYMENT.md)
+- [Testing guide](https://github.com/zainshah3464/relayon/blob/f4dd930eafd2ab61381bc1c049bb6cdbb7480235/docs/TESTING.md)
+- [Changelog](https://github.com/zainshah3464/relayon/blob/f4dd930eafd2ab61381bc1c049bb6cdbb7480235/docs/CHANGELOG.md)
+- [Roadmap](https://github.com/zainshah3464/relayon/blob/f4dd930eafd2ab61381bc1c049bb6cdbb7480235/docs/ROADMAP.md)
+- [Troubleshooting](https://github.com/zainshah3464/relayon/blob/f4dd930eafd2ab61381bc1c049bb6cdbb7480235/docs/TROUBLESHOOTING.md)
+- [Quick user guide](https://github.com/zainshah3464/relayon/blob/f4dd930eafd2ab61381bc1c049bb6cdbb7480235/docs/relayon-guide.md)
+- [Workflow examples](https://github.com/zainshah3464/relayon/blob/f4dd930eafd2ab61381bc1c049bb6cdbb7480235/docs/workflow-examples.md)
+
+### Important source areas
+
+- [Dashboard](https://github.com/zainshah3464/relayon/tree/f4dd930eafd2ab61381bc1c049bb6cdbb7480235/apps/dashboard)
+- [API](https://github.com/zainshah3464/relayon/tree/f4dd930eafd2ab61381bc1c049bb6cdbb7480235/apps/api)
+- [Ingress](https://github.com/zainshah3464/relayon/tree/f4dd930eafd2ab61381bc1c049bb6cdbb7480235/apps/ingress)
+- [Workers](https://github.com/zainshah3464/relayon/tree/f4dd930eafd2ab61381bc1c049bb6cdbb7480235/apps/workers)
+- [Prisma schema](https://github.com/zainshah3464/relayon/blob/f4dd930eafd2ab61381bc1c049bb6cdbb7480235/packages/db/prisma/schema.prisma)
+- [RLS policies](https://github.com/zainshah3464/relayon/blob/f4dd930eafd2ab61381bc1c049bb6cdbb7480235/packages/db/prisma/rls/policies.sql)
+- [SDK](https://github.com/zainshah3464/relayon/tree/f4dd930eafd2ab61381bc1c049bb6cdbb7480235/packages/sdk)
+- [CLI](https://github.com/zainshah3464/relayon/tree/f4dd930eafd2ab61381bc1c049bb6cdbb7480235/packages/cli)
+- [Docker Compose](https://github.com/zainshah3464/relayon/blob/f4dd930eafd2ab61381bc1c049bb6cdbb7480235/docker-compose.yml)
+- [GitHub Actions](https://github.com/zainshah3464/relayon/tree/f4dd930eafd2ab61381bc1c049bb6cdbb7480235/.github/workflows)
+- [Tests](https://github.com/zainshah3464/relayon/tree/f4dd930eafd2ab61381bc1c049bb6cdbb7480235/test)
 
 ---
 
-**Last updated:** 2026-10-26 (v1.5.0)
+**Last updated:** 2026-11-25  
+**FAQ version:** v3.7.0  
+**Basis:** Relayon source snapshot `f4dd930eafd2ab61381bc1c049bb6cdbb7480235` and the uploaded v1.5.0 FAQ, reconciled against the v3.7.0 architecture/features audit.
 
-**Changelog of this FAQ:**
-- v1.0 → v1.5: Rewrote security section (encryption closed the plaintext gap). Added "New in v1.1-v1.5" section. Updated comparison tables (9 adapters, scheduling, versioning). Added Q&As for schedules, versioning, API keys, dry-run, encryption. Updated roadmap summary to v2.0 test-first reality. Corrected free-tier limits (Redis command usage went up in v1.3+ due to schedules).
-```
-
----
+**Maintenance note:** When the source changes, re-check route paths, provider support, environment variables, test coverage, license metadata and deployment behavior before changing this FAQ. Do not copy old v1.5 claims forward without verification.

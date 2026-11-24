@@ -1,14 +1,15 @@
 # Contributing to Relayon
 
-> **How to contribute to Relayon — from bug reports to pull requests.**
+> **Contribution guide for Relayon v3.7.0 — reporting issues, working in the monorepo, testing changes, and submitting pull requests.**
 >
-> **Current version:** v1.5.0
+> **Current version:** v3.7.0  
+> **Repository:** [github.com/zainshah3464/relayon](https://github.com/zainshah3464/relayon)
 
-Relayon is a **source-available** project (governed by the Relayon Proprietary Source-Visible License v1.0) and welcomes contributions of all sizes. The source code is publicly visible so you can audit it, learn from it, and improve it via Pull Requests. However, it is **not** released under an open-source license — see [License & Copyright Assignment](#license--copyright-assignment) before submitting a PR.
+Relayon is a source-available project governed by the **Relayon Proprietary Source-Visible License v1.0**. The repository is publicly viewable, but it is **not an open-source-licensed project**. Before preparing or submitting a contribution, read the repository's [`LICENSE`](../LICENSE) in full, especially its rules about modifications, written permission, attribution, and contributions.
 
-> ⚖️ **Important:** By submitting a Pull Request to Relayon, you assign copyright of your contribution to Zain Shah upon merge, per the Relayon Proprietary Source-Visible License v1.0 (Section 2.3). You retain no rights to withdraw contributions.
+> **Important — contribution terms:** Section 2.3 of the current license states that code, documentation, or assets contributed through a Pull Request are assigned to the Licensor upon merge. Do not rely on this guide as a substitute for the full license or legal advice. If you are unsure whether your proposed contribution is permitted, contact the maintainer before doing the work.
 
-This guide covers the workflow, conventions, and expectations.
+This guide describes the repository workflow and engineering expectations. It does not grant rights beyond the license.
 
 ---
 
@@ -16,59 +17,77 @@ This guide covers the workflow, conventions, and expectations.
 
 - [Code of Conduct](#code-of-conduct)
 - [Ways to Contribute](#ways-to-contribute)
+- [Before You Start](#before-you-start)
 - [Development Setup](#development-setup)
+- [Repository Layout](#repository-layout)
 - [Making Changes](#making-changes)
-- [Adding a Destination Adapter](#adding-a-destination-adapter)
+- [Testing and Verification](#testing-and-verification)
+- [Adding or Changing Destination Adapters](#adding-or-changing-destination-adapters)
+- [Security-Sensitive Changes](#security-sensitive-changes)
 - [Commit Convention](#commit-convention)
 - [Pull Request Process](#pull-request-process)
-- [What We're Looking For](#what-were-looking-for)
-- [What We Don't Accept](#what-we-dont-accept)
+- [Review Expectations](#review-expectations)
+- [What We Look For](#what-we-look-for)
+- [What We Will Not Accept](#what-we-will-not-accept)
 - [Getting Help](#getting-help)
-- [License & Copyright Assignment](#license--copyright-assignment)
+- [License and Attribution](#license-and-attribution)
 
 ---
 
 ## Code of Conduct
 
-Be respectful. Be honest. Assume good faith. We're all here to build something useful.
+Be respectful, honest, and constructive. Assume good faith, and keep discussions focused on the work.
 
-Specific expectations:
-- **No condescension.** Beginners are welcome. We were all beginners once.
-- **No gatekeeping.** If a contribution is small but correct, accept it.
-- **Critique code, not people.** "This function has a race condition" is fine. "You're an idiot" is not.
-- **Ask before assuming.** If a design decision seems wrong, ask why before rewriting.
+- **No condescension.** Explain technical concerns without insulting contributors.
+- **No gatekeeping.** Clear, reproducible reports and focused documentation fixes are valuable.
+- **Critique code, not people.** Describe the defect, risk, or trade-off.
+- **Ask before assuming.** Discuss architectural changes before replacing established patterns.
+- **Respect security reports.** Do not publish exploitable details before coordinating a fix.
 
-Violations result in a warning first, then a ban. No exceptions.
+Harassment, abuse, or repeated bad-faith behavior may result in participation being restricted.
 
 ---
 
 ## Ways to Contribute
 
-### You don't need to write code
+You do not need to submit application code to help.
 
-| Contribution | Value |
+| Contribution | Useful examples |
 |---|---|
-| **Bug reports** with reproduction steps | Extremely high |
-| **Documentation improvements** | Very high |
-| **Typo fixes** | Welcome |
-| **Translations** (Urdu, Hindi, Arabic) | Welcome |
-| **Feature proposals** with use cases | Very high |
-| **Screenshots** of your workflow using Relayon | High (for the README) |
-| **Testing** on Windows / macOS / Linux | High |
-| **Testing a specific adapter** (Slack, Sheets, MongoDB, etc.) | High — smoke test only covers HTTP |
+| Bug reports | Reproduction steps, expected/actual behavior, logs with secrets removed |
+| Documentation | Clarify setup, API behavior, deployment constraints, or recovery steps |
+| Testing | Add unit, integration, E2E, smoke, or regression coverage |
+| Adapter work | Fix an existing destination adapter or add a supported integration |
+| Reliability | Retry classification, idempotency, queue recovery, DLQ behavior |
+| Security | Responsible vulnerability reports and narrowly scoped fixes |
+| Developer tooling | SDK, CLI, workflow sync, build, or local-development improvements |
+| Accessibility and UX | Keyboard behavior, readable errors, responsive layout, accessible controls |
+| Performance | Reproducible profiling and before/after measurements |
 
-### Code contributions
+When reporting a bug, include the Relayon version or commit, runtime/OS, the affected service, exact steps, expected result, actual result, and relevant redacted logs.
 
-| Contribution | Value |
-|---|---|
-| **New destination adapters** (Linear, PagerDuty, Opsgenie, Kafka, S3, etc.) | Very high — see [Adding a Destination Adapter](#adding-a-destination-adapter) |
-| **New signature verifiers** (Twilio, SendGrid, Slack Events API) | Very high |
-| **Retry policy improvements** | High |
-| **Unit tests** (currently 0 — see [TESTING.md](./TESTING.md)) | **Extremely high** — this is v2.0's biggest priority |
-| **Performance optimizations** with benchmarks | High |
-| **Bug fixes** | High |
+Do not attach real API keys, passwords, webhook secrets, customer payloads, database URLs, or personal data to issues or pull requests.
 
-**Note on unit tests:** After 5 versions in 5 days (v1.0 → v1.5), the codebase has zero unit tests. Every feature is verified manually via documented checklists (see [TESTING.md](./TESTING.md#feature-specific-manual-tests)). The manual checklists are the specification for the tests v2.0 will add. **Any test PR is welcomed and prioritized.**
+---
+
+## Before You Start
+
+1. Read the relevant documentation under [`docs/`](.).
+2. Search existing issues and pull requests for the same problem.
+3. For a small, isolated correction, prepare a focused change.
+4. For a new capability, public API change, schema change, new adapter, or architectural change, open an issue or discussion first.
+5. For license-sensitive work, confirm permission with the maintainer before modifying or redistributing the source.
+
+A proposal should explain:
+
+- The problem and who it affects.
+- The expected behavior.
+- The proposed implementation area.
+- Compatibility or migration implications.
+- Security, reliability, and operational risks.
+- How the change can be tested.
+
+Do not assume that a feature is on an active roadmap simply because it appeared in an older version of this guide. Check the current repository and discuss scope with the maintainer.
 
 ---
 
@@ -76,132 +95,106 @@ Violations result in a warning first, then a ban. No exceptions.
 
 ### Prerequisites
 
-| Requirement | Version | Purpose |
-|---|---|---|
-| Node.js | 22.x | Runtime |
-| npm | 10.x | Package manager |
-| Git | Latest | Version control |
-| Prisma CLI | 6.19.3 (pinned) | Migrations |
+| Requirement | Version / detail |
+|---|---|
+| Node.js | `>=20.0.0` according to the root `package.json`; CI currently uses Node 22 |
+| npm | Use the npm version compatible with the committed lockfile |
+| Git | Current stable version |
+| PostgreSQL | Required for database-backed development |
+| Redis | Required for queue-backed flows |
+| MongoDB | Required for event and delivery data paths |
+| Prisma | Pinned to `6.19.3` in the root package manifest |
 
-**Prisma is pinned on purpose.** `npx prisma generate` is banned in this project — it fetches the latest CLI which removed the `generate` command (v8.x). Always use the absolute-path invocation (see [ARCHITECTURE.md § 6](./ARCHITECTURE.md#6-npx-prisma-generate-is-banned)).
+Use Node 22 when you want to match the current GitHub Actions CI environment. The package engine declaration is `>=20.0.0`; do not interpret the CI version as a different package-engine requirement.
 
 ### Clone and install
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/relayon.git
+git clone https://github.com/zainshah3464/relayon.git
 cd relayon
-npm install
+
+npm ci
 ```
 
-### Environment setup
+Use `npm ci` for a reproducible install when working from the committed lockfile. If you intentionally change dependencies, update the lockfile and explain why.
 
-Each app has its own `.env.example`. Copy them:
+### Environment configuration
 
-```bash
-cp packages/db/.env.example packages/db/.env
-cp apps/api/.env.example apps/api/.env.local
-cp apps/ingress/.env.example apps/ingress/.env.local
-cp apps/workers/.env.example apps/workers/.env.local
-```
+Start from the environment example files in the relevant app/package directories. Keep local secrets in ignored `.env` or `.env.local` files; never commit them.
 
-You'll need free accounts on:
-- **[Neon](https://neon.tech)** — PostgreSQL
-- **[MongoDB Atlas](https://cloud.mongodb.com)** — MongoDB (M0 free tier)
-- **[Upstash](https://console.upstash.com)** — Redis (TCP, not REST)
-- **[Groq](https://console.groq.com)** — AI (free tier)
+The monorepo contains separate runtime applications and shared packages. Configure the services you intend to run, including the database, Redis, MongoDB, authentication, encryption, and any optional integrations required by the feature under development.
 
-Generate secrets:
+Important practices:
 
-```bash
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-```
+- Keep API and Workers encryption configuration compatible wherever both services need to decrypt the same stored credentials.
+- Keep API-key hashing configuration stable for the lifetime of issued keys; changing a pepper can invalidate existing keys.
+- Use distinct local/test credentials and destinations. Do not point test runs at production systems.
+- Use dummy credentials or local test doubles for automated tests.
+- Do not copy production `.env` files into issue attachments, logs, screenshots, or pull requests.
 
-Run once for each secret:
+The exact required environment variables depend on the service and feature. Treat the current `.env.example` files and configuration validation in source as authoritative; this guide intentionally does not maintain a second, potentially stale environment-variable inventory.
 
-**v1.0 secrets:**
-- `JWT_SECRET`
-- `JWT_REFRESH_SECRET`
-- `CRON_SECRET`
-- `IP_HASH_SALT`
+### Generate the Prisma client and apply migrations
 
-**v1.2+ secrets:**
-- `API_KEY_PEPPER` — used for SHA-256 hashing of API keys. **Must be stable forever** — rotating it invalidates all issued API keys.
-
-**v1.3+ secrets:**
-- `CONNECTOR_ENCRYPTION_KEY` — 64 hex chars (32 bytes). **Must be identical in `apps/api/.env.local` and `apps/workers/.env.local`.** Mismatched keys = all encrypted credentials become unreadable.
-
-**v1.4+ (recommended, replaces v1.3 singular key):**
-- `CONNECTOR_ENCRYPTION_KEYS` — comma-separated `kid:hexkey` pairs. First key = current encryption key; all keys available for decryption. Format:
-  ```
-  CONNECTOR_ENCRYPTION_KEYS=key-2026-10:<64hex>,key-2026-01:<64hex>
-  ```
-  For local dev, one key is fine: `CONNECTOR_ENCRYPTION_KEYS=dev-2026-10:<64hex>`
-
-**v1.4+ API env (needed for schedule run-now):**
-- `WORKERS_URL` — `http://localhost:3003` locally, `https://relayon-workers.vercel.app` in prod
-- `CRON_SECRET` — same value as Workers (already listed above)
-
-**Optional toggles:**
-- `FULL_CONFIG_ENCRYPTION=true` (v1.5) — encrypts every non-metadata config field, not just secret fields. Default is `false`.
-
-### Run migrations
+The root scripts delegate database operations to the `db` workspace:
 
 ```bash
 npm run db:generate
 npm run db:deploy
 ```
 
-If you're starting from scratch (no DB tables yet):
+For local schema development where a new migration is intended:
 
 ```bash
-npm run db:migrate -- --name init
+npm run db:migrate -- --name describe_the_change
 ```
 
-**Current migration history (v1.5):**
-- `init` (v1.0) — base schema
-- `add_routing_rules` (v1.1) — conditional routing
-- `api_keys_scopes` (v1.2) — API keys with scopes
-- `v13_schedules_and_versions` (v1.3) — scheduled workflows + versioning
-- *(v1.4 and v1.5 require no migrations — adapters and encryption are data-layer changes only)*
+Review the generated migration before committing it. Do not edit an already-applied migration to change deployed database history; add a new migration instead.
 
-### Run all services
+The Prisma CLI and client are pinned to `6.19.3`. Use the repository scripts rather than installing an arbitrary global Prisma version.
 
-In **4 separate terminals**:
+### Run the applications
+
+Run each service in its own terminal:
 
 ```bash
-npm run dev:api        # :3001
-npm run dev:ingress    # :3002
-npm run dev:workers    # :3003
-npm run dev:dashboard  # :4200
+npm run dev:api
+npm run dev:ingress
+npm run dev:workers
+npm run dev:dashboard
 ```
 
-Dashboard opens at **http://localhost:4200**. Sign up once, then you're in.
+The current local development scripts use these expected ports:
 
-### Verify setup
+| Application | Local port |
+|---|---:|
+| API | `3001` |
+| Ingress | `3002` |
+| Workers | `3003` |
+| Dashboard | `4200` |
 
-```bash
-npm run typecheck    # 0 errors expected
-npm run build:dashboard && npm run build:api && npm run build:ingress && npm run build:workers
-```
+The Dashboard is available at `http://localhost:4200` when its dev server starts successfully. Some workflows require all four applications and their backing services; a dashboard-only UI change may need fewer services.
 
-**Expected workers log** (v1.5 — 9 adapters, 3 routers):
+---
 
-```
-[AdapterRegistry] Adapter registered: http → HttpAdapter
-[AdapterRegistry] Adapter registered: slack → SlackAdapter
-[AdapterRegistry] Adapter registered: email → EmailAdapter
-[AdapterRegistry] Adapter registered: sheets → SheetsAdapter
-[AdapterRegistry] Adapter registered: discord → DiscordAdapter
-[AdapterRegistry] Adapter registered: airtable → AirtableAdapter
-[AdapterRegistry] Adapter registered: notion → NotionAdapter
-[AdapterRegistry] Adapter registered: postgres → PostgresAdapter
-[AdapterRegistry] Adapter registered: mongodb → MongoDbAdapter
-[RouterExplorer] Mapped {/internal/schedule/tick, POST} route
-[RouterExplorer] Mapped {/internal/schedule/run-now, POST} route
-[RouterExplorer] Mapped {/internal/egress/dry-run, POST} route
-```
+## Repository Layout
 
-If you see **9 adapters** but fewer routers, or **fewer than 9 adapters**, something is misconfigured. Check the `EgressModule` providers array.
+Relayon is an npm-workspaces monorepo. The principal application boundaries are:
+
+| Path | Responsibility |
+|---|---|
+| `apps/dashboard/` | Angular dashboard |
+| `apps/api/` | NestJS control-plane API |
+| `apps/ingress/` | HTTP webhook ingress |
+| `apps/workers/` | Processing, delivery, schedules, and worker-side integrations |
+| `packages/db/` | Prisma schema, generated client integration, and database scripts |
+| `packages/shared/` | Shared application code |
+| `packages/sdk/` | SDK generation and package |
+| `scripts/` | Repository maintenance, smoke tests, and workflow tooling |
+| `test/` | Integration, E2E, and load-test assets |
+| `docs/` | Product, API, architecture, deployment, security, and operations documentation |
+
+Keep changes inside the correct ownership boundary. Shared contracts should not be duplicated independently across apps when a shared package is the appropriate place.
 
 ---
 
@@ -209,230 +202,271 @@ If you see **9 adapters** but fewer routers, or **fewer than 9 adapters**, somet
 
 ### Branch naming
 
+Use a short, descriptive branch name:
+
+```text
+feat/add-destination-capability
+fix/handle-retry-boundary
+docs/update-contributing-guide
+test/cover-api-key-rotation
+refactor/extract-shared-validator
+chore/update-tooling
 ```
-feat/add-linear-adapter
-fix/retry-policy-off-by-one
-docs/update-api-reference
-refactor/extract-signature-verifiers
+
+Recommended prefixes:
+
+- `feat` — new behavior
+- `fix` — bug fix
+- `docs` — documentation-only change
+- `test` — tests or test infrastructure
+- `refactor` — restructuring without intended behavior change
+- `perf` — performance improvement
+- `chore` — maintenance and tooling
+- `ci` — CI workflow changes
+
+### Keep changes focused
+
+- One logical change per branch and pull request.
+- Avoid unrelated formatting or generated-file churn.
+- Update documentation when behavior, configuration, APIs, or operational procedures change.
+- Add or update migrations when persistent schema changes require them.
+- Preserve backward compatibility unless a breaking change has been explicitly approved.
+- Do not commit build output, local environment files, credentials, or machine-specific artifacts.
+
+### Generated files and SDK
+
+If a change affects the OpenAPI contract or SDK inputs, use the repository's SDK scripts and include the expected generated changes:
+
+```bash
+npm run sdk:generate
+npm run sdk:build
 ```
 
-Prefix matches the commit type (`feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `chore`).
+Do not hand-edit generated SDK output when the source contract is the correct place to make the change. Review the diff to ensure generation did not introduce unrelated changes.
 
-### Keep branches focused
+### Workflow configuration
 
-One branch = one logical change. If you find a typo while working on a feature, submit the typo fix as a **separate PR**. Small, focused PRs get merged faster.
+The repository provides workflow synchronization scripts:
 
-### Before you code
+```bash
+npm run workflows:pull
+npm run workflows:validate
+npm run workflows:push
+```
 
-For **bug fixes** and **small features** (under 100 lines), just code and PR.
-
-For **large features** (new adapter, new endpoint family, schema changes), **open an issue first**. Describe:
-- What problem are you solving?
-- What's the proposed approach?
-- What alternatives did you consider?
-
-This prevents wasted work on something that doesn't fit the roadmap.
-
-**Special case — encryption or `__dryRun` changes:** Always open an issue first, even for small changes. These are the two areas where a subtle bug has severe consequences (data exposure or unexpected writes to live destinations). See [What We Don't Accept](#what-we-dont-accept).
+Use the validation command before proposing workflow-definition changes. Be careful with `push`: confirm the target environment and intended workflow changes before running it.
 
 ---
 
-## Adding a Destination Adapter
+## Testing and Verification
 
-**This is the most common contribution.** Since v1.2, adding an adapter is a **single-file change** — the registry auto-discovers adapters via `@DestinationAdapter` decorator, so no `egress.module.ts` edits are needed beyond adding the class to `providers`.
+Relayon has more than one test layer. Choose the narrowest relevant test while developing, then run broader checks before submitting.
 
-### The 4 things every adapter must do
+### Root commands
 
-1. **Extend `DeliveryAdapter`** — implement the `send(ctx: DeliveryContext): Promise<AdapterResult>` method
-2. **Register the decorator** — `@DestinationAdapter({ type, displayName, configSchema })`
-3. **Honor `__dryRun`** — if `ctx.config.__dryRun === true`, run a **safe probe that does NOT write to the destination** (see below)
-4. **Return a well-formed `AdapterResult`** — `{ success, statusCode, latencyMs, responseBody, error, retryable }`
+| Command | Purpose |
+|---|---|
+| `npm run typecheck` | Type-check workspaces that expose a typecheck script |
+| `npm run lint` | Run workspace lint scripts where configured |
+| `npm test` | Run the root Vitest unit-test configuration |
+| `npm run test:watch` | Run Vitest in watch mode |
+| `npm run test:ui` | Open the Vitest UI |
+| `npm run test:coverage` | Run unit tests with V8 coverage |
+| `npm run test:integration` | Run the integration-test configuration |
+| `npm run test:e2e` | Run Playwright E2E tests |
+| `npm run test:e2e:ui` | Run Playwright in UI mode |
+| `npm run test:e2e:full` | Run the full E2E directory |
+| `npm run test:mutation` | Run Stryker mutation testing |
+| `npm run test:mutation:critical` | Run the configured critical-file mutation scope |
+| `npm run test:load` | Run the webhook ingress k6 load scenario |
+| `npm run test:load:sustained` | Run the sustained ingress scenario |
+| `npm run test:load:burst` | Run the burst ingress scenario |
+| `npm run test:load:delivery` | Run the delivery-throughput scenario |
+| `npm run smoke` | Run the repository smoke-test script |
+| `npm run test:all` | Run unit, integration, and E2E commands sequentially |
 
-### Template
+Some test layers need local infrastructure, environment variables, browser installation, or external test services. Read the relevant test configuration and test files before running them.
+
+### Suggested verification sequence
+
+For most code changes:
+
+```bash
+npm run typecheck
+npm test
+npm run build:dashboard
+npm run build:api
+npm run build:ingress
+npm run build:workers
+```
+
+For changes that touch integration boundaries, also run the relevant integration tests:
+
+```bash
+npm run test:integration
+```
+
+For user-facing flows, run the applicable Playwright tests:
+
+```bash
+npm run test:e2e
+```
+
+For queue, ingress, or delivery performance work, use the relevant k6 scenario and include the workload, environment, and before/after results in the pull request.
+
+For deployment-sensitive changes, run the smoke test only against an explicitly configured test or approved deployment. Never run destructive or write-capable checks against production without authorization.
+
+### Be precise about test claims
+
+- Report exactly which commands you ran.
+- Include whether each command passed, failed, or was not run.
+- Include relevant failure output, with secrets and personal data removed.
+- Do not claim full coverage because a subset of tests passed.
+- Do not claim that CI runs every local test layer unless the current workflow configuration confirms it.
+
+The current `.github/workflows/ci.yml` workflow installs dependencies, generates the Prisma client and SDK, type-checks workspaces, and builds the Dashboard, API, Ingress, and Workers. Do not describe that workflow as automatically running the complete unit/integration/E2E/load suite unless the workflow itself has been updated to do so.
+
+---
+
+## Adding or Changing Destination Adapters
+
+Relayon has nine built-in destination adapter classes in the current Workers egress module:
+
+- HTTP
+- Slack
+- Email
+- Google Sheets
+- Discord
+- Airtable
+- Notion
+- PostgreSQL
+- MongoDB
+
+The codebase also contains an external adapter loader. These are two different extension paths; choose the one that matches the intended contribution.
+
+### Built-in adapter path
+
+Built-in adapters implement the `DeliveryAdapter` contract from the Workers egress adapter types. The contract includes:
 
 ```typescript
-import { Injectable } from '@nestjs/common';
-import { DestinationAdapter } from './plugin.decorator';
-import type { AdapterResult, DeliveryAdapter, DeliveryContext } from './types';
+export interface DeliveryContext {
+  destinationId: string;
+  destinationType: string;
+  config: Record<string, unknown>;
+  payload: unknown;
+  correlationId: string;
+  eventId: string;
+  attemptNumber: number;
+}
 
-const TIMEOUT_MS = 10_000;
+export interface AdapterResult {
+  success: boolean;
+  statusCode: number;
+  latencyMs: number;
+  responseBody: string;
+  error: string | null;
+  retryable: boolean;
+}
 
-@Injectable()
-@DestinationAdapter({
-  type: 'linear',                    // ← unique, lowercase
-  displayName: 'Linear',             // ← shown in dashboard dropdown
-  configSchema: {
-    required: ['apiKey', 'teamId'],
-    optional: ['labelIds'],
-  },
-})
-export class LinearAdapter implements DeliveryAdapter {
-  readonly type = 'linear';
-
-  async send(ctx: DeliveryContext): Promise<AdapterResult> {
-    const started = Date.now();
-    const apiKey = ctx.config['apiKey'];
-    const teamId = ctx.config['teamId'];
-
-    // 1. Config validation
-    if (typeof apiKey !== 'string' || apiKey.length === 0) {
-      return this.error("missing 'apiKey'", started);
-    }
-    if (typeof teamId !== 'string' || teamId.length === 0) {
-      return this.error("missing 'teamId'", started);
-    }
-
-    // 2. Dry-run — safe probe, NO write
-    if (ctx.config['__dryRun'] === true) {
-      try {
-        const res = await fetch('https://api.linear.app/graphql', {
-          method: 'POST',
-          headers: {
-            Authorization: apiKey,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ query: '{ viewer { id } }' }),
-        });
-        return {
-          success: res.ok,
-          statusCode: res.status,
-          latencyMs: Date.now() - started,
-          responseBody: res.ok ? 'Linear API key valid' : 'Invalid Linear key',
-          error: res.ok ? null : `Linear: ${res.status}`,
-          retryable: false,
-        };
-      } catch (err) {
-        return {
-          success: false,
-          statusCode: 0,
-          latencyMs: Date.now() - started,
-          responseBody: '',
-          error: err instanceof Error ? err.message : String(err),
-          retryable: false,
-        };
-      }
-    }
-
-    // 3. Real delivery
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
-
-    try {
-      const res = await fetch('https://api.linear.app/graphql', {
-        method: 'POST',
-        headers: {
-          Authorization: apiKey,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          query: `mutation { issueCreate(input: { teamId: "${teamId}", title: "..." }) { success } }`,
-        }),
-        signal: controller.signal,
-      });
-
-      const bodyText = await res.text();
-      const ok = res.ok;
-
-      return {
-        success: ok,
-        statusCode: res.status,
-        latencyMs: Date.now() - started,
-        responseBody: bodyText.slice(0, 500),
-        error: ok ? null : `Linear: ${res.status}`,
-        retryable: !ok && (res.status >= 500 || res.status === 429),
-      };
-    } catch (err) {
-      return {
-        success: false,
-        statusCode: 0,
-        latencyMs: Date.now() - started,
-        responseBody: '',
-        error: err instanceof Error ? err.message : String(err),
-        retryable: true,
-      };
-    } finally {
-      clearTimeout(timer);
-    }
-  }
-
-  private error(msg: string, started: number): AdapterResult {
-    return {
-      success: false,
-      statusCode: 0,
-      latencyMs: Date.now() - started,
-      responseBody: '',
-      error: `linear adapter: ${msg}`,
-      retryable: false,
-    };
-  }
+export interface DeliveryAdapter {
+  readonly type: string;
+  send(ctx: DeliveryContext): Promise<AdapterResult>;
 }
 ```
 
-### `__dryRun` — the critical safety rule
+When adding a built-in adapter, review the current neighboring implementations and update every integration point required by the feature, which may include:
 
-**If you skip this, we can't merge the PR.** Without `__dryRun` handling, the dashboard's "Test connection" button will send a real message/email/row to the destination — every time a user clicks validate. That is a data-leak bug.
+1. The adapter implementation and its registration metadata/decorator.
+2. The Workers egress module provider list so NestJS instantiates the class.
+3. Destination-type validation and configuration handling.
+4. API response/configuration behavior, where applicable.
+5. Dashboard destination selection and configuration UI.
+6. Secret-field handling and encryption configuration, where applicable.
+7. Tests, documentation, and any relevant API/SDK contract.
 
-Every adapter MUST check `ctx.config.__dryRun === true` **before** the real `fetch` call and use a safe probe instead. Approved probes:
+Do not assume that adding a class alone makes an adapter available end-to-end. Verify the registry, backend validation, persistence, and UI paths.
 
-| Adapter type | Safe probe |
-|---|---|
-| HTTP-like (REST APIs) | `HEAD` or `GET` to a metadata endpoint |
-| Auth-only | `GET /whoami` or `/me` with the API key |
-| Database | `SELECT 1` / `ping` |
-| Webhook (Slack, Discord) | URL format check only — cannot be tested without sending |
+### Adapter result and retry behavior
 
-**Slack and Discord are the safe exception:** their webhooks cannot be probed without sending a message. For those, return `success: true` with a message like `"config valid — cannot be tested without sending"`. This is the safest possible behavior.
+Return a complete `AdapterResult` on every path. In particular:
 
-### Register in `egress.module.ts`
+- `success` must reflect the actual outcome.
+- `statusCode` should reflect the upstream response where one exists; use the established convention in neighboring adapters when no response exists.
+- `latencyMs` should be measured for the attempt.
+- `responseBody` should be bounded and must not expose credentials or sensitive upstream data.
+- `error` should be actionable and safe to log.
+- `retryable` must distinguish transient failures from permanent configuration or validation failures.
 
-Since v1.2, the registry auto-discovers via `DiscoveryService`, but the adapter **class must still be listed in `providers`** for NestJS to instantiate it:
+Use existing retry and circuit-breaker behavior rather than introducing a second retry loop inside an adapter. Set timeouts and ensure network operations are bounded. Avoid logging authorization headers, connection strings, tokens, or complete secret-bearing configuration objects.
 
-```typescript
-// apps/workers/src/modules/egress/egress.module.ts
+### Dry-run and validation safety
 
-import { LinearAdapter } from './adapters/linear.adapter';
+A connection test must not unexpectedly create, update, send, or delete customer data. Follow the existing dry-run contract and behavior used by the adapter registry and dashboard. If a destination cannot be safely probed without performing a write, make that limitation explicit and do not silently perform a real delivery.
 
-@Module({
-  providers: [
-    // ... existing 9 ...
-    LinearAdapter,  // ← add here
-  ],
-})
+A dry-run implementation must be reviewed for side effects, not merely for a successful HTTP status.
+
+### External adapter path
+
+The Workers code includes an external adapter loader that reads adapter directories from:
+
+```text
+RELAYON_EXTERNAL_ADAPTERS_DIR
 ```
 
-That's it. On restart, you'll see `[AdapterRegistry] Adapter registered: linear → LinearAdapter`.
+If the variable is not set, the loader uses the `adapters` directory under the process working directory. Each external adapter directory is expected to contain a `manifest.json` and the JavaScript entrypoint declared by that manifest.
 
-### Update the frontend form
+The current manifest schema requires:
 
-The destination modal in `apps/dashboard/src/app/features/workflows/workflow-detail.component.ts` has an `@switch` on `destForm.controls.type.value` with a `@case` per adapter. You need to add:
+- `schemaVersion: 1`
+- A lowercase adapter `type` matching the schema's format
+- `displayName`
+- Semver `version`
+- `trust`
+- `author`
+- A `.js` `entrypoint`
+- A `fields` array describing configuration fields
 
-1. A `<option value="linear">Linear</option>` in the `<select>`
-2. A `@case ('linear') { ... }` block with form fields for required config
-3. Form controls in `destForm` group (e.g., `linearApiKey`, `linearTeamId`)
-4. Config builder in `buildDestinationConfig()` switch
+The supported field types in the current schema are `text`, `url`, `password`, `email`, `textarea`, `number`, `boolean`, `select`, `json`, and `string-array`.
 
-See the existing `@case ('notion')` block as a template.
+The entrypoint must export a default object with a `send` function. The sandbox runner passes configuration, payload, and a limited context containing event ID, correlation ID, and attempt number.
 
-### Test your adapter manually
+**Important sandbox limitation:** The implementation uses Node.js worker threads, resource limits, a timeout, and a constrained HTTPS request bridge. This is not equivalent to hardened operating-system or container isolation. Do not describe it as a security boundary that makes arbitrary untrusted code safe. External adapter code still requires careful review and controlled deployment.
 
-The smoke test only covers HTTP. To test a new adapter:
+The loader currently rejects external adapters that declare `trust: "trusted"` at execution time; use the supported sandboxed mode and validate against the actual manifest schema and runtime contract.
 
-1. **Dry-run:** Dashboard → workflow → + Add destination → select your type → fill fields → click "Test connection" → expect green checkmark, **and confirm nothing was sent** to the destination
-2. **Real delivery:** Save destination → trigger a webhook or run-now → check destination received the payload
-3. **Failure path:** Use a fake API key → expect `401`/`403` on dry-run + `success: false` with retryable classification on real delivery
-4. **Retry behavior:** Point at a `500` endpoint → expect delivery to enter `queue:egress:delayed` and retry with backoff
+---
 
-Document the manual test result in your PR description.
+## Security-Sensitive Changes
+
+Changes involving authentication, authorization, tenant boundaries, cryptography, secrets, webhook verification, queues, or adapter execution require extra scrutiny.
+
+At minimum:
+
+- Preserve tenant scoping on every read and write path.
+- Use timing-safe comparison for secret/signature/hash comparisons where required.
+- Validate webhook signatures against the exact raw body and provider-specific signing rules.
+- Do not weaken encryption envelope validation or key-derivation boundaries.
+- Do not introduce plaintext secret persistence or return secret material in API responses.
+- Keep API and Workers encryption behavior compatible for shared encrypted data.
+- Do not log credentials, raw API keys, tokens, private payloads, or decrypted configuration.
+- Bound network calls and worker execution with timeouts.
+- Treat external adapter code and webhook payloads as untrusted input.
+- Add regression tests for both successful and rejected/failed paths.
+- Document migration and key-rotation implications.
+
+The project does not have universal row-level security coverage across every table. Do not assume that database RLS replaces application-level tenant authorization. Preserve the explicit authorization checks in the relevant service and query paths.
+
+If a change touches the encryption implementation, API-key verification, signature verification, or sandbox execution, explain the threat model and the failure modes addressed in the pull request.
 
 ---
 
 ## Commit Convention
 
-We use **[Conventional Commits](https://www.conventionalcommits.org/)**.
+Use [Conventional Commits](https://www.conventionalcommits.org/).
 
 ### Format
 
-```
+```text
 <type>(<scope>): <short summary>
 
 <optional body>
@@ -440,279 +474,203 @@ We use **[Conventional Commits](https://www.conventionalcommits.org/)**.
 <optional footer>
 ```
 
-### Types
+Examples:
 
-| Type | Meaning | Example |
-|---|---|---|
-| `feat` | New feature | `feat(ingress): add Twilio signature verifier` |
-| `fix` | Bug fix | `fix(workers): correct Groq timeout parsing` |
-| `perf` | Performance | `perf(ingress): reduce cold start by 100ms` |
-| `docs` | Documentation only | `docs(readme): update architecture diagram` |
-| `refactor` | Code change, no feature/fix | `refactor(api): extract tenant guard` |
-| `test` | Adding/fixing tests | `test(shared): add signature verifier tests` |
-| `chore` | Tooling, deps, config | `chore(deps): bump prisma to 6.19.3` |
-| `ci` | CI configuration | `ci: add smoke test job` |
-
-### Scopes (optional but recommended)
-
-`api`, `ingress`, `workers`, `dashboard`, `db`, `shared`, `docs`, `deploy`, `crypto`, `adapters`, `schedule`, `versions`
-
-### Examples
-
-Good:
-```
-feat(adapters): add Linear destination adapter
-fix(ingress): handle Shopify base64 signature correctly
-docs(api): clarify DLQ replay semantics
-refactor(crypto): extract keyring loader
-perf(workers): batch Prisma query for N events
+```text
+feat(adapters): add destination configuration support
+fix(ingress): reject invalid webhook signatures
+test(api): cover API key rotation expiry
+docs(contributing): refresh v3.7 contribution guide
+refactor(workers): centralize retry classification
+perf(processing): reduce redundant workflow reads
+chore(deps): update approved dependency
+ci: add integration test job
 ```
 
-Bad (rejected):
-```
-Update code
-Fixed stuff
-WIP
-asdf
-```
+Use a scope when it improves clarity, such as `api`, `ingress`, `workers`, `dashboard`, `db`, `shared`, `sdk`, `docs`, `crypto`, `adapters`, `schedule`, or `ci`.
 
-### Commit body — when to include
-
-Include a body when the **why** isn't obvious from the title:
-
-```
-fix(workers): skip app.listen on Vercel serverless
-
-Vercel's serverless runtime calls the handler directly and manages
-the HTTP server itself. Calling app.listen() in the serverless
-context crashes the function with "No exports found in module".
-
-Fix: export the Express instance as default. Local dev still calls
-app.listen via the VERCEL env var check.
-
-Refs: https://vercel.com/docs/functions/runtimes/node-js
-```
+Avoid vague messages such as `update code`, `fix stuff`, `changes`, or `WIP`.
 
 ---
 
 ## Pull Request Process
 
-### 1. Sync your fork
+### 1. Create a focused branch
 
 ```bash
 git checkout main
-git pull upstream main
-git checkout -b feat/your-branch
+git pull origin main
+git checkout -b docs/update-contributing-guide
 ```
 
-### 2. Make your changes
+Use the repository's current contribution and license rules before creating or publishing a fork or modified copy. The license restricts unauthorized modification and derivative works.
 
-Write code. Add tests where it matters (any test is better than none). Update docs if you changed behavior.
+### 2. Make the change
+
+- Keep the diff focused.
+- Follow nearby code conventions.
+- Add tests for changed behavior.
+- Update docs and generated artifacts when required.
+- Include migrations for schema changes.
+- Remove temporary debugging code.
 
 ### 3. Verify locally
 
-```bash
-npm run typecheck
-npm run build:dashboard && npm run build:api && npm run build:ingress && npm run build:workers
-```
-
-Both must pass. **CI will run the same checks**, so local failures mean CI failures.
-
-If your change touches encryption or adapters, also manually run the relevant test from [TESTING.md](./TESTING.md#feature-specific-manual-tests).
+Run the applicable typecheck, tests, and builds. Record the exact commands and outcomes in the PR. Do not mark checks as passed if they were not run.
 
 ### 4. Commit
 
 ```bash
-git add .
-git commit -m "feat(adapters): add Linear destination adapter"
+git add <relevant-files>
+git commit -m "docs(contributing): update contribution guide"
 ```
 
-### 5. Push and open PR
+Avoid `git add .` when unrelated local files may be present.
+
+### 5. Push and open a pull request
+
+Only publish a branch or derivative changes when your intended contribution is permitted under the current license and any required permission has been obtained.
+
+When authorized:
 
 ```bash
-git push origin feat/your-branch
+git push -u origin docs/update-contributing-guide
 ```
 
-Then open a PR at `https://github.com/zainshah3464/relayon/compare`.
+Open a pull request against the repository's intended base branch and link the related issue or discussion.
 
-### PR title
-
-Same format as the commit message. Squashed commits inherit the PR title.
-
-### PR description
-
-Use this template:
+### Pull request description template
 
 ```markdown
-## What
-Brief description of the change.
+## Summary
+What changed?
 
-## Why
-Problem being solved. Link to issue if applicable.
+## Motivation
+What problem does this solve?
 
-## How
-Approach taken. Mention tradeoffs if any.
+## Implementation
+Which areas changed? Mention important trade-offs.
+
+## Compatibility / Migration
+Does this change affect APIs, persisted data, configuration, SDKs, or deployments?
 
 ## Testing
-- [ ] `npm run typecheck` passes
-- [ ] All 4 builds pass
-- [ ] Smoke test passes (if deploy changes)
-- [ ] Manual test performed (see TESTING.md — describe what you tested)
-- [ ] For adapter PRs: `__dryRun` confirmed to NOT write to destination
+- [ ] `npm run typecheck`
+- [ ] Relevant unit tests
+- [ ] Relevant integration tests
+- [ ] Relevant E2E tests
+- [ ] Relevant builds
+- [ ] Manual verification (describe exact steps)
+- [ ] No production credentials or customer data included
 
-## Safety checklist (for encryption/dry-run changes only)
-- [ ] Change does not expose plaintext secrets in API responses
-- [ ] Change does not weaken `enc:v2:` envelope validation
-- [ ] If touching `crypto-box.ts`, both API and Workers copies are updated identically
-- [ ] If adding an adapter, `ctx.config.__dryRun` is checked before any write
+## Security and reliability
+- [ ] Tenant authorization reviewed
+- [ ] Secrets are not logged or returned
+- [ ] Timeouts and retry behavior reviewed
+- [ ] Dry-run/test-connection behavior is side-effect safe
+- [ ] Migration and rollback implications documented, if applicable
 
-## Copyright assignment (required)
-- [ ] I confirm that by submitting this PR, I assign copyright of my contribution to Zain Shah (the Licensor) upon merge, per Section 2.3 of the Relayon Proprietary Source-Visible License v1.0
-- [ ] I confirm I have the right to make this contribution (not copied from another source without permission)
+## Documentation
+List updated documentation or explain why none is needed.
 
-## Screenshots (if UI change)
-Before/After.
+## License
+I have read the current Relayon license and confirmed that this contribution is permitted under its terms. I understand the contribution provisions that apply upon merge.
 ```
 
-### Review process
-
-- I (Zain) review every PR within **48 hours** (usually faster).
-- I'll either approve, request changes, or explain why the PR is out of scope.
-- "Request changes" is not personal — it's about the code.
-- If we disagree, we discuss. If we still disagree, my call as maintainer decides.
-
-### Merge strategy
-
-- **Squash and merge** for feature/fix PRs (one commit per feature).
-- **Rebase and merge** for small fixes (preserve commit messages).
-- Never "merge commits" (avoids noise).
+Do not copy a copyright-assignment checkbox from an older guide without reading the current license and understanding the terms.
 
 ---
 
-## What We're Looking For
+## Review Expectations
 
-### High priority (v1.5 → v2.0)
+Review focuses on correctness, maintainability, compatibility, and operational safety.
 
-1. **Unit tests** — currently 0. The manual checklists in [TESTING.md](./TESTING.md) are the specification. Any test PR is prioritized over feature PRs.
-2. **New destination adapters** — Linear, PagerDuty, Opsgenie, Kafka, AWS S3, Google BigQuery, ClickHouse. Follow [Adding a Destination Adapter](#adding-a-destination-adapter).
-3. **New signature verifiers** — Twilio, SendGrid, Slack Events API (not just webhooks)
-4. **Retry policy improvements** — per-destination overrides, jitter, dead-letter after success
-5. **Observability** — OpenTelemetry spans, Prometheus metrics
-6. **Documentation** — any docs improvement is accepted
+A reviewer may ask for:
 
-**Already shipped (do not re-add):** Discord (v1.2), Airtable (v1.3), Notion (v1.3), PostgreSQL (v1.4), MongoDB (v1.4)
+- A smaller or more focused diff.
+- Tests for failure cases and edge conditions.
+- Evidence for performance claims.
+- Clarification of API or schema compatibility.
+- Better handling of secrets, retries, timeouts, and tenant boundaries.
+- Documentation for new configuration or operational behavior.
 
-### Medium priority
-
-- **Smoke test expansion** — add version snapshot + restore check, API key verify check, dry-run validation check
-- **Dashboard UX** improvements (charts, filters, bulk actions)
-- **Performance optimizations** (with benchmarks showing the win)
-- **Accessibility** improvements (WCAG AA compliance)
-- **Internationalization** (i18n for dashboard)
-- **Error messages** that are more actionable
-
-### Low priority
-
-- Code style changes without functional benefit
-- Dependency bumps (unless for security)
-- "Modernization" refactors (unless fixing a real problem)
+A request for changes is part of the engineering process, not a personal judgment. Do not assume a review deadline or merge guarantee; timing depends on maintainer availability and the complexity of the change.
 
 ---
 
-## What We Don't Accept
+## What We Look For
 
-| Category | Why |
-|---|---|
-| **Dependencies without justification** | Every dep adds attack surface, bundle size, and maintenance burden |
-| **Breaking changes in minor versions** | Use `feat!:` for breaking, and expect heavy scrutiny |
-| **Tests that just test mocks** | A test that mocks Prisma and asserts Prisma was called is worthless |
-| **LLM output tests** | AI is non-deterministic; test the boundaries, not the content |
-| **Reformatting existing code** without discussion | Diffs become unreadable |
-| **AI-generated PRs without review** | If you submit it, you own it — understand every line |
-| **"Cleanup" PRs that touch 50 files** | Scope creep — split into focused PRs |
-| **Adding console.log statements** | Use the structured `logger` |
-| **Hardcoded secrets or credentials** | Even in tests. Use env vars. |
+High-value contributions generally improve:
 
-### Safety-critical rejections (v1.3+)
+- Correctness of webhook ingestion and signature verification.
+- Event processing, delivery reliability, retry classification, and DLQ recovery.
+- Tenant isolation, authentication, authorization, and secret handling.
+- Adapter correctness, configuration validation, and safe connection testing.
+- Workflow scheduling, versioning, import/export, and synchronization.
+- API and SDK consistency.
+- Dashboard accessibility, responsive behavior, and actionable error states.
+- Automated regression coverage and reproducible performance improvements.
+- Setup, deployment, troubleshooting, and security documentation.
 
-These are **hard rejections** — we will not merge even with a good-faith explanation, because the failure modes are severe:
+A focused bug fix with a regression test is often more valuable than a broad refactor without measurable benefit.
 
-| Category | Why |
-|---|---|
-| **Adapter PRs that don't honor `__dryRun`** | Testing a destination would write real data. Data-leak bug. |
-| **PRs that weaken encryption validation** | e.g., removing auth tag verification, allowing truncated envelope, downgrade to CBC. Encryption is not a place for "just make it work." |
-| **PRs that store secrets as plaintext in new fields** | If you add a new adapter with a new secret field, add it to `SECRET_CONFIG_KEYS`. Non-negotiable. |
-| **PRs that change crypto envelope format without backward compat** | `enc:v1:` data must stay decryptable. New formats must be additive (`enc:v3:` alongside v1/v2). |
-| **PRs that add `.env` files or leak secrets in test fixtures** | Even test Slack webhooks. Use placeholders. |
-| **PRs that bypass `timingSafeEqual`** | Any signature or hash comparison must be timing-safe. Naive `a === b` is rejected. |
-| **PRs that add `eval()` / `Function()` / `vm`** | Zero code execution surface. Use JSONata for user expressions. |
+---
 
-**Why these are hard rejections:** Each of these has caused real production incidents at companies far larger than this project. We cannot take "I'll fix it in a follow-up" for any of them.
+## What We Will Not Accept
 
-### License-related rejections (v3.7+)
+The following are grounds for rejection:
 
-These PRs will be rejected because they violate the Relayon Proprietary Source-Visible License v1.0:
+- Hard-coded credentials, tokens, private keys, or production data.
+- Logging or returning plaintext secrets or sensitive customer payloads.
+- Changes that bypass tenant authorization or weaken authentication.
+- Non-timing-safe comparisons in security-sensitive paths where constant-time comparison is required.
+- Adapter validation that unexpectedly writes to a live destination.
+- Unbounded network requests, retry loops, or worker execution.
+- Unreviewed changes to encryption formats or key-derivation behavior.
+- Unsafe dynamic code execution such as `eval()` or `Function()` for user-controlled expressions.
+- Tests that only assert mock calls without validating meaningful behavior.
+- Unjustified dependencies, unrelated formatting churn, or sweeping cleanup without an agreed scope.
+- Generated output edited by hand when the source contract or generator should be changed.
+- Claims of test coverage, performance, security, or compatibility that are not supported by evidence.
+- Changes that remove required copyright notices, attribution, or other license-required material.
+- Contributions that conflict with the current license or lack required written permission.
 
-| Category | Why |
-|---|---|
-| **PRs that remove copyright headers** | Section 3.6 — no license header removal permitted |
-| **PRs that remove "Powered by Relayon" attribution** | Section 3.6 — attribution is mandatory |
-| **PRs that rebrand the project under a different name** | Section 3.2 — no derivative works without written permission |
-| **PRs that re-add MIT license headers** | MIT was superseded by the proprietary license on Nov 20, 2026 |
+For security-sensitive work, a good-faith explanation does not replace the need to preserve the relevant security guarantees.
 
 ---
 
 ## Getting Help
 
-| Channel | Use for |
-|---|---|
-| **GitHub Issues** | Bug reports, feature requests |
-| **GitHub Discussions** | Questions, ideas, show-and-tell |
-| **Email** | Security disclosures (see `SECURITY.md`) |
+Use the repository's GitHub issue and discussion facilities for ordinary project questions, reproducible bugs, and proposed work.
 
-**Response time (solo maintainer):**
-- Bug reports: 24-72 hours
-- Feature requests: 3-7 days
-- PR reviews: 48 hours
-- Security disclosures: 24 hours
+For a suspected vulnerability, follow the private reporting instructions in [`SECURITY.md`](./SECURITY.md). Do not publish exploit details, secrets, or customer data in a public issue.
 
-**If you haven't heard back in a week**, ping the issue/PR. I might have missed it.
+When asking for help, include:
+
+- The version or commit you are using.
+- The service or package involved.
+- Minimal reproduction steps.
+- Relevant redacted logs and error messages.
+- What you already tried.
 
 ---
 
-## First Contribution?
+## License and Attribution
 
-Look for issues labeled **`good first issue`** — these are scoped to be completed in a few hours and have clear acceptance criteria.
+Relayon is governed by the **Relayon Proprietary Source-Visible License v1.0**, effective November 20, 2026, according to the repository license file. It is not distributed under the MIT License.
 
-If none fit, open an issue describing what you'd like to work on and I'll help scope it.
+The license contains restrictions on modification, derivative works, redistribution, competing products, AI training, trademark use, and removal of copyright or attribution notices. It also defines the contribution assignment terms that apply upon merge.
 
-**Easy first PRs:**
-- Fix a typo in any of the 11 docs files
-- Add a test for a pure function (any function, any file)
-- Add a screenshot of your Relayon workflow to `docs/screenshots/`
-- Add an error message that's more actionable than what's there
-- Improve a section of this CONTRIBUTING guide
+Before contributing:
 
----
+1. Read the complete [`LICENSE`](../LICENSE).
+2. Confirm that the proposed activity is allowed.
+3. Obtain written permission from the Licensor where the license requires it.
+4. Ensure that any contribution does not contain third-party material that you are not authorized to submit.
+5. Preserve all required copyright, attribution, and branding notices.
 
-## License & Copyright Assignment
-
-Relayon is **not** open source. The source code is publicly visible and contributions are welcome, but the project is governed by the **Relayon Proprietary Source-Visible License v1.0** (effective November 20, 2026), which supersedes the previous MIT license.
-
-**By submitting a Pull Request, you agree that:**
-
-1. **You assign copyright of your contribution to Zain Shah (the Licensor) upon merge**, per Section 2.3 of the Relayon Proprietary Source-Visible License v1.0.
-2. **You retain no rights to withdraw contributions** once merged. Your code becomes part of Relayon under the Licensor's copyright.
-3. **You have the right to make the contribution** — the code is your original work or you have explicit permission to contribute it, and it doesn't infringe any third-party rights.
-4. **Your contribution is licensed to the Licensor** under the terms of the Relayon Proprietary Source-Visible License v1.0. This includes the right for the Licensor to sublicense, relicense, or reincorporate your contribution in future versions of Relayon (including under different license terms).
-5. **You will not reintroduce MIT-licensed components** without explicit written permission, unless they are legitimate third-party dependencies.
-
-If you're contributing on behalf of an employer, you confirm that your employer has authorized the contribution and agrees to the copyright assignment above.
-
-**Why this matters:** The Licensor needs full ownership of all contributions so that the project can be reliably enforced, sublicensed, or relicensed in the future without needing to track down every past contributor. This is standard for proprietary projects accepting open contributions.
-
-**Full license text:** See `LICENSE` for the complete terms. For questions, email **zainshahzs110@gmail.com** with subject line `"Relayon Contributing Question — [Your Name]"`.
+The license file is the authoritative legal document. If this guide and the license differ, the license controls. For license questions, contact the Licensor using the contact details in the license or repository documentation.
 
 ---
 
-Thank you for contributing. Every bug report, every typo fix, every new adapter makes Relayon better for someone else.
+Thank you for taking the time to improve Relayon. Clear reports, careful tests, safe integrations, and accurate documentation all help make the project more reliable.

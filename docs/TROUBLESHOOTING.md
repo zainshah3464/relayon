@@ -1,1562 +1,1381 @@
 # Relayon — Troubleshooting
 
-> **Common issues, their root causes, and the fixes that actually work.**
+> **Operational troubleshooting for local development, Vercel deployments, and self-hosted Docker Compose environments.**
 >
-> **Current version:** v1.5.0
-
-Every issue in this document was **encountered during v1.0–v1.5 development and deployment** and has been verified as a real fix. Nothing here is theoretical.
-
----
-
-## Table of Contents
-
-- [Local Development](#local-development)
-- [Database & Prisma](#database--prisma)
-- [Vercel Deployment](#vercel-deployment)
-- [Runtime Errors](#runtime-errors)
-- [Delivery & Retries](#delivery--retries)
-- [AI Enrichment](#ai-enrichment)
-- [Authentication](#authentication)
-- [Cron & Automation](#cron--automation)
-- [Performance](#performance)
-- [Encryption & Key Rotation (v1.3+)](#encryption--key-rotation-v13)
-- [Scheduled Workflows (v1.3+)](#scheduled-workflows-v13)
-- [Workflow Versioning & Diff (v1.3+)](#workflow-versioning--diff-v13)
-- [Adapters (v1.2–v1.5)](#adapters-v12v15)
-- [Destination Validation & Dry-Run (v1.5)](#destination-validation--dry-run-v15)
-- [API Keys (v1.2+)](#api-keys-v12)
-- [Dashboard UI Gotchas](#dashboard-ui-gotchas)
-- [Diagnostics](#diagnostics)
+> **Current version:** v3.7.0
+>
+> **Repository snapshot used for this update:** `main` at `f4dd930eafd2ab61381bc1c049bb6cdbb7480235` (24 November 2026).
+>
+> This guide combines historical v1.x failure patterns that may still occur with troubleshooting for the v2.x–v3.7 platform surface. A historical incident is not proof that the same defect exists in v3.7.0. Confirm the current code, deployment topology, logs, and live OpenAPI contract before applying a code-level workaround.
 
 ---
 
-## Local Development
+## Table of contents
 
-### `npm run dev:dashboard` fails with "Application bundle generation failed"
-
-**Symptom:**
-```
-✘ [ERROR] NG5002: Opening tag "span" not terminated.
-```
-
-**Cause:** An Angular template has an unclosed tag, usually because of a malformed `[class.xxx/opacity]` binding.
-
-**Fix:** Tailwind modifiers (`/20`, `hover:`, `md:`) **cannot be used in Angular property bindings**. Refactor to `@if` control flow:
-
-```html
-<!-- ❌ Wrong -->
-<span [class.bg-rose/20]="isError">...</span>
-
-<!-- ✅ Correct -->
-@if (isError) {
-  <span class="bg-rose/20">...</span>
-}
-```
+- [How to troubleshoot safely](#how-to-troubleshoot-safely)
+- [System map and first checks](#system-map-and-first-checks)
+- [Local development and workspace](#local-development-and-workspace)
+- [Dashboard and browser](#dashboard-and-browser)
+- [API, ingress, and workers](#api-ingress-and-workers)
+- [Database and Prisma](#database-and-prisma)
+- [Redis, queues, and event processing](#redis-queues-and-event-processing)
+- [Delivery, retries, circuit breaker, and DLQ](#delivery-retries-circuit-breaker-and-dlq)
+- [Destination adapters and validation](#destination-adapters-and-validation)
+- [Authentication, sessions, and API keys](#authentication-sessions-and-api-keys)
+- [Encryption and key rotation](#encryption-and-key-rotation)
+- [Schedules and background automation](#schedules-and-background-automation)
+- [AI assistant, enrichment, RAG, and BYOK](#ai-assistant-enrichment-rag-and-byok)
+- [Outbound webhooks and transactional outbox](#outbound-webhooks-and-transactional-outbox)
+- [Vercel deployment](#vercel-deployment)
+- [Docker Compose and self-hosting](#docker-compose-and-self-hosting)
+- [SDK, CLI tunnel, and workflow YAML](#sdk-cli-tunnel-and-workflow-yaml)
+- [Performance and observability](#performance-and-observability)
+- [Security and tenant-isolation checks](#security-and-tenant-isolation-checks)
+- [Diagnostics and incident checklist](#diagnostics-and-incident-checklist)
+- [Escalation and bug reports](#escalation-and-bug-reports)
 
 ---
 
-### `ng serve` hangs at "Component HMR has been enabled" for >60s
+## How to troubleshoot safely
 
-**Cause:** First build is slow (cold cache).
+Use this sequence. It avoids changing production state before the failure is understood.
 
-**Fix:**
+1. **Identify the failing boundary:** Dashboard, API, Ingress, Workers, PostgreSQL, MongoDB, Redis, AI provider, destination provider, scheduler, or deployment platform.
+2. **Record the exact failure:** HTTP status, response body, timestamp with timezone, correlation ID, affected tenant/workflow/destination IDs (redact them in public reports), and the deployment commit.
+3. **Check service health and dependencies:** A healthy frontend does not prove the API, worker queues, or data stores are healthy.
+4. **Compare runtime configuration:** Check variable names, presence, whitespace, URL scheme, and whether secrets are consistent across services. Never paste secret values into an issue or chat.
+5. **Inspect the relevant logs and durable state:** API/Ingress/Workers logs, PostgreSQL rows, Mongo event/delivery records, Redis queue state, and provider response.
+6. **Make the smallest reversible change:** Avoid clearing queues, deleting keys, changing encryption material, editing applied migrations, or replaying a large DLQ batch as a first step.
+7. **Verify recovery end to end:** Health alone is insufficient. Send a controlled test event and confirm it is accepted, processed, delivered, and visible in the expected records.
+
+### Important operating rules
+
+- Do not run `prisma migrate dev` against production. Use the repository's production migration path (`npm run db:deploy`) after reviewing and backing up.
+- Never edit a migration that has already been applied to a shared environment. Add a new migration.
+- Do not rotate `API_KEY_PEPPER`, JWT secrets, or connector-encryption keys as a debugging experiment.
+- Do not delete Redis keys or queue data unless you know exactly what the key represents and have an approved recovery plan.
+- Do not use `0.0.0.0/0` as a permanent database firewall rule. Prefer the narrowest network access supported by the hosting provider.
+- A successful dry-run/connection check is not proof that a real destination write will succeed.
+- A `processed` event does not imply every destination delivery succeeded. Event processing and delivery states are separate.
+- Never assume Vercel functions are continuously running. The serverless topology depends on scheduled invocations.
+- Treat examples containing `YOUR_*`, `<secret>`, or sample tokens as placeholders. Replace them safely; do not send literal angle-bracket placeholders in Windows CMD.
+
+---
+
+## System map and first checks
+
+Relayon v3.7.0 is organized as four applications with shared packages and three primary data stores.
+
+| Component | Responsibility | Local address | Production health endpoint |
+|---|---|---|---|
+| Dashboard | Angular user interface | `http://localhost:4200` | `https://relayon.vercel.app` |
+| API | NestJS control plane: auth, tenants, workflows, settings, admin, AI and product APIs | `http://localhost:3001/api` | `https://relayon-api.vercel.app/api/health` |
+| Ingress | Express public webhook receiver, playground and tunnel capture | `http://localhost:3002` | `https://relayon-ingress.vercel.app/health` |
+| Workers | NestJS event processing, enrichment, routing, egress, retry and scheduling | `http://localhost:3003/internal` | `https://relayon-workers.vercel.app/internal/health` |
+| PostgreSQL | Relational source of truth for tenants, users, workflows, destinations, schedules, API keys, integrations and outbox records | configured by `DATABASE_URL` | provider-specific |
+| MongoDB | Event and delivery documents | configured by `MONGODB_URI` | provider-specific |
+| Redis | Queues, idempotency, rate limits, cache and coordination | configured by Redis URL | provider-specific |
+
+### Quick health checks
+
 ```bash
-cd apps/dashboard
-rmdir /s /q .angular\cache
-cd ../.. && npm run dev:dashboard
+curl -i https://relayon-api.vercel.app/api/health
+curl -i https://relayon-ingress.vercel.app/health
 ```
 
-The second build will be under 5 seconds.
+Workers health is protected in the deployed configuration; include the cron header when required:
+
+```bash
+curl -i https://relayon-workers.vercel.app/internal/health \
+  -H "X-Cron-Secret: YOUR_CRON_SECRET"
+```
+
+For local services:
+
+```bash
+curl -i http://localhost:3001/api/health
+curl -i http://localhost:3002/health
+curl -i http://localhost:3003/internal/health \
+  -H "X-Cron-Secret: YOUR_LOCAL_CRON_SECRET"
+```
+
+If an endpoint returns `404`, first confirm the base URL and route prefix. The API, Ingress, and Workers are separate network surfaces; `/api/...`, public ingress paths, and `/internal/...` are not interchangeable.
+
+### Find the failing layer
+
+| Symptom | Start with |
+|---|---|
+| Dashboard cannot sign in or load data | Browser network tab, API health, CORS, API logs |
+| Source webhook gets `4xx` | Ingress route, workflow identifiers, signature, request size, quota/rate limit |
+| Source webhook gets `5xx` or times out | Ingress logs, PostgreSQL/Redis connectivity, queue enqueue operation |
+| Event accepted but not processed | Redis ingest queue, worker invocation/cron, worker logs |
+| Event processed but destination not delivered | Mongo delivery record, egress queue, adapter config, provider response |
+| Scheduled workflow does not run | PostgreSQL schedule state, timezone/next-run, worker schedule tick and cron |
+| Dashboard/API works but AI fails | Provider resolution, BYOK key status, model, rate limits and provider response |
+| Customer webhook notification is delayed | PostgreSQL outbox rows, API outbox poller/tick and endpoint response |
 
 ---
 
-## Database & Prisma
+## Local development and workspace
 
-### `EPERM: operation not permitted, rename query_engine-windows.dll.node`
+### `npm ci` fails or workspace packages cannot resolve
 
-**Symptom:**
+**Likely causes**
+
+- Node/npm version differs from the repository's expected toolchain.
+- The lockfile and `package.json` have drifted.
+- Install was run from an app subdirectory instead of the monorepo root.
+- A prior partial install left an inconsistent `node_modules`.
+
+**Checks and recovery**
+
+```bash
+node --version
+npm --version
+git status --short
 ```
-Error:
-EPERM: operation not permitted, rename 'node_modules\.prisma\client\query_engine-windows.dll.node.tmpXXXX' -> 'query_engine-windows.dll.node'
+
+The current CI workflow uses Node 22. The root package engine permits Node `>=20`; use the CI version when reproducing CI behavior.
+
+Run install from the repository root:
+
+```bash
+npm ci
 ```
 
-**Cause:** On Windows, Prisma's query engine `.dll` is locked by any running process that has loaded `@prisma/client`. `prisma generate` can't replace it while it's locked.
+If the lockfile is genuinely out of sync, do not delete it casually in a production branch. Reconcile dependency changes intentionally, regenerate the lockfile with the agreed Node/npm toolchain, and commit the lockfile change.
 
-**Fix:**
+### A root script works on one machine but not another
+
+**Cause:** Workspace scripts, environment files, and local service dependencies are not necessarily identical on every machine.
+
+**Fix**
+
+1. Run commands from the repository root unless the script explicitly says otherwise.
+2. Inspect the script in root `package.json`; do not guess script names.
+3. Confirm the required `.env` file is in the expected app/package location.
+4. Confirm PostgreSQL, MongoDB and Redis are reachable from the process that is failing.
+
+The repository's intended local startup uses separate terminals:
+
+```bash
+npm run dev:api
+npm run dev:ingress
+npm run dev:workers
+npm run dev:dashboard
+```
+
+### `npm run dev:dashboard` reports Angular template/compiler errors
+
+**Cause:** A template syntax error, invalid Angular binding, missing import, or incompatible dependency state.
+
+**Fix**
+
+- Read the first Angular compiler error; later errors may be cascading.
+- Check the component template and its standalone `imports`.
+- Do not put Tailwind modifier syntax such as `/20`, `hover:` or `md:` into an Angular class-property name. Use a static class in an Angular control-flow branch or a supported class binding.
+- Run the dashboard build after the fix:
+
+```bash
+npm run build:dashboard
+```
+
+Historical v1.x example: an unclosed `<span>` caused by `[class.bg-rose/20]` was fixed by using `@if` and a normal `class="bg-rose/20"` element. This is a useful pattern, not evidence that the current source contains that exact defect.
+
+### Angular development server appears stuck after HMR startup
+
+**Likely cause:** Cold build/cache, memory pressure, or another Node process holding a file.
+
+**Fix**
+
+1. Wait for the first compile and inspect CPU/memory before assuming it is hung.
+2. Stop the dashboard process cleanly.
+3. If the Angular cache is suspected to be corrupt, remove only the dashboard cache:
+
+```powershell
+Remove-Item -Recurse -Force apps/dashboard/.angular/cache
+npm run dev:dashboard
+```
+
+Do not kill every Node process on a machine that may be running unrelated development services.
+
+### Windows: Prisma `EPERM` while replacing a query-engine DLL
+
+**Symptom**
+
+```text
+EPERM: operation not permitted, rename
+...query_engine-windows.dll.node.tmp...
+```
+
+**Cause:** A process has loaded the Prisma query-engine DLL, so Windows prevents Prisma from replacing it.
+
+**Fix**
+
+1. Stop Relayon API, Ingress, Workers, Prisma Studio, and any test process using `@prisma/client`.
+2. Close or restart tools that may hold the file (including editor extensions) if necessary.
+3. Inspect remaining Node processes:
+
 ```cmd
-# 1. Stop all dev servers (Ctrl+C in each terminal)
-# 2. Kill any orphan node processes
-taskkill /f /im node.exe
-
-# 3. Verify no processes remain
 tasklist | findstr /i node
+```
 
-# 4. Delete leftover .tmp files
-del /f /q node_modules\.prisma\client\query_engine-windows.dll.node.tmp*
+4. Remove only stale temporary files after confirming no process is using the client.
+5. Regenerate:
 
-# 5. Regenerate
+```bash
 npm run db:generate
 ```
 
-**Prevention:** Always stop servers before `db:generate` or `npm install`.
-
-**If still failing:** VS Code's Prisma extension also locks the file. Disable the extension for this workspace, or close VS Code and run the command from a plain terminal.
+**Prevention:** Stop app/test processes before regenerating Prisma Client or reinstalling workspace dependencies.
 
 ---
 
-### `Invalid environment configuration: { NODE_ENV: ["...received '\tproduction'"] }`
+## Dashboard and browser
 
-**Symptom:**
-```json
-{ NODE_ENV: ["Invalid enum value. Expected 'development' | 'production' | 'test', received '\tproduction'"] }
-```
+### Dashboard loads but API requests fail
 
-**Cause:** A **tab character (`\t`)** snuck into the `NODE_ENV` env var during copy-paste. Very common when pasting from docs, Slack, or Excel.
+Check the browser Network panel:
 
-**Fix (Vercel):**
-1. Project → Settings → Environment Variables
-2. Click on `NODE_ENV`
-3. **Select all, delete, then manually type** `production` (don't paste)
-4. Save → Redeploy
+- Request URL: is it pointing to the intended API environment?
+- Status: `401`, `403`, `404`, `429`, `5xx`, or browser CORS error?
+- Response body: capture the exact server message.
+- Request headers: confirm auth is attached without exposing the token in screenshots.
+- Origin: compare it with the API's configured CORS allow-list.
 
-**Fix (local `.env.local`):**
-```bash
-cat -A apps/ingress/.env.local | head -5
-# Or in PowerShell
-Get-Content apps/ingress/.env.local | Format-Hex
-```
+**Common causes**
 
-Delete and re-type the value manually.
+- Incorrect API base URL in the dashboard build/runtime configuration.
+- API deployment is unavailable or points to a different environment.
+- Browser origin is not allowed by CORS.
+- Session cookie/token expired or refresh flow failed.
+- Reverse proxy routes `/api` to the wrong upstream in self-hosted deployments.
 
-**Prevention:** Use `.trim()` in Zod schemas for enum-like values:
+### Login succeeds but dashboard immediately returns to sign-in
+
+Check:
+
+1. API login response and browser storage/cookie behavior.
+2. Whether refresh requests are sent to the correct API origin.
+3. Whether `JWT_SECRET` and `JWT_REFRESH_SECRET` are stable across API instances.
+4. Whether cookies are configured for the deployed domain, HTTPS and SameSite policy.
+5. Whether the refresh-token record exists and is still valid.
+
+Changing JWT signing secrets invalidates existing tokens. Do not rotate them to fix a single user's session; first establish whether configuration differs between instances.
+
+### A new feature or page is missing
+
+A component file existing on disk does not mean Angular renders it.
+
+Check:
+
+- Is the route registered in the current route tree?
+- Is a standalone component imported by the parent component?
+- Is the component actually referenced in the template?
+- Is the feature hidden by a feature flag, role, tenant setting or plan entitlement?
+- Did the relevant file make it into the deployed commit?
+- Is the browser loading a stale bundle/service-worker cache?
+
+After fixing, run the dashboard build and verify the route in a clean browser session. Do not rely on the existence of a source file alone.
+
+### PWA/service worker shows stale UI
+
+- Hard-refresh once to distinguish browser cache from server behavior.
+- Inspect service-worker registration and update state in browser developer tools.
+- Verify the deployment serves the expected asset hashes.
+- Test in a private window to isolate local cache.
+- Do not instruct users to clear all browser data as the first-line fix; that may remove useful session state.
+
+### UI shows masked/encrypted credentials incorrectly
+
+The database representation, API response representation, and UI summary are different layers. A ciphertext envelope in PostgreSQL should not be rendered as a usable secret in the dashboard/API response.
+
+Check:
+
+1. Is the database field encrypted where the current configuration policy requires encryption?
+2. Does the API redact/mask sensitive fields before returning them?
+3. Does the dashboard summary recognize the current envelope format?
+4. Is the UI showing an old cached bundle?
+
+Do not “fix” a display issue by returning plaintext credentials to the browser.
+
+---
+
+## API, ingress, and workers
+
+### API route returns `404 Not Found`
+
+**Checklist**
+
+1. Confirm the request is sent to the API host, not Ingress or Workers.
+2. Confirm the `/api` prefix is present where required.
+3. Check the current controller's route decorator and HTTP method.
+4. Check that its NestJS module is imported into the relevant parent module.
+5. Inspect startup logs for the mapped route.
+6. Confirm the deployed commit includes the controller/module registration.
+
+A controller file can compile while its module is not registered. Historical schedule-route incidents were caused by missing module imports; this remains a useful NestJS diagnostic pattern, not a claim that v3.7 has that defect.
+
+### Workers internal endpoint returns `401 Unauthorized`
+
+**Cause:** Missing or mismatched `X-Cron-Secret`.
+
+**Fix**
+
+- Confirm the caller sends `X-Cron-Secret`.
+- Compare the configured `CRON_SECRET` between the caller and the Workers runtime using a secret manager or secure environment inspection. Do not print the value into logs.
+- Confirm the request is reaching the intended Workers deployment.
+- Redeploy/restart only after correcting the secret configuration.
+
+`WORKERS_URL` and `CRON_SECRET` are particularly important when API operations forward work to Workers (for example, schedule run-now or dry-run validation).
+
+### Ingress webhook returns `401` or signature verification fails
+
+**Check**
+
+- The source type configured on the workflow.
+- Correct signing secret for that source/workflow.
+- The exact signature header expected by the verifier.
+- Raw request body handling. HMAC must use the original bytes, not JSON that has been parsed and serialized again.
+- Timestamp tolerance for timestamped signature schemes.
+- Whether a reverse proxy/body parser modified the request before verification.
+
+Relayon's ingress implementation includes source-specific verification for Stripe, GitHub, Shopify, Slack and generic HMAC in the audited source snapshot. Confirm the exact source-specific header and signature format in the current verifier before writing a custom sender.
+
+### Ingress rejects a valid-looking webhook with `413`
+
+The current ingress JSON parser has a documented 5 MB body limit in the audited source snapshot.
+
+**Fix**
+
+- Check the source payload size and proxy/platform body-size limit.
+- Remove unnecessary fields or send a smaller test payload.
+- If a larger limit is genuinely required, change the parser and upstream proxy limits deliberately, then test memory and abuse implications. Do not raise the limit blindly.
+
+### Ingress returns `429 Too Many Requests`
+
+Possible causes:
+
+- Tenant quota reached.
+- Ingress per-tenant rate limit reached.
+- Provider/source is retrying too aggressively.
+- Duplicate/replay traffic is overwhelming a tenant or endpoint.
+
+Check the tenant's usage/quota view, ingress logs, rate-limit configuration and source retry policy. Do not disable rate limiting globally as a quick fix.
+
+### API or Workers crashes with numeric environment values
+
+**Cause:** Environment variables are strings at runtime even when TypeScript generics suggest a number.
+
+**Fix**
+
+Parse and validate numeric values at the configuration boundary:
+
 ```typescript
-NODE_ENV: z.string().trim().pipe(z.enum(['development', 'production', 'test']))
-```
+const timeoutMs = Number.parseInt(
+  config.get<string>('ADAPTER_TIMEOUT_MS') ?? '15000',
+  10,
+);
 
----
-
-### `Error: P1001: Can't reach database server at ...`
-
-**Cause:** Neon connection URL is wrong, or SSL is disabled.
-
-**Fix:**
-1. Verify the URL includes `?sslmode=require`
-2. Test connectivity:
-   ```bash
-   psql "postgresql://user:pass@host/db?sslmode=require" -c "SELECT 1"
-   ```
-3. Confirm Neon project is not suspended (free tier pauses after 7 days idle)
-
----
-
-### `prisma: command not found` during Vercel build
-
-**Symptom:**
-```
-sh: line 1: prisma: command not found
-npm error code 127
-```
-
-**Cause:** Two common reasons:
-1. `prisma` is in `devDependencies` but Vercel installs with `NODE_ENV=production` (skips dev deps)
-2. `npx prisma` runs from a context where `node_modules/.bin` isn't in `PATH`, so it fetches `prisma@latest` (which is now `8.0.0-rc.x` and has no `generate` command)
-
-**Fix (the one that works):**
-
-**Root `package.json`:**
-```json
-"dependencies": {
-  "prisma": "6.19.3",
-  "@prisma/client": "6.19.3"
-}
-```
-Exact version, not `^6.2.0`.
-
-**Vercel → Settings → Build Command:**
-```bash
-node ./node_modules/prisma/build/index.js generate --schema=./packages/db/prisma/schema.prisma && npm run build
-```
-
-**Do NOT use `npx`** in build commands. `npx` downloads latest if local binary is missing.
-
----
-
-### `prisma migrate dev` ran on production — how to recover
-
-**Symptom:** You accidentally ran `npm run db:migrate` (which generates new migrations) instead of `npm run db:deploy` (which applies pending migrations only) on production Neon.
-
-**Why it's a problem:** `prisma migrate dev` can:
-- Fail mid-migration, leaving schema in an inconsistent state
-- Prompt interactively (blocking in CI)
-- Regenerate migration files, which if pushed, changes future deploy behavior
-
-**Fix:**
-1. Check `packages/db/prisma/migrations/` — is there a **new** folder you didn't commit before?
-2. If yes: delete it locally, do NOT commit
-3. Restore DB from `pg_dump` backup (Neon → Restore to timestamp on free tier)
-4. Apply only pending migrations: `npm run db:deploy`
-
-**Prevention (v1.0 rule, still true in v1.5):** Never run `db:migrate` on production. Only `db:deploy`. Always `pg_dump` before.
-
----
-
-## Vercel Deployment
-
-### "No exports found in module ... main.js" (Workers/Ingress)
-
-**Symptom:**
-```
-No exports found in module "/var/task/apps/workers/src/main.js".
-Did you forget to export a function or a server?
-Node.js process exited with exit status: 1.
-```
-
-**Cause:** Vercel serverless requires a **default export handler**. Calling `app.listen()` doesn't work — Vercel manages the HTTP server.
-
-**Fix (NestJS):**
-
-```typescript
-import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
-
-let cachedServer: any = null;
-
-async function createApp() {
-  const app = await NestFactory.create(AppModule);
-  app.setGlobalPrefix('internal');
-  await app.init();
-  return app;
-}
-
-export default async function handler(req: any, res: any) {
-  if (!cachedServer) {
-    const app = await createApp();
-    cachedServer = app.getHttpAdapter().getInstance();
-  }
-  return cachedServer(req, res);
-}
-
-if (!process.env.VERCEL) {
-  (async () => {
-    const app = await createApp();
-    await app.listen(3003);
-  })();
+if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+  throw new Error('ADAPTER_TIMEOUT_MS must be a positive integer');
 }
 ```
 
-**Fix (Express):**
-```typescript
-const app = createApp();
-export default app;
-if (!process.env.VERCEL) app.listen(3002);
-```
+This applies to timeout, batch-size, token-limit and time-budget settings. Prefer the project's existing validated configuration schema over scattered ad-hoc parsing.
+
+### `NODE_ENV` validation fails even though it looks correct
+
+**Cause:** Hidden whitespace or an unexpected value in the environment.
+
+**Fix**
+
+- Inspect the variable's value and surrounding whitespace without printing other secrets.
+- Re-enter `development`, `production`, or `test` cleanly.
+- Validate/trim configuration at the boundary where appropriate.
+- Redeploy/restart the affected service.
+
+Do not change `NODE_ENV` to an unsupported value to bypass validation.
 
 ---
 
-### "Include source files outside of Root Directory" — why is it needed?
+## Database and Prisma
 
-**Cause:** In a monorepo, `packages/db` and `packages/shared` are at the repo root. But the app (`apps/api`) is deployed from a subdirectory. Vercel needs to access both.
+### `P1001: Can't reach database server`
 
-**Fix:** In every app project's Settings:
-- **Build & Development → Include source files outside of the Root Directory in the Build Step** → **ON**
+**Check**
 
-Without this, `@prisma/client` and other workspace packages won't resolve.
+1. `DATABASE_URL` points to the correct PostgreSQL host/database.
+2. The host is reachable from the app runtime, not merely from a developer laptop.
+3. Managed database SSL requirements are satisfied.
+4. Username/password and database name are correct.
+5. Provider firewall, network allow-list, connection pool and project status.
+6. The runtime uses the intended pooled or direct connection URL.
 
----
+Test from the same network/runtime where possible. A successful local `psql` command does not prove Vercel or a container can reach the database.
 
-### Deployment stuck on an old commit
+### Prisma Client cannot find a query engine for the runtime
 
-**Cause:** Vercel's GitHub webhook silently broke, or "Ignored Build Step" is skipping builds.
+**Cause:** Prisma Client was generated for a different platform than the deployed runtime, or the schema's `binaryTargets` do not include the target needed by the current deployment.
 
-**Fix:**
-1. **Settings → Build & Development → Ignored Build Step** — set to **Automatic**
-2. **Settings → Git → Disconnect** → **Reconnect** the repo
-3. Manually **Redeploy** with "Use existing Build Cache" **unchecked**
-4. If still stuck, push a `--allow-empty` commit to force trigger
+**Fix**
 
----
+1. Inspect `packages/db/prisma/schema.prisma`.
+2. Compare its generator `binaryTargets` with the actual deployment targets and the current Prisma version.
+3. Run the repository's `npm run db:generate` from the monorepo root.
+4. Build/deploy from a clean install using the pinned lockfile.
+5. Do not copy a generated client from a developer machine into a different OS/runtime.
 
-### Build cache serving stale files
+The current schema in the audited snapshot declares multiple targets; do not replace it with the old v1.5 two-target example. The schema in the checked-out v3.7.0 source is authoritative.
 
-**Symptom:** Build passes but app behaves like an old version.
+### `prisma: command not found` during build
 
-**Fix:** Always uncheck **"Use existing Build Cache"** when redeploying manually.
+**Likely causes**
 
----
+- Prisma CLI is not installed in the build environment.
+- Build runs from the wrong workspace/root.
+- Production install omitted a package expected by the build.
+- A command invokes an unpinned remote `npx` package instead of the repository's installed Prisma version.
 
-### `PrismaClientInitializationError: Query engine library not found`
+**Fix**
 
-**Symptom:** API/Workers deploy succeeds, but every request returns:
-```
-PrismaClientInitializationError: Query engine library for current platform "rhel-openssl-3.0.x" could not be found.
-```
+- Confirm `prisma` and `@prisma/client` versions in the lockfile/package manifests.
+- Confirm the build step installs the workspace dependencies required for Prisma generation.
+- Run the repo's documented DB generation script or the pinned local binary.
+- Avoid unpinned `npx prisma` in production build commands; it may resolve a different CLI version.
 
-**Cause:** Prisma's `binaryTargets` in `schema.prisma` doesn't include Vercel's Amazon Linux 2023 runtime target.
+Do not blindly copy the v1.5-era hard-coded Vercel build command. The current workspace build configuration and pinned Prisma version take precedence.
 
-**Fix:** Update `packages/db/prisma/schema.prisma`:
+### `P2021` / table does not exist after deployment
 
-```prisma
-generator client {
-  provider      = "prisma-client-js"
-  binaryTargets = ["native", "rhel-openssl-3.0.x"]
-}
-```
+**Cause:** Migration was not applied to the database used by the deployed service, or the service is connected to a different database than expected.
 
-Then `npm run db:generate` and commit the regenerated `@prisma/client`. Redeploy.
+**Fix**
 
-**Why both targets:** `native` = local dev (Windows/Mac/Linux). `rhel-openssl-3.0.x` = Vercel Node runtime. Both needed.
+1. Confirm the runtime's database host/database name (redact credentials).
+2. Inspect `_prisma_migrations`.
+3. Check the migration status using the project's approved operational process.
+4. Back up before applying pending production migrations.
+5. Run the production migration command:
 
----
-
-## Runtime Errors
-
-### `GroqError: timeout must be an integer`
-
-**Symptom:** Workers crash on first request.
-
-```
-GroqError: timeout must be an integer
-    at validatePositiveInteger (groq-sdk/core.js:703)
-```
-
-**Cause:** Environment variables are **strings**. `config.get<number>('GROQ_TIMEOUT_MS')` only satisfies TypeScript — at runtime it's `"6000"`, not `6000`.
-
-**Fix:**
-```typescript
-// ❌ Wrong
-const timeout = config.get<number>('GROQ_TIMEOUT_MS') ?? 20000;
-
-// ✅ Correct
-const timeout = parseInt(config.get<string>('GROQ_TIMEOUT_MS') ?? '20000', 10);
-```
-
-Same pattern applies to `ADAPTER_TIMEOUT_MS`, `BATCH_SIZE`, `TIME_BUDGET_MS`.
-
----
-
-### `CLI.UNKNOWN_COMMAND: No command registered for 'generate'`
-
-**Cause:** `npx prisma generate` fetched `prisma@latest` (`8.0.0-rc.x`) which removed the `generate` command.
-
-**Fix:**
-1. Pin exact version in root and workspace `package.json`: `"prisma": "6.19.3"`
-2. Delete `package-lock.json`, run `npm install`
-3. In Vercel build command, use absolute path
-4. Never use `npx` in build scripts
-
----
-
-### MongoDB `MongooseServerSelectionError`
-
-**Cause:** Atlas IP whitelist doesn't include Vercel's IPs, or credentials are wrong.
-
-**Fix:**
-1. Atlas → Network Access → Add IP → `0.0.0.0/0` (allow all — for free tier)
-2. Verify URI in env: `mongodb+srv://user:pass@cluster.mongodb.net/?retryWrites=true&w=majority`
-3. If password contains special chars (`@`, `:`, `/`), URL-encode them (`@` → `%40`)
-
----
-
-### `Schema validation failed, no changes applied` on `db:deploy`
-
-**Cause:** Local Prisma schema and DB migrations are out of sync (someone edited `schema.prisma` but didn't create a migration).
-
-**Fix:**
-1. Run `npx prisma migrate dev --name <descriptive-name>` locally — this creates a new migration
-2. Commit the migration folder to Git
-3. On next deploy, `db:deploy` will apply it
-
-**Never edit already-applied migrations.** They are immutable once shipped.
-
----
-
-## Delivery & Retries
-
-### Deliveries stuck in `pending` forever
-
-**Cause:** `/internal/deliver` isn't being triggered, OR `nextAttemptAt` is in the future and no cron is running.
-
-**Diagnose:**
 ```bash
-curl https://relayon-workers.vercel.app/internal/egress/stats \
-  -H "X-Cron-Secret: <secret>"
+npm run db:deploy
 ```
 
-**Fix:**
-- If `pending > 0` and no cron → set up external cron (see `DEPLOYMENT.md`)
-- If `pending = 0` but events don't deliver → check destination config
+Do not run `migrate dev` against production.
 
-**Manually trigger:**
+### Local schema changed but `db:deploy` does not create the missing table
+
+**Cause:** Editing `schema.prisma` does not create a migration.
+
+**Fix (local development)**
+
 ```bash
-curl -X POST https://relayon-workers.vercel.app/internal/deliver \
-  -H "X-Cron-Secret: <secret>"
+npx prisma migrate dev --name descriptive_change
 ```
 
----
+Review the generated SQL and migration directory, commit both schema and migration, then allow the deployment pipeline to apply it with `db:deploy`.
 
-### Circuit breaker permanently open
+Use the repository-pinned Prisma CLI (or workspace script) rather than an unpinned remote version.
 
-**Symptom:** All deliveries to a destination retry indefinitely, no actual HTTP attempts made.
+### Production migration failed or was run with the wrong command
 
-**Cause:** `circuit:dest:{id}` counter in Redis stuck above threshold (5).
+**Immediate response**
 
-**Diagnose:** Upstash console → Data Browser → search `circuit:dest:`
+1. Stop further deploy attempts until the database state is understood.
+2. Preserve the exact migration logs and `_prisma_migrations` state.
+3. Take/verify a database backup or provider point-in-time recovery point.
+4. Determine whether the migration partially applied and whether it is marked rolled back/failed.
+5. Follow a reviewed forward-fix or restore plan.
 
-**Fix:**
-- Wait 300 seconds (auto-closes after TTL)
-- OR delete the key manually in Upstash console
-- AND verify the destination is actually healthy before it retries
+Do not delete migration folders as a first response. Do not restore a production database without understanding data loss since the restore point. `migrate dev` can generate development migrations and prompt interactively; production deployment should apply committed migrations only.
 
----
+### Prisma connection pool exhaustion
 
-### Max retries exhausted but reason is unclear
+Symptoms include connection timeouts, `too many connections`, slow API requests, or failures that appear only under concurrency.
 
-**Symptom:** Delivery in DLQ, `dlqReason: 'Max retry attempts exhausted'`, but `lastResponse.statusCode: 0`.
+Check:
 
-**Cause:** Adapter never reached the destination — network error or timeout.
+- Number of deployed instances/functions and concurrency.
+- Connection pool limits in the connection URL/provider.
+- Whether each request creates an unmanaged PrismaClient instead of reusing the app-scoped client.
+- Long-running transactions and queries.
+- Whether the deployment should use a pooler for application traffic and a direct URL for migrations.
 
-**Check `attempts` array in MongoDB:**
-```javascript
-db.deliveries.findOne({ _id: ObjectId("...") })
-// attempts[].error will say "Adapter timed out" or "ECONNREFUSED"
-```
+Do not increase the database connection limit without checking the provider plan and total possible serverless concurrency.
 
-**Common causes:**
-- Destination URL unreachable from Vercel's region
-- Destination requires IP allowlist (Vercel IPs change)
-- Timeout too short (`ADAPTER_TIMEOUT_MS` default 15s)
+### Row-level security behaves differently locally and in production
 
----
+Relayon includes PostgreSQL RLS policy files and an application script. RLS coverage is policy-specific; do not assume every table is protected just because RLS is enabled somewhere.
 
-### Slack destination fails with "missing or invalid 'webhookUrl'"
+Check:
 
-**Symptom:** DLQ entry with:
-```json
-{ "code": "network_error", "message": "slack adapter: missing or invalid 'webhookUrl'" }
-```
+- Whether the relevant table has RLS enabled.
+- Whether the intended policy exists and is applied.
+- Whether the request sets the expected tenant context.
+- Which database role the app uses (superuser/table owner roles can bypass policies depending on configuration).
+- Whether tests use the same role/transaction setup as the application.
 
-**Cause (from v1.3 chat):** Two possibilities:
-1. The webhook URL stored doesn't start with `https://hooks.slack.com/` — the adapter's local validation rejects it before ever calling Slack
-2. The webhook URL was created with dummy test data (e.g., `https://hooks.slack.com/services/FAKE/TEST/URL`) — this passes the local check, but Slack API returns `404` because the webhook doesn't actually exist
-
-**Diagnose:**
-```javascript
-// Prisma Studio → destinations → your destination → config
-// Or:
-db.destinations.findOne({ name: 'Test Slack' })
-// Then check config.webhookUrl — is it enc:v2:... (encrypted, expected)
-```
-
-**Fix:**
-- If config shows `enc:v2:...` but delivery fails → the **decrypted** URL is invalid. Re-save the destination with a real webhook URL.
-- If config shows plaintext `https://hooks.slack.com/services/FAKE/...` → this is a fake URL from testing. Re-save with a real one.
-
-**Critical:** This is **not a bug** — it's the adapter correctly rejecting an invalid Slack webhook. Two DLQ entries from fake URLs is expected behavior in testing.
-
-**Verification trick:** After creating a Slack destination, decrypt and check via the API:
-```bash
-curl -H "Authorization: Bearer <jwt>" \
-  https://relayon-api.vercel.app/api/workflows/<id>/destinations
-```
-Should return `{"config": {"webhookUrl": "••••••••"}}` — redacted, not ciphertext, not plaintext.
+Use the dedicated RLS test workflow and `npm run db:rls` where appropriate. Do not “fix” a tenant leak by disabling RLS.
 
 ---
 
-## AI Enrichment
+## Redis, queues, and event processing
 
-### Enrichment always fails with `401 Unauthorized`
+### Event is accepted (`202`) but never appears as processed
 
-**Cause:** `GROQ_API_KEY` invalid or expired.
+An ingress acknowledgement means the event was accepted into the ingest path; it does not mean all worker processing has completed.
 
-**Fix:**
-```bash
-curl https://api.groq.com/openai/v1/models \
-  -H "Authorization: Bearer $GROQ_API_KEY"
-```
-If this fails, generate a new key at https://console.groq.com.
+**Check in order**
 
----
+1. Is Redis reachable from Ingress and Workers?
+2. Did Ingress successfully enqueue the event?
+3. Is the worker processing invocation/cron running?
+4. Are Workers healthy and authorized?
+5. Are batch size/time budget settings too restrictive?
+6. Are worker logs reporting MongoDB, PostgreSQL, transform, enrichment or queue errors?
+7. Is the event stuck in a processing state that recovery logic should reclaim?
 
-### Enrichment always fails with `404 model_not_found`
+For Vercel, confirm the external scheduler actually invokes processing. For Compose, confirm the `cron` service is running and its logs show successful calls.
 
-**Cause:** `GROQ_MODEL` references a model not available in your Groq region.
+### Ingest queue grows continuously
 
-**Fix:**
-```bash
-curl https://api.groq.com/openai/v1/models \
-  -H "Authorization: Bearer $GROQ_API_KEY" | grep '"id"'
-```
+Possible causes:
 
-Set `GROQ_MODEL` to one that's listed. Known-good:
-- `openai/gpt-oss-120b` (recommended)
-- `openai/gpt-oss-20b` (faster)
-- `llama-3.3-70b-versatile` (if available)
+- Worker cron stopped or points to an old URL.
+- `CRON_SECRET` mismatch.
+- Workers deployment unhealthy.
+- Batch/time budget too small for the incoming rate.
+- Repeated worker failures cause items to be retried/requeued.
+- Redis latency or resource pressure.
 
-**Note:** Model availability varies by region.
+Compare incoming rate, processing rate, oldest queue age, worker duration and error rate. Increase batch settings only after confirming downstream stores and adapters can handle the added concurrency.
 
----
+### Event processing repeatedly fails
 
-### Enrichment slow (>5s per event)
+Inspect the event's correlation ID across Ingress and Workers logs. Separate these failure classes:
 
-**Cause:** Groq free tier can queue requests during peak hours.
+- Workflow lookup/configuration failure.
+- Transform expression error.
+- AI enrichment/provider error.
+- MongoDB persistence error.
+- Destination routing/configuration error.
+- Worker timeout or memory exhaustion.
 
-**Fix:**
-- Increase cache TTL (`groq.enrich` caches 1h by default)
-- Batch more events (`BATCH_SIZE`)
-- Reduce `GROQ_MAX_TOKENS`
-- Consider Groq paid tier
+If AI enrichment is optional for the workflow, determine whether the failure is configured to be fail-open or fail-closed in the current implementation. Do not assume all AI failures stop ordinary event processing.
 
----
+### Duplicate events appear
 
-## Authentication
+Ingress uses idempotency/deduplication controls. Check:
 
-### "Invalid or expired token" on every request
+- Whether the source sends a stable event ID or `X-Idempotency-Key`.
+- Whether retries use the same idempotency identifier.
+- Whether requests are hitting different environments/tenants/workflows.
+- Redis availability/eviction and idempotency TTL.
+- Whether the source's event is genuinely a distinct event with a different ID.
 
-**Cause:** JWT_SECRET changed, invalidating all tokens.
+Do not remove idempotency keys globally to “fix” missing events. First confirm whether the sender is reusing an identifier incorrectly.
 
-**Fix:** Log in again. If login fails, verify:
-```bash
-curl https://relayon-api.vercel.app/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"...","password":"..."}'
-```
+### Redis `ECONNREFUSED`, TLS, or authentication errors
 
----
+- Confirm the correct Redis endpoint and port.
+- Use the provider's TLS-enabled URL where required.
+- Verify password/ACL credentials and network access.
+- Check whether the app expects a TCP URL rather than a REST URL.
+- Confirm Docker service DNS names are used inside Compose rather than `localhost`.
 
-### "Invalid email or password" even with correct credentials
+`localhost` inside a container means that same container, not another Compose service.
 
-**Cause (most common):** Password stored with one bcrypt cost, compared with another. Or user created via a different auth path.
+### Queue state appears inconsistent after Redis restart
 
-**Fix:**
-- Verify user exists: `SELECT email, role FROM users WHERE email = '...'`
-- Check `password_hash` starts with `$2a$` or `$2b$` (bcrypt marker)
-
----
-
-### Auto-logout after 15 minutes
-
-**Cause:** By design. Access tokens expire in 15 minutes.
-
-**Fix:** The dashboard's `authInterceptor` refreshes silently. If getting logged out instead, verify:
-- `JWT_REFRESH_SECRET` set on API
-- `refresh_tokens` table has valid row
-- Network tab shows `/api/auth/refresh` returning 200
+Redis persistence and queue recovery behavior depend on the configured deployment. Check the Compose Redis persistence settings or managed-provider persistence/eviction policy. Inspect the durable Mongo event/delivery records before attempting manual queue reconstruction. Avoid flushing Redis in production.
 
 ---
 
-### `curl: The system cannot find the file specified` (Windows CMD)
+## Delivery, retries, circuit breaker, and DLQ
 
-**Symptom:** Running a curl command like:
+### Deliveries remain `pending`
+
+**Likely causes**
+
+- Delivery invocation is not running.
+- The delivery queue is delayed because `nextAttemptAt` is in the future.
+- A destination is disabled or not selected by routing.
+- Workers cannot reach Redis, MongoDB or the destination.
+- The worker invocation ends before its batch/time budget is exhausted.
+
+**Diagnose**
+
+1. Inspect the delivery record and its `status`, `nextAttemptAt`, `attempts` and `lastResponse`.
+2. Confirm the delivery cron/invocation runs.
+3. Check the egress queue and delayed retry backlog.
+4. Confirm the destination is enabled and the workflow routing rule selected it.
+5. Inspect adapter and provider errors.
+
+A pending delivery is not necessarily stuck if its retry time is still in the future.
+
+### Delivery enters DLQ
+
+Read the complete delivery history before replaying:
+
+- Last HTTP status and response snippet.
+- Network error (`ECONNREFUSED`, `ETIMEDOUT`, DNS, TLS).
+- Retryable vs permanent classification.
+- Attempt count and retry timestamps.
+- Destination configuration and credential status.
+
+Fix the underlying destination problem first. Then replay one controlled item and verify it reaches the destination before bulk replaying.
+
+### Destination returns `429` or `5xx`
+
+The remote provider may be rate-limiting or temporarily unavailable.
+
+- Respect `Retry-After` where the adapter supports it.
+- Reduce destination concurrency or request volume.
+- Confirm provider account quota and status page.
+- Check whether multiple workflows share the same provider account.
+- Let retry/backoff logic operate; avoid manual rapid-fire replay.
+
+### Circuit breaker appears permanently open
+
+A circuit breaker prevents repeated calls to an unhealthy destination. Inspect the current breaker implementation and Redis key/TTL before deleting anything.
+
+Historical v1.x behavior used a destination-scoped Redis counter and a time-based auto-close. Do not assume the old key name, threshold or TTL is unchanged in v3.7.0. Verify the current source/configuration and destination health first.
+
+### Delivery says failed but destination received the request
+
+This can happen when the destination accepted the request but the response was lost, timed out, or could not be parsed. The sender cannot always know whether a remote side effect occurred.
+
+**Mitigation**
+
+- Use destination-side idempotency keys where supported.
+- Make downstream handlers idempotent.
+- Inspect destination logs by correlation/event ID.
+- Avoid blind replay if the operation is not safe to repeat.
+
+### Event is `processed`, but one destination is still pending or failed
+
+This is expected when event processing and each destination delivery have separate lifecycles. Inspect each delivery independently. Do not reset the event record to force a delivery retry.
+
+### MongoDB delivery query or event lookup fails
+
+Confirm the API/Workers are using the same `MONGODB_URI` and `MONGODB_DB_NAME`, and that the queried event ID/correlation ID belongs to that database/environment. Check indexes and database permissions before changing schemas.
+
+---
+
+## Destination adapters and validation
+
+### Adapter is missing from the destination selector
+
+Check:
+
+1. Adapter type is part of the current adapter registry.
+2. Adapter provider is registered in the current Egress module.
+3. API adapter metadata endpoint returns the type.
+4. Dashboard options are built from current metadata rather than an old static list.
+5. The deployed Workers/API/dashboard versions are compatible.
+
+Historical v1.x adapter additions required registration in `EgressModule.providers`; this remains a useful plugin-registration check, but verify the current registry and loader.
+
+### `401` / `403` from a destination provider
+
+- Re-save/verify the credential using the provider's current format.
+- Check token scopes and account permissions.
+- Confirm the token belongs to the intended workspace/project.
+- Check whether a BYOK/provider integration key is being confused with a destination credential.
+- Check provider token expiry/revocation.
+
+Never paste provider tokens into logs or issue reports.
+
+### HTTP destination fails
+
+Check URL scheme (`https://` in production), DNS, TLS certificate, redirect behavior, target firewall, request method, headers, payload mapping and timeout. Confirm the destination endpoint is reachable from the Workers runtime—not just from your laptop.
+
+Do not allow arbitrary private-network destinations without understanding SSRF protections and the deployment's network boundary.
+
+### Slack/Discord webhook rejected
+
+- Confirm the URL is a real provider-generated webhook URL, not a placeholder/test URL.
+- Confirm the provider's current canonical URL format.
+- Confirm the webhook still exists and the channel/workspace allows it.
+- Check whether the credential was saved encrypted and can be decrypted by Workers.
+- Inspect provider response; a locally valid-looking URL may still be revoked or nonexistent.
+
+A URL passing local validation is not proof that the provider recognizes it.
+
+### Email adapter fails
+
+Check provider API key, sender/domain verification, recipient format, rate limits, and provider response. If the deployment uses a tenant BYOK email integration, confirm that provider resolution selected the intended tenant key rather than the platform fallback.
+
+### Airtable or Notion returns `4xx`
+
+- Airtable: confirm base/table identifiers, field names, field types, and integration access.
+- Notion: confirm the integration is explicitly shared with the target page/database/data source and that the configured API version/resource identifier is current.
+- For both: inspect the provider response body and permissions; a `404` can represent inaccessible resources, not only missing resources.
+
+Do not hard-code old Notion API-version headers from historical troubleshooting snippets. Use the version expected by the current adapter.
+
+### PostgreSQL adapter errors
+
+| Error | Likely meaning | Check |
+|---|---|---|
+| `ECONNREFUSED` | Host/port unreachable | URL, network, firewall, service state |
+| `ETIMEDOUT` | Network path or server response too slow | DNS, routing, provider availability, timeout |
+| `28P01` | Authentication failed | Username/password and URL encoding |
+| relation/table missing | Wrong table/schema/search path | Target database, schema and table |
+| column missing | Mapping does not match target schema | Column names and payload paths |
+
+Use a least-privilege database account restricted to the required schema/table and operations. Avoid granting superuser access to a destination adapter.
+
+### MongoDB adapter errors
+
+- Confirm URI starts with `mongodb://` or `mongodb+srv://`.
+- URL-encode reserved characters in credentials.
+- Confirm Atlas/network allow-list includes the actual Workers egress path.
+- Confirm database/collection names and write permissions.
+- Check provider connection limits and TLS requirements.
+
+Avoid permanent `0.0.0.0/0` access where a narrower allow-list or private network is possible.
+
+### Custom/external adapter fails to load
+
+The current repository includes an external adapter loader and sandbox runner. Check the adapter package manifest, expected entry point, adapter contract, registration/allow-list policy, runtime compatibility, timeout and memory limits, and Workers logs.
+
+The sandbox uses worker-thread/time/resource controls; do not describe it as a hardened OS/container security boundary. Only load code from trusted sources and keep external adapter execution isolated from secrets and privileged network access.
+
+### Dry-run reports success but real delivery fails
+
+A validation/dry-run checks only what its adapter implementation is designed to check. Some integrations can validate configuration or connectivity without performing a real write; others cannot prove provider-side permissions or payload validity without a real operation.
+
+- Read the adapter's dry-run contract.
+- Check whether the test uses `HEAD`, `GET`, `SELECT 1`, `ping`, or a configuration-only check.
+- Confirm real-write permissions and payload shape separately.
+- Verify that `__dryRun` is honored before any side-effecting request.
+
+For Slack/Discord-style webhooks, a safe dry-run must not send a real message. If a test message appears, treat it as a safety defect and stop further tests until the adapter is corrected.
+
+---
+
+## Authentication, sessions, and API keys
+
+### `401 Unauthorized` on API request
+
+Check:
+
+- Correct API host and route.
+- `Authorization: Bearer <real-token>` format for bearer-token endpoints.
+- Token expiry and refresh flow.
+- JWT signing secrets consistent across API instances.
+- Browser cookie domain/SameSite/secure settings when cookie sessions are used.
+- Whether the route expects an API key instead of a JWT (or vice versa).
+
+Do not include a real JWT in a bug report. Revoke exposed credentials.
+
+### Windows CMD: `The system cannot find the file specified` when using curl
+
+In Windows CMD, `<` and `>` are redirection operators. A literal placeholder such as `<jwt-token>` is interpreted as shell syntax.
+
+Use a variable with a real token:
+
 ```cmd
-curl -H "Authorization: Bearer <jwt-token>" https://relayon-api.vercel.app/api/workflows
-```
-Returns:
-```
-The system cannot find the file specified.
+set JWT=PASTE_REAL_TOKEN_HERE
+curl -H "Authorization: Bearer %JWT%" https://relayon-api.vercel.app/api/workflows
 ```
 
-**Cause:** `<` and `>` are **redirection operators** in Windows CMD. `<jwt-token>` is interpreted as "redirect from file named jwt-token" — which doesn't exist.
+PowerShell:
 
-**Fix:** Use the actual token, not the placeholder. And **always** use `%JWT%` variable for long tokens:
-
-```cmd
-set JWT=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-
-curl -H "Authorization: Bearer %JWT%" ^
-  https://relayon-api.vercel.app/api/workflows/YOUR_WORKFLOW_ID/destinations
-```
-
-**In PowerShell:**
 ```powershell
-$JWT = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-curl -H "Authorization: Bearer $JWT" `
-  https://relayon-api.vercel.app/api/workflows/YOUR_WORKFLOW_ID/destinations
+$JWT = "PASTE_REAL_TOKEN_HERE"
+curl.exe -H "Authorization: Bearer $JWT" https://relayon-api.vercel.app/api/workflows
 ```
 
-**Rule:** Never use `<placeholder>` in CMD. Always paste the real value or use a variable.
+Use a test account and never save a real token in shell history longer than necessary.
+
+### `403 Forbidden` or missing API-key scope
+
+The API key may not have the scope required by the endpoint. Review the current scope list in the API reference/OpenAPI and create a key with the minimum required scopes. Existing key scopes should not be assumed editable.
+
+JWT dashboard sessions and API-key authorization can have different permission semantics. Confirm which credential type the request used.
+
+### API key returns `401`
+
+Check:
+
+1. Key format and environment (`live` vs `test`) according to current API reference.
+2. Key was copied completely and is not masked.
+3. Key is not expired or revoked.
+4. Key belongs to the expected tenant/environment.
+5. `API_KEY_PEPPER` has not changed unexpectedly.
+6. The API is connected to the database that contains the key record.
+
+If `API_KEY_PEPPER` changes, previously stored key hashes may no longer verify. Treat pepper rotation as a planned credential migration, not a routine restart.
+
+### API key rotation or grace period behaves unexpectedly
+
+Inspect the key and rotation records, expiry and revocation timestamps, and the current verification code. Confirm the API deployment is running the expected commit. If an old key remains valid beyond its intended window, revoke it through the supported API/dashboard path and investigate before issuing more keys.
+
+### OAuth callback fails
+
+Check provider client ID/secret, exact callback URL, HTTPS/domain, allowed redirect URI, and environment-specific configuration. Confirm the API and OAuth provider use the same callback route. A callback configured for localhost will not automatically work for the production domain.
+
+### Email verification or password reset link is invalid
+
+Check email provider delivery, `APP_ORIGIN`/public dashboard URL, token expiry, one-time-use state, and whether the link was rewritten by an email security scanner. Do not extend token lifetime globally to work around one malformed link.
 
 ---
 
-### Getting a real JWT for manual testing
+## Encryption and key rotation
 
-**Step 1 — Login and grab the token:**
-```cmd
-curl -X POST https://relayon-api.vercel.app/api/auth/login ^
-  -H "Content-Type: application/json" ^
-  -d "{\"email\":\"zain@acme.com\",\"password\":\"YOUR_PASSWORD\"}"
-```
+### `Unsupported state or unable to authenticate data`
 
-Response:
-```json
-{
-  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "refreshToken": "...",
-  "user": { ... }
-}
-```
+**Likely cause:** API encrypted a credential with one key, but Workers attempted to decrypt it with a different key or incompatible key ring.
 
-**Step 2 — Use it:**
-```cmd
-set JWT=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+**Fix**
 
-curl -H "Authorization: Bearer %JWT%" ^
-  https://relayon-api.vercel.app/api/workflows
-```
+1. Confirm API and Workers have compatible `CONNECTOR_ENCRYPTION_KEYS` configuration.
+2. Confirm the same key ID maps to the same key material in both services.
+3. Check that the required historical key is still present.
+4. Restart/redeploy affected services after correcting configuration.
+5. Test decryption using a controlled non-production record before replaying deliveries.
 
-**If you don't remember the password:** Skip JWT testing — verify via Prisma Studio (local DB) instead. All encryption/state checks can be done there without a token.
+The plural key-ring variable is the current configuration pattern in the audited source; the singular `CONNECTOR_ENCRYPTION_KEY` is a legacy compatibility name. Follow the checked-out env examples and deployment guide.
 
----
+### `Unknown kid` after encryption-key rotation
 
-## Cron & Automation
+**Cause:** Ciphertext in the database references a key ID that is no longer available to the decrypting service.
 
-### GitHub Actions cron doesn't run at scheduled time
+**Recovery**
 
-**Cause:** GitHub Actions schedule is **best-effort**. Expected delay: 10-60 minutes. Under load, can skip entirely.
+1. Restore the missing key ID/material from the secure backup/secret manager.
+2. Deploy a compatible key ring to every service that decrypts credentials.
+3. Verify that affected records can be decrypted.
+4. Run the repository's documented rotation process to re-encrypt under the intended current key.
+5. Verify migration completion before removing the old key.
 
-**Fix:** Use `workflow_dispatch` for manual triggers, or cron-job.org (1-min interval), or Upstash QStash.
+If the old key material is permanently lost, ciphertext encrypted only with that key is not recoverable. Restore credentials from their authoritative source and re-save them.
 
----
+### API and Workers have different key-ring ordering/content
 
-### Vercel cron doesn't fire every 2 hours
+Key IDs and key material must match across services. Compare configuration securely; do not print full key values. A different current-key selection may also affect which key is used for newly encrypted values.
 
-**Cause:** Vercel Hobby allows **1 cron per project, once per day**. Hard limit.
+### Secrets appear as plaintext in the database
 
-**Fix:** Use external cron (cron-job.org, GitHub Actions, QStash), or upgrade to Vercel Pro.
+Not every configuration field is a secret. Endpoint URLs, methods and non-sensitive routing metadata may be stored as ordinary configuration depending on the selected encryption policy. Verify the current secret-field policy and `FULL_CONFIG_ENCRYPTION` behavior before declaring a defect.
 
----
+If a field that should be encrypted is stored in plaintext:
 
-### Schedule tick returns `{due: 0, enqueued: 0}` forever
+- Stop creating more affected records.
+- Confirm the API path calls the encryption helper.
+- Check service version/configuration and key-ring presence.
+- Re-save or migrate affected credentials through a reviewed process.
+- Avoid manually editing ciphertext in SQL.
 
-**Cause (v1.3+):** Nothing is due. Possible reasons:
-1. `nextRunAt` is in the future (schedule not yet reached)
-2. Schedule `isActive: false` (paused or deactivated)
-3. External cron isn't hitting `/internal/schedule/tick` at all
-4. The workflow itself is inactive
+### API returns ciphertext instead of a masked value
 
-**Diagnose via Prisma Studio:**
-```sql
--- All schedules
-SELECT workflow_id, cron_expression, is_active, next_run_at, last_run_at
-FROM workflow_schedules;
-```
+Check response DTO/serializer redaction and destination-specific UI rendering. Never solve this by exposing decrypted credentials to all dashboard clients.
 
-**Diagnose via workers status endpoint:**
-```cmd
-curl https://relayon-workers.vercel.app/internal/schedule/status ^
-  -H "X-Cron-Secret: <secret>"
-```
+### API key pepper or JWT secret was accidentally changed
 
-**Fix depending on cause:**
-- If `next_run_at` is future → wait, or click "Run now" in dashboard
-- If `is_active = false` → click "Resume" in dashboard
-- If external cron not calling tick → add it to cron-job.org
-- If workflow inactive → activate workflow
-
-**Force a test:**
-```sql
--- Set nextRunAt to past (via Prisma Studio)
-UPDATE workflow_schedules
-SET next_run_at = NOW() - INTERVAL '1 minute'
-WHERE workflow_id = 'YOUR_WORKFLOW_ID';
-```
-Then hit tick. Should return `{enqueued: 1}`.
+- Restore the intended secret from the secret manager if possible.
+- Expect sessions/API keys to be invalidated if the old value cannot be restored.
+- Follow the documented reauthentication/reissue procedure.
+- Do not generate a new random value on each container start; secrets must be stable across instances.
 
 ---
 
-## Performance
+## Schedules and background automation
 
-### API cold start takes 3-8 seconds
+### Scheduled workflow does not fire
 
-**Cause:** NestJS + Prisma + Mongoose + Config initialization on cold start.
+Check all of the following:
 
-**Expected:** First request after idle → 3-8s. Subsequent → 100-200ms.
+1. Workflow is active.
+2. Schedule is active.
+3. Cron expression is valid.
+4. Configured timezone is what the operator expects.
+5. `nextRunAt` is due and not in the future.
+6. Workers schedule-tick endpoint is being invoked.
+7. Caller has the correct `CRON_SECRET`.
+8. Workers can reach PostgreSQL and Redis.
+9. The schedule has not already been claimed/advanced by another scheduler instance.
 
-**Fix:** Use keep-alive GitHub Actions workflow pinging `/api/health` every 12 hours. Or accept it.
+Use the schedule status endpoint and database record where available. Inspect the current route in Workers rather than relying on an old URL copied from v1.x.
 
----
+### Schedule tick returns `due: 0` / `enqueued: 0`
 
-### Dashboard loads slowly on first visit
+This may be normal. No schedule may be due at the time of the tick.
 
-**Cause:** Angular bundle (~310 KB v1.0, ~340 KB v1.5) fetched from CDN.
+Check `isActive`, `nextRunAt`, timezone and workflow active state. Do not repeatedly force `nextRunAt` into the past in production; use a controlled test schedule or the dashboard's supported Run now action.
 
-**Fix:** Verify CDN caching works: `curl -I https://relayon.vercel.app` — check `cache-control` header.
+### Run now reports triggered but no event is visible
 
----
+Separate the steps:
 
-## Encryption & Key Rotation (v1.3+)
+- API accepted the run-now request.
+- API successfully called Workers.
+- Workers enqueued/processed the scheduled payload.
+- Event record was persisted.
+- Destination deliveries were created and delivered.
 
-### `CONNECTOR_ENCRYPTION_KEY must be 64 hex chars`
+Check API-to-Workers URL/secret, worker logs, queue depth, correlation ID and Mongo event record. A success response from the first step does not prove the final delivery completed.
 
-**Cause:** Env var is missing, wrong length, or has non-hex characters.
+### Bulk pause/resume returns `updated: 0`
 
-**Fix:**
+This can be a valid no-op if there are no schedules or all schedules are already in the requested state. Check the matching schedule count and response contract before treating it as a failure.
+
+### Vercel cron is delayed or does not run
+
+Do not assume a serverless function is a persistent worker. Confirm the configured external cron provider, cadence, request URL, secret header, provider execution history and target deployment. GitHub Actions schedules are best-effort and can be delayed; use a scheduler appropriate to the required operational SLA.
+
+### Docker Compose cron is not advancing work
+
+Check:
+
 ```bash
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+docker compose ps
+docker compose logs --tail=200 cron
+docker compose logs --tail=200 workers
+docker compose logs --tail=200 api
 ```
-This prints 64 hex chars. Paste (don't include quotes, don't include whitespace) into `CONNECTOR_ENCRYPTION_KEY` or `CONNECTOR_ENCRYPTION_KEYS`.
+
+The checked-in Compose cron sidecar invokes worker processing, delivery, schedule tick and the API outbox tick. Confirm the sidecar is running, internal service DNS names resolve, and its shared secret matches the API/Workers configuration.
 
 ---
 
-### `Unsupported state or unable to authenticate data` on delivery
+## AI assistant, enrichment, RAG, and BYOK
 
-**Cause:** API and Workers have **different** encryption keys. API encrypted data with key A, Workers tries to decrypt with key B → GCM auth tag fails.
+### AI enrichment returns `401 Unauthorized`
 
-**Fix:**
-1. Open `apps/api/.env.local` — copy the exact value of `CONNECTOR_ENCRYPTION_KEY` (or `_KEYS`)
-2. Open `apps/workers/.env.local` — paste the same value
-3. **In production (Vercel):** Same on both projects' env vars
-4. Restart both services
+- Confirm the selected provider credential is present and valid.
+- Determine whether the request used a tenant BYOK key or platform fallback.
+- Check provider account status, key revocation and project permissions.
+- Verify the key is configured in the correct environment.
+- Do not paste the key into logs or test output.
 
-**Verification:**
-```bash
-# Both must be identical
-grep CONNECTOR_ENCRYPTION apps/api/.env.local
-grep CONNECTOR_ENCRYPTION apps/workers/.env.local
-```
+### AI provider returns `404 model_not_found`
 
-**v1.4+ note:** `CONNECTOR_ENCRYPTION_KEYS` (plural) also must match. Format: `kid1:hexkey1,kid2:hexkey2`. **Same kid, same key, same order** in both apps.
+The configured model may have been retired, renamed, or may not be enabled for that provider/account/region.
+
+- Query the provider's current model list using the provider's authenticated API or console.
+- Confirm the model identifier is exact.
+- Check the provider resolver and tenant integration selection.
+- Update the model setting only after confirming provider support.
+
+Do not treat a historical Groq model name in an old runbook as a permanent model guarantee.
+
+### AI request times out or is rate-limited
+
+Check provider status, model latency, tenant/provider rate limits, request size, token limits and configured timeout. Reduce request volume or use an available fallback where configured. AI enrichment/assistant requests should not be used as a substitute for the core event-delivery health check.
+
+### BYOK key is saved but not used
+
+Check:
+
+1. Provider integration record exists for the correct tenant.
+2. Key encryption/decryption succeeds.
+3. Integration is enabled/toggled on.
+4. Provider resolver selects that provider/key for the requested feature.
+5. The feature actually supports that provider (assistant, enrichment, email, etc.).
+6. The deployment is running code that includes the relevant v3.5–v3.7 integration behavior.
+
+A saved key does not necessarily become the default for every feature. Follow provider-resolution rules for the specific module.
+
+### AI assistant returns irrelevant answers or empty RAG results
+
+- Confirm knowledge documents/chunks were ingested and indexed.
+- Check tenant scoping on retrieval.
+- Verify embedding/model configuration and provider availability.
+- Check query intent/routing and the tool selected by the assistant.
+- Compare a simple known-answer query with a query that requires tenant knowledge.
+- Inspect retrieval scores and source chunks where the application exposes them.
+
+Do not bypass tenant filters to make retrieval return more results.
+
+### AI works for one tenant but not another
+
+Compare tenant integration enablement, BYOK credentials, quotas, role/permission and knowledge corpus state. Do not copy one tenant's key or knowledge records into another tenant as a workaround.
 
 ---
 
-### Secrets showing plaintext in Prisma Studio
+## Outbound webhooks and transactional outbox
 
-**Symptom:** Open `destinations` table → `config` column shows `{"webhookUrl": "https://hooks.slack.com/..."}` instead of `{"webhookUrl": "enc:v2:..."}`.
+Relayon's platform can notify customer-configured webhook endpoints. This is distinct from inbound source webhooks and destination adapters attached to a workflow.
 
-**Cause (from v1.3):** Two possibilities:
-1. `destinations.service.ts` didn't call `encryptConfig()` — code wasn't deployed or hasn't restarted
-2. The field isn't in `SECRET_CONFIG_KEYS` — e.g., HTTP `url` and `method` are **intentionally plaintext** (not secrets)
+### Customer webhook endpoint receives no notification
 
-**Verify by destination type:**
+Check:
 
-| Type | Encrypted fields |
+- Endpoint is registered and enabled for the expected event types.
+- Endpoint URL is reachable from the API runtime.
+- Outbox event row was created.
+- API outbox poller/tick is running.
+- Delivery attempts and next-attempt timestamps.
+- Endpoint response status, timeout and retry behavior.
+- Signing secret and signature verification at the receiver.
+
+The outbox is persisted in PostgreSQL; a missing notification may be waiting in the outbox rather than lost in the event-delivery queue.
+
+### Receiver rejects signature
+
+- Use the endpoint's configured signing secret, not a workflow source secret or destination credential.
+- Verify the exact Standard Webhooks signing header and timestamp format expected by the current implementation.
+- Verify the receiver signs/verifies the original payload bytes as specified by the protocol.
+- Check clock skew and replay/timestamp tolerance.
+- Confirm endpoint secret rotation was completed on both sides.
+
+Do not paste signing secrets into a support ticket.
+
+### Outbox backlog grows
+
+Check API outbox tick schedule, API logs, database connectivity, endpoint timeouts, retry policy and lock/claim behavior. In Compose, confirm the cron sidecar includes the API outbox tick. In Vercel, confirm the external scheduler calls the API outbox route documented for the deployed version.
+
+---
+
+## Vercel deployment
+
+### Build uses the wrong directory or cannot resolve workspace packages
+
+The monorepo uses four Vercel projects with app-specific root directories:
+
+| Project | Root directory |
 |---|---|
-| `slack`, `discord` | `webhookUrl` |
-| `email` | `apiKey`, `privateKey` |
-| `sheets` | `privateKey` |
-| `airtable`, `notion` | `apiKey` |
-| `postgres`, `mongodb` | `connectionString` |
-| `http` | **None** — `url`/`method`/`headers` are plaintext by design |
+| Dashboard | `apps/dashboard` |
+| API | `apps/api` |
+| Ingress | `apps/ingress` |
+| Workers | `apps/workers` |
 
-**HTTP destination is NOT a bug** — `url` is an endpoint (not a secret), and it's rendered in the dashboard summary. If you want full encryption including `url`, set `FULL_CONFIG_ENCRYPTION=true` (v1.5+).
+The apps depend on root-level workspace packages such as `packages/db` and `packages/shared`. Ensure Vercel's monorepo settings allow the build to access source files outside the app root and that the build/install command runs with the correct workspace context.
 
-**If a real secret field (e.g., `webhookUrl` on Slack) is plaintext:**
-1. Check Workers startup log — did it log `encryptConfig` being called?
-2. Verify `destinations.service.ts` imports `encryptConfig` from `crypto-box`
-3. Restart API
-4. Re-save the destination
+### Deployment is stuck on an old commit
+
+Check:
+
+- Vercel project is connected to the expected Git repository and branch.
+- Deployment commit SHA matches GitHub.
+- Ignored Build Step configuration.
+- Build logs and project root directory.
+- Whether the latest commit changed files relevant to that project.
+- Whether a previous deployment is still serving production traffic.
+
+Prefer a normal new commit/redeploy with a clean build over an empty commit as the first response.
+
+### Build succeeds but runtime uses stale code
+
+- Confirm production alias points to the intended deployment.
+- Compare deployment commit SHA with the intended Git commit.
+- Check service-specific deployment status; one Vercel project may deploy while another is unchanged.
+- Verify browser/service-worker cache for Dashboard.
+- Rebuild only the affected app after confirming the source change is included.
+
+### Serverless worker queue stops progressing
+
+Vercel functions are not a continuously running worker process. Confirm external cron invocations for processing, delivery and schedule tick are configured and succeeding. Also confirm API outbox tick is scheduled if customer webhook notifications are enabled.
+
+Do not solve this by starting an unbounded background loop inside a serverless request handler.
+
+### Workers/API cannot call each other
+
+Check `WORKERS_URL`, `API_URL` where applicable, deployment hostnames, route prefixes, TLS, `CRON_SECRET`, provider network rules and function logs. Do not use a dashboard/public URL where an internal service URL is required.
+
+### Environment variable is set but app still sees old value
+
+Vercel environment variables are associated with deployment environments. After changing one:
+
+1. Confirm Production/Preview/Development scope.
+2. Confirm the correct project is being edited.
+3. Redeploy the affected project.
+4. Confirm the deployment timestamp/commit.
+5. Check the application startup/config validation log without exposing the secret.
 
 ---
 
-### `Unknown kid "key-2026-01"` after rotation
+## Docker Compose and self-hosting
 
-**Symptom:** Delivery moves to DLQ with:
-```json
-{ "message": "Credential decryption failed: Unknown kid \"key-2026-01\" — is this key still present in CONNECTOR_ENCRYPTION_KEYS?" }
+### `docker compose config` reports missing variables
+
+Copy the Docker environment example to the expected root `.env` location, populate every required value, and validate:
+
+```bash
+docker compose config
 ```
 
-**Cause:** An encrypted envelope exists in the DB that was encrypted with `key-2026-01`, but that key was removed from the env var **before** the rotation script re-encrypted all data.
+Do not commit the populated `.env` file. Do not use example/default secrets in production.
 
-**Fix (in order of preference):**
-1. **Re-add the missing key:** Put `key-2026-01:<hex>` back into `CONNECTOR_ENCRYPTION_KEYS`. Redeploy. Delivery succeeds. Then run rotation script to re-encrypt, THEN remove old key.
-2. **Or restore from backup:** If key is lost forever, the affected rows are unrecoverable.
-3. **Or re-save affected destinations:** If you only have a few destinations, delete and recreate them with fresh credentials.
+### Containers start but cannot reach each other
 
-**Prevention (from v1.4 runbook):**
-- **Never** remove a key from the ring without running the rotation script first
-- **Verify** rotation completed: `SELECT config FROM destinations` should show only `enc:v2:<current-kid>:...`
-- **Wait 24h** after rotation before removing the old key
+Inside Compose, use service names (for example `postgres`, `redis`, `mongo`, `api`, `workers`) and container ports. `localhost` inside a container points to that same container.
+
+Check:
+
+```bash
+docker compose ps
+docker compose logs --tail=200 api
+docker compose logs --tail=200 ingress
+docker compose logs --tail=200 workers
+```
+
+Also inspect network membership and health checks. Do not expose database ports publicly just to make container-to-container connectivity work.
+
+### Migration container exits unsuccessfully
+
+- Inspect `migrate` logs.
+- Confirm `DATABASE_URL`/direct URL and PostgreSQL health.
+- Confirm the migration container uses the same schema/migration files as the app image.
+- Back up the database and inspect migration state before retrying.
+- Do not start app services against a schema that is known to be incompatible.
+
+The Compose stack includes a one-shot migration stage; ensure it completes successfully before treating the application stack as ready.
+
+### Nginx returns `502 Bad Gateway`
+
+Check:
+
+- Upstream service container is running and healthy.
+- Nginx upstream names/ports match Compose service definitions.
+- Dashboard/API path routing is correct.
+- The app is listening on the container interface, not only `127.0.0.1`.
+- Startup ordering/health checks completed.
+
+### Host architecture causes image/platform errors
+
+The checked-in Compose configuration documents ARM64 testing for an Oracle Cloud Ampere deployment. Operators on x86_64 should review the `platform` stanza and Docker images before deploying. Do not force an incompatible architecture without verifying all base images and native dependencies.
+
+### Data disappears after container recreation
+
+Confirm PostgreSQL, Redis and MongoDB use the intended named persistent volumes. `docker compose down -v` removes volumes and can delete persistent data; do not run it in production as a routine cleanup command.
+
+Before upgrades, back up PostgreSQL and MongoDB and confirm Redis persistence/recovery requirements for the deployment.
+
+### Compose cron is running but no background work occurs
+
+Inspect `cron` logs and verify internal URLs, shared secret, API/Workers health and network access. Confirm all four invocation classes are running: process, deliver, schedule tick and outbox tick. A running cron container does not prove its HTTP requests succeeded.
 
 ---
 
-### `enc:v2:` migration from `enc:v1:` — is it required?
+## SDK, CLI tunnel, and workflow YAML
 
-**Short answer:** No. v1.4 code decrypts `enc:v1:` envelopes automatically (tries every key in the ring). Migration is **opt-in** for key rotation, not required for v1.4 to work.
+### SDK requests return type/schema errors
 
-**When to migrate:**
-- You want to rotate the encryption key (security hygiene, compliance)
-- You're removing an old key from the ring
+- Confirm SDK version matches the API's OpenAPI contract.
+- Regenerate from the intended API spec if the server contract changed.
+- Check auth configuration and API base URL.
+- Inspect both SDK `error` and `data` results.
+- Do not hand-edit generated SDK files as the permanent fix.
 
-**How to migrate:**
+The repository's SDK workflow uses the OpenAPI spec and generator. Use the current root scripts (`sdk:sync`, `sdk:generate`, `sdk:build`) as defined by `package.json`.
+
+### SDK calls wrong server
+
+Set the client base URL explicitly for self-hosted or non-production environments. Ensure the URL is the API base, not the dashboard or ingress base.
+
+### CLI tunnel cannot establish a session
+
+Check:
+
+- `RELAYON_API_KEY` is set and has required access.
+- API URL points to the intended Relayon deployment.
+- API tunnel session creation succeeds.
+- Ingress tunnel capture URL is reachable.
+- Local port is listening and not blocked by firewall.
+- CLI can maintain/reconnect its SSE stream.
+
+Run the CLI with a non-sensitive label and inspect API/Ingress logs using the session identifier. Do not expose the raw API key in terminal screenshots.
+
+### Tunnel connects but local app receives no request
+
+Confirm the source is sending to the tunnel URL returned by the CLI, not the normal workflow endpoint. Check the tunnel session is active, the local port is correct, and the CLI output shows forwarding rather than only session creation.
+
+### Workflow YAML validation or push fails
+
+- Run the repository's workflow validation command locally.
+- Check YAML syntax, schema/version fields and referenced workflow identifiers.
+- Confirm the API key has the required workflow read/write scope.
+- Confirm target tenant/environment and API base URL.
+- Review the API response; do not overwrite remote workflow state until the diff is understood.
+
+---
+
+## Performance and observability
+
+### API cold start or first request is slow
+
+A cold serverless function may initialize NestJS, Prisma and provider clients. Compare cold vs warm latency and inspect traces before treating one slow first request as a regression.
+
+If every request is slow, investigate database connection setup, slow queries, pool saturation, external calls in request paths and network latency.
+
+### Dashboard initial load is slow
+
+Check bundle transfer size, cache headers, route-level lazy loading, service-worker behavior, CDN status and browser performance traces. Do not use a historical v1.5 bundle-size figure as the v3.7 baseline.
+
+### Worker batch exceeds time budget
+
+Check batch size, event payload size, AI provider latency, transform complexity, adapter timeouts and DB query duration. Reduce batch size or tune time budget based on measured behavior and platform execution limits. Do not increase timeouts beyond the hosting platform's maximum.
+
+### Sentry/OpenTelemetry shows no data
+
+- Confirm `SENTRY_DSN` / `OTEL_EXPORTER_OTLP_ENDPOINT` is set in the correct service.
+- Confirm outbound network access to the collector/provider.
+- Check environment and sampling configuration.
+- Verify instrumentation initializes before app modules where required.
+- Distinguish “no errors” from “telemetry not configured.”
+
+### Logs cannot be correlated across services
+
+Use the event correlation ID and timestamps to search Ingress, Workers, Mongo event/delivery records and destination logs. Ensure clocks are synchronized and include timezone in incident reports. Do not use email addresses, raw tokens or full webhook payloads as correlation identifiers.
+
+---
+
+## Security and tenant-isolation checks
+
+### One tenant can see another tenant's data
+
+Treat this as a security incident.
+
+1. Stop further exposure and preserve logs.
+2. Record endpoint, request ID, tenant IDs (redacted in external reports), user role and timestamp.
+3. Verify authorization guard and tenant-context resolution.
+4. Verify database query filters and applicable RLS policy.
+5. Reproduce with two isolated test tenants in a non-production environment.
+6. Review logs for broader access and rotate credentials only if exposure warrants it.
+7. Follow the project's security disclosure process.
+
+Do not patch by trusting a client-supplied tenant ID or by disabling RLS.
+
+### Sensitive headers or payload data appear in logs
+
+Check request logging, exception serialization, tracing attributes, and adapter error snippets. Redact Authorization, Cookie, Set-Cookie, X-API-Key and provider credentials. The ingress implementation in the audited snapshot filters sensitive headers from the queued event header snapshot; verify other logging paths separately.
+
+### Internal worker endpoint is publicly callable
+
+Internal routes should require `X-Cron-Secret` as configured. Check reverse proxy routing, route guard/middleware and secret configuration. Do not rely on an obscure URL path as authentication.
+
+### External adapter security concern
+
+The external adapter runner's worker-thread/time/resource controls are not equivalent to a hardened container or OS sandbox. Restrict who can register adapters, review adapter code, limit secrets/network access, and do not execute untrusted packages in a privileged production worker.
+
+---
+
+## Diagnostics and incident checklist
+
+### Capture the minimum useful incident bundle
+
+Before changing production state, collect:
+
+- Relayon version/tag and deployed commit SHA.
+- Deployment topology: Vercel or Docker Compose.
+- Affected app/service and environment.
+- UTC timestamp and timezone of the user-visible failure.
+- HTTP method, route, status and sanitized response body.
+- Correlation/event ID.
+- Relevant service logs around the timestamp.
+- Sanitized database record state (no payload secrets).
+- Queue depth/age and retry/DLQ state.
+- Recent deploy, migration, environment, provider-key or destination changes.
+
+### Inspect the event lifecycle
+
+Use the dashboard/API to locate the event by correlation ID. Then inspect the event record in MongoDB and its associated delivery records. Field names can evolve; use the current Mongoose schemas rather than copying old shell queries blindly.
+
+Questions to answer:
+
+- Did Ingress accept the request?
+- Was the event queued?
+- Did Workers claim and process it?
+- Did transformation/routing complete?
+- Were delivery records created?
+- Which destinations succeeded, failed or remain delayed?
+- Was a failure classified retryable or permanent?
+
+### Inspect schedule state
+
+Use the current API schedule endpoints and/or Prisma Studio in a controlled environment. Check workflow active state, schedule active state, cron expression, timezone, next-run and last-run timestamps. Do not manually update production timestamps unless following an approved recovery procedure.
+
+### Inspect encryption state
+
+Check the expected encrypted envelope and key ID without copying ciphertext into a public report. Confirm API/Workers key-ring compatibility and response redaction. A masked API value is expected; ciphertext should not be returned as a credential the user can reuse.
+
+### Useful repository commands
+
 ```bash
+# Workspace and dependency state
+git status --short
+node --version
+npm --version
+
+# Static checks/builds
+npm run typecheck
+npm run lint
+npm run build:dashboard
 npm run build:api
-node scripts/rotate-encryption-key.mjs
+npm run build:ingress
+npm run build:workers
+
+# Database client/migration commands
+npm run db:generate
+npm run db:migrate       # local development only
+npm run db:deploy        # production migration deployment
+npm run db:studio
+npm run db:rls
+
+# Tests / validation (check package.json for exact current script availability)
+npm run test
+npm run test:integration
+npm run workflows:validate
 ```
 
-Script iterates every workflow and destination, decrypts with any matching key, re-encrypts with current key. **Idempotent** — safe to run multiple times.
+Run only the commands that exist in the checked-out `package.json`; the list is a diagnostic index, not a guarantee that every environment has all optional services installed.
+
+### Healthy end-to-end verification
+
+After a fix, use a controlled test workflow and verify:
+
+1. Ingress accepts a valid test webhook.
+2. Event is visible with the expected correlation ID.
+3. Workers process it without an unhandled error.
+4. Expected destination delivery records are created.
+5. Destination receives the expected payload exactly once where idempotency is supported.
+6. Delivery state and response are visible in the dashboard/API.
+7. Any schedule/outbox path involved in the incident advances normally.
 
 ---
 
-## Scheduled Workflows (v1.3+)
+## Escalation and bug reports
 
-### `Cannot PUT /api/workflows/:id/schedule` (404 error in dashboard)
+Before opening an issue, search existing reports:
 
-**Symptom (v1.3–v1.4 real bug, from chat):**
-- Dashboard shows "Cannot PUT /api/workflows/a3c1f122.../schedule"
-- Or "Cannot PUT" in the schedule card error area
-- API logs show **no route** for `/api/workflows/:workflowId/schedule`
+- [Relayon GitHub Issues](https://github.com/zainshah3464/relayon/issues)
+- [Relayon repository](https://github.com/zainshah3464/relayon)
 
-**Cause (the actual v1.4 bug):** `SchedulesModule` was **never imported in `apps/api/src/app.module.ts`**. The controller file existed, the service existed, but the module was never registered — so NestJS never mapped the routes at runtime. TypeScript build passed because module wiring isn't typechecked.
+Include:
 
-**Fix:**
-1. Open `apps/api/src/app.module.ts`
-2. Ensure `SchedulesModule` is in `imports`:
-   ```typescript
-   import { SchedulesModule } from './modules/schedules/schedules.module';
+- Version/tag and deployed commit SHA.
+- Environment and deployment topology.
+- Which component is failing (Dashboard / API / Ingress / Workers / PostgreSQL / MongoDB / Redis / provider).
+- Exact error message and sanitized HTTP response.
+- Timestamp with timezone and correlation ID.
+- Minimal reproduction steps.
+- What you expected and what actually happened.
+- Relevant sanitized logs and whether the issue reproduces locally.
 
-   @Module({
-     imports: [
-       // ... other modules
-       SchedulesModule,  // ← must be here
-     ],
-   })
-   export class AppModule {}
-   ```
-3. Save → API auto-restarts (watch mode)
-4. Verify in API logs:
-   ```
-   [RoutesResolver] SchedulesController {/api/workflows/:workflowId/schedule}
-   [RouterExplorer] Mapped {/api/workflows/:workflowId/schedule, GET} route
-   [RouterExplorer] Mapped {/api/workflows/:workflowId/schedule, PUT} route
-   [RouterExplorer] Mapped {/api/workflows/:workflowId/schedule, DELETE} route
-   [RouterExplorer] Mapped {/api/workflows/:workflowId/schedule/run-now, POST} route
-   ```
+**Never include:** passwords, JWTs, API keys, OAuth client secrets, webhook signing secrets, encryption keys, full database URLs, or unredacted customer payloads.
 
-**Missing route = module not imported.** This is the most common NestJS gotcha. If a route 404s but the controller file exists, check `app.module.ts` first.
+For security vulnerabilities, do not open a public issue with exploit details. Use the security contact and disclosure process documented in the repository's current `SECURITY.md`.
 
 ---
 
-### `Cannot POST .../schedule/run-now` (v1.4)
-
-**Cause:** `WORKERS_URL` or `CRON_SECRET` missing in API env. The run-now endpoint forwards to Workers, so it needs both.
-
-**Fix:**
-```env
-# apps/api/.env.local
-WORKERS_URL=http://localhost:3003
-CRON_SECRET=<same as workers' secret>
-```
-
-For Vercel production: add both env vars to the API project, redeploy.
-
----
-
-### Run-now button shows "✓ Triggered" but no event appears
-
-**Cause:** The trigger succeeded at API level, but Workers didn't actually enqueue the event — or the external cron isn't processing the queue.
-
-**Diagnose:**
-```cmd
-# Check if event is in the queue
-curl https://relayon-workers.vercel.app/internal/status ^
-  -H "X-Cron-Secret: <secret>"
-```
-
-If `incoming > 0` → event is queued but processing cron isn't running. Manually trigger:
-```cmd
-curl -X POST https://relayon-workers.vercel.app/internal/process ^
-  -H "X-Cron-Secret: <secret>"
-```
-
-If `incoming = 0` → event was processed but delivery may have failed. Check Events page for the correlation ID returned by run-now.
-
----
-
-### `runNow` fails with "Workflow is inactive"
-
-**Cause (v1.4):** The workflow is set to `isActive: false`, but the schedule itself might still be active.
-
-**Fix:** Activate the workflow in the dashboard. The schedule will then fire normally on the next cron tick, and run-now will work.
-
----
-
-### Bulk pause/resume returning `updated: 0`
-
-**Cause (v1.5):** You have no schedules, or all schedules are already in the target state.
-
-**Verify:**
-```sql
-SELECT COUNT(*) FROM workflow_schedules WHERE is_active = true;
--- If 0, pause-all correctly returns {updated: 0}
-```
-
-This is **not an error** — it's accurate reporting.
-
----
-
-### Bulk routes not working (404 on `/api/schedules/bulk/pause-all`)
-
-**Cause (v1.5):** `SchedulesBulkController` not registered in `SchedulesModule`.
-
-**Fix:**
-1. Open `apps/api/src/modules/schedules/schedules.module.ts`
-2. Ensure both controllers are registered:
-   ```typescript
-   @Module({
-     controllers: [SchedulesController, SchedulesBulkController],  // ← both
-     providers: [SchedulesService],
-     exports: [SchedulesService],
-   })
-   export class SchedulesModule {}
-   ```
-3. Check API logs for `/api/schedules/bulk/pause-all` mapping
-
-**Why a separate controller:** `@Controller('workflows/:workflowId/schedule')` conflicts with `/bulk/pause-all` — the router would match `bulk` as `:workflowId`. Separate `@Controller('schedules')` avoids the conflict.
-
----
-
-## Workflow Versioning & Diff (v1.3+)
-
-### Version history shows only v1 after multiple edits
-
-**Cause:** The version capture hook isn't firing on updates. `WorkflowsService.update()` should call `WorkflowVersionsService.capture()`.
-
-**Fix:**
-1. Check `workflows.service.ts` — does `update()` call `this.versions.capture(...)` at the end?
-2. Check `WorkflowsModule` — is `WorkflowVersionsService` in `providers`?
-3. Restart API. Make an edit. Check `GET /workflows/:id/versions`.
-
----
-
-### `GET /versions/:id` returns `404 Not Found`
-
-**Cause:** Version doesn't exist for this tenant. Either the workflow is new (no versions yet) or the tenant check failed.
-
-**Verify:**
-```javascript
-// Prisma Studio → workflow_versions table
-// Filter by workflowId and tenantId
-```
-
-If empty → versions were never captured (see previous issue).
-
----
-
-### Restore creates new version but destinations are missing
-
-**Cause:** Not a bug — restore **deletes all destinations and recreates them from the snapshot**. Their UUIDs change. Any external system referencing old destination IDs will need updating.
-
-**Verify:**
-1. Check the new version's snapshot: `GET /workflows/:id/versions/:v` — does `snapshot.destinations` have the expected entries?
-2. Check the actual destinations: `GET /workflows/:id/destinations` — same count?
-
-If snapshot has destinations but actual doesn't → bug in restore transaction. Check API logs for `$transaction` errors.
-
----
-
-### Diff returns `identical: true` for versions that are clearly different
-
-**Cause:** One of two things:
-1. The snapshots really are byte-equal (empty edit, no-op update)
-2. The snapshots are structurally equal but the diff compares JSON-stringified version (whitespace-sensitive)
-
-**Verify:**
-```bash
-curl -H "Authorization: Bearer %JWT%" ^
-  https://relayon-api.vercel.app/api/workflows/YOUR_ID/versions/1
-curl -H "Authorization: Bearer %JWT%" ^
-  https://relayon-api.vercel.app/api/workflows/YOUR_ID/versions/2
-```
-Compare `snapshot` objects. If they're equal → `identical: true` is correct.
-
-**Known limitation:** Diff is line-based on pretty-printed JSON. Reordering keys with same values will show as a diff even though data is semantically identical.
-
----
-
-### Diff output is enormous / unreadable
-
-**Cause:** Large snapshots (many destinations, long transform expressions) produce many diff lines.
-
-**Fix:** The endpoint caps at context=3 lines by default. Frontend renders with color-coding and scroll. If a specific diff is unusable, download the two snapshots separately and compare manually.
-
----
-
-## Adapters (v1.2–v1.5)
-
-### `Cannot find module 'pg-format'` or TypeScript error on `pg-format` import
-
-**Cause (v1.4):** `pg-format` has no `@types/pg-format` package on npm.
-
-**Fix:** Add a module declaration in `apps/workers/src/types.d.ts`:
-
-```typescript
-declare module 'pg-format' {
-  const format: {
-    (format: string, ...args: unknown[]): string;
-    ident: (val: string) => string;
-    literal: (val: unknown) => string;
-    string: (val: string) => string;
-  };
-  export default format;
-}
-```
-
-Then `npm run typecheck` should pass.
-
----
-
-### `diff@7` import fails with ESM error
-
-**Symptom (v1.5):**
-```
-Error [ERR_REQUIRE_ESM]: require() of ES Module /node_modules/diff/libesm/index.js not supported
-```
-
-**Cause:** `diff@7` is ESM-first. NestJS CommonJS build can't `import` it directly.
-
-**Fix (the one that works):** Use `require()` with a type assertion:
-
-```typescript
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const { createTwoFilesPatch } = require('diff') as {
-  createTwoFilesPatch: (
-    oldFile: string,
-    newFile: string,
-    oldStr: string,
-    newStr: string,
-    oldHeader?: string,
-    newHeader?: string,
-    options?: { context?: number },
-  ) => string;
-};
-```
-
-**Not the fix:** Adding `esModuleInterop: true` — that doesn't help ESM-only packages in a CommonJS context.
-
----
-
-### Airtable adapter returns `422 Unprocessable Entity`
-
-**Cause (v1.3):** Payload field names don't match Airtable column names, and `typecast: false` (default).
-
-**Fix:**
-1. In Airtable → your base → your table → verify column names are exactly as expected
-2. In destination config, set `"typecast": true` to allow Airtable to coerce types
-3. If column names differ from payload keys, either:
-   - Rename Airtable columns to match, OR
-   - Add a JSONata transform to reshape the payload before delivery
-
-**Example:** If Airtable has a column named `Event Type` (with space), the payload field must be `"Event Type"` (with space).
-
----
-
-### Notion adapter returns `404 Not Found` even with valid credentials
-
-**Cause (v1.3):** Notion integration isn't **shared** with the target database. Notion's API returns `404` for resources the integration doesn't have access to (security through obscurity).
-
-**Fix:**
-1. Open the Notion database in your browser
-2. Click `•••` (top right) → `Connections` → `Add connections`
-3. Select your integration
-4. Save → retry the delivery
-
-**Verification:** You can also test via:
-```bash
-curl https://api.notion.com/v1/data_sources/<dataSourceId> \
-  -H "Authorization: Bearer <apiKey>" \
-  -H "Notion-Version: 2026-03-11"
-```
-If this returns `404`, the integration isn't shared. If it returns `200`, the destination should work.
-
----
-
-### PostgreSQL adapter `ECONNREFUSED`
-
-**Cause:** Connection string is wrong, SSL is misconfigured, or the PG server is rejecting Vercel's IP.
-
-**Fix:**
-1. Verify `connectionString` includes `?sslmode=require` for cloud-hosted Postgres (Neon, Supabase, RDS)
-2. Test the connection from the destination modal → "Test connection" (v1.5+). This runs `SELECT 1` without inserting.
-3. If `SELECT 1` fails but psql works locally → check that the PG server allows `0.0.0.0/0` or Vercel's IP range
-4. Check Workers logs for exact error (`ETIMEDOUT` vs `ECONNREFUSED` vs `28P01` auth failure)
-
-**`28P01` = authentication failed.** Double-check user/password in the connection string.
-
----
-
-### PostgreSQL adapter `relation "events" does not exist`
-
-**Cause:** Table specified in config doesn't exist, or `search_path` isn't set correctly.
-
-**Fix:**
-1. In destination config, `table` can be `"events"` (uses default search_path) or `"myschema.events"` (explicit schema)
-2. If using `"events"`, ensure `search_path` on the PG side includes the target schema
-3. Regex validation rejects anything not matching `^[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]*)?$` — dots are allowed for schema.table
-
-**Verify table exists:**
-```sql
-SELECT table_schema, table_name
-FROM information_schema.tables
-WHERE table_name = 'events';
-```
-
----
-
-### PostgreSQL adapter `column "event_type" does not exist`
-
-**Cause:** `columns` mapping is wrong, or payload doesn't have the path being mapped.
-
-**Fix:**
-- `columns: { "type": "event_type" }` means "extract payload.type, insert into event_type column"
-- If payload is `{ "data": { "type": "..." } }`, the mapping needs `{ "data.type": "event_type" }`
-- If no columns mapped, adapter falls back to single `payload` JSONB column — verify that column exists
-- Run `Test connection` first (v1.5) — dry-run does `SELECT 1` only, won't reveal column mismatches. Real delivery will.
-
----
-
-### MongoDB adapter `MongoServerSelectionError`
-
-**Cause:** Connection string format wrong, IP not allowed in Atlas, or credentials wrong.
-
-**Fix:**
-1. URI must start with `mongodb://` or `mongodb+srv://`
-2. Atlas → Network Access → allow Vercel IPs (`0.0.0.0/0` for free tier)
-3. If password has `@`, `:`, `/`, or other special chars → URL-encode (`@` → `%40`)
-4. Test via destination "Test connection" (v1.5) — runs `ping`, doesn't insert
-
----
-
-### MongoDB adapter documents missing `_relayon` metadata
-
-**Cause:** Adapter uses `_relayon` field to store event metadata. If missing, either:
-1. The destination wasn't using the MongoDB adapter (wrong type)
-2. An older code version is deployed
-
-**Verify:**
-```javascript
-db.events.findOne()  // check for _relayon field
-```
-
-If missing → redeploy Workers with latest code.
-
----
-
-### Discord adapter — webhook URL rejected
-
-**Cause (v1.2):** URL doesn't start with `https://discord.com/api/webhooks/`.
-
-**Fix:** Discord webhook URLs have this exact format:
-```
-https://discord.com/api/webhooks/<webhook_id>/<webhook_token>
-```
-If you have an old `discordapp.com` URL, replace with `discord.com`. Discord migrated their domain in 2022.
-
----
-
-### Adapter not appearing in dropdown after adding
-
-**Cause (v1.2+):** The `@DestinationAdapter` decorator is present, but the adapter class isn't in `EgressModule.providers`.
-
-**Fix:**
-1. Open `apps/workers/src/modules/egress/egress.module.ts`
-2. Add the new adapter to `providers`:
-   ```typescript
-   providers: [
-     // ... existing
-     YourNewAdapter,  // ← add here
-   ]
-   ```
-3. Restart Workers
-4. Verify startup log shows `[AdapterRegistry] Adapter registered: <type> → <ClassName>`
-
----
-
-## Destination Validation & Dry-Run (v1.5)
-
-### Validate endpoint returns `401 Unauthorized`
-
-**Symptom (v1.5, from chat):**
-```cmd
-curl -X POST http://localhost:3001/api/destinations/validate ^
-  -H "Authorization: Bearer b6d7d62****************************" ^
-  -H "Content-Type: application/json" ^
-  -d "{\"type\":\"http\",\"config\":{}}"
-# {"statusCode":401,"error":"Unauthorized","message":"Invalid or expired token"}
-```
-
-**Cause:** Two issues combined:
-1. **`Bearer` prefix missing** — should be `Authorization: Bearer <token>`, not `Authorization: <token>`
-2. **Token is fake/masked** — `b6d7d62****...` is not a real JWT
-
-**Fix:**
-1. Get a real JWT (see [Getting a real JWT](#getting-a-real-jwt-for-manual-testing))
-2. Use `Bearer` prefix
-3. Use `%JWT%` variable in CMD to avoid shell parsing issues
-
-**Not a bug:** 401 is correct behavior — the endpoint is properly guarded. The test was wrong, not the server.
-
----
-
-### Test connection button shows "✓ Connection verified" but 0ms latency
-
-**Symptom (v1.5, from chat):** Dashboard shows:
-```
-✓ Connection verified
-HTTP 200 · 0ms
-```
-
-**Cause:** Two possibilities:
-1. **HTTP HEAD returns 405/4xx fast** — some servers respond to HEAD in <1ms from edge. Real latency is sub-1ms.
-2. **Latency calculation bug** — `Date.now() - started` where `started` was set inside the dry-run branch instead of at the top of `send()`.
-
-**Verify:**
-- Test against `https://httpbin.org/post` — should show 200-500ms (real network round-trip)
-- Test against `https://httpbin.org/status/500` — should show `✗ Validation failed` with `Reachable but returned 500`
-
-**If both return 0ms → bug in HTTP adapter's dry-run latency calculation.** Check that `started` is set at the very beginning of `send()` before the `__dryRun` branch.
-
-**If real URLs show real latency but fast URLs show 0ms → not a bug.** HEAD is just fast.
-
----
-
-### Validate returns `layer: 'schema'` instead of `layer: 'both'`
-
-**Cause (v1.5):** Workers unreachable from API. The dry-run was skipped because:
-- `WORKERS_URL` not set on API
-- `CRON_SECRET` mismatch between API and Workers
-- Workers deployment is down
-
-**Diagnose:**
-```bash
-# From API's context, can it reach Workers?
-curl -X POST $WORKERS_URL/internal/egress/dry-run \
-  -H "X-Cron-Secret: $CRON_SECRET" \
-  -H "Content-Type: application/json" \
-  -d '{"type":"http","config":{"url":"https://httpbin.org/post"}}'
-```
-
-**Response tells you:**
-- `401` → `CRON_SECRET` mismatch
-- `404` → Workers route missing (module not imported)
-- `500` → Workers internal error (check logs)
-- `200` → Workers reachable; the issue was API not sending request — verify API env
-
-**Graceful fallback:** If Workers unreachable, `layer: 'schema'` with a warning is returned — the config still validates for schema. This is by design.
-
----
-
-### Dry-run sent a real Slack message
-
-**This is the v1.5 safety bug that was caught before ship.**
-
-**Cause:** If the Slack adapter doesn't honor `ctx.config.__dryRun`, the "Test connection" button calls the real webhook → real message sent to channel.
-
-**Fix:** Every adapter **must** check `__dryRun === true` before the real `fetch`. For Slack/Discord (which can't be probed without sending), return:
-```typescript
-if (ctx.config['__dryRun'] === true) {
-  return {
-    success: true,
-    statusCode: 200,
-    latencyMs: Date.now() - started,
-    responseBody: 'config valid — Slack webhooks cannot be tested without sending a message',
-    error: null,
-    retryable: false,
-  };
-}
-```
-
-**Verify no message sent:** After clicking "Test connection" on a Slack destination, check the Slack channel. If a "Relayon test" or "Validation payload" message appears, the adapter is missing the `__dryRun` check.
-
-**For contributors:** Adding a new adapter without `__dryRun` handling will be rejected in PR review (see `CONTRIBUTING.md`).
-
----
-
-## API Keys (v1.2+)
-
-### `X-API-Key` returns `401 Unauthorized`
-
-**Cause:** One of:
-1. Key format invalid (doesn't match `rlk_<live|test>_<8hex>_<48hex>`)
-2. Key revoked (`revokedAt` set)
-3. Key expired (`expiresAt` < now)
-4. Key hash mismatch (`API_KEY_PEPPER` changed)
-5. Wrong environment (used `rlk_test_*` in production)
-
-**Diagnose:**
-```bash
-# Check key exists in DB
-SELECT prefix, scopes, environment, expires_at, revoked_at
-FROM api_keys
-WHERE prefix = 'rlk_live_ab12cd34';
-```
-
-**Fix depending on cause:**
-- Revoked → create new key
-- Expired → create new key with longer TTL or `neverExpires: true`
-- `API_KEY_PEPPER` changed → **all keys invalid**. This is a breaking change, documented. Must reissue all keys.
-
----
-
-### `403 Forbidden` with "Missing scope(s): workflows:write"
-
-**Cause:** The API key was created with insufficient scopes. E.g., you have `workflows:read` but tried to `POST /api/workflows`.
-
-**Fix:**
-1. Create a new key with the needed scope (you cannot edit an existing key's scopes)
-2. Revoke the old key
-3. Deploy the new key to your application
-
-**Available scopes:**
-```
-events:read, workflows:read, workflows:write, destinations:read,
-destinations:write, dlq:read, dlq:write, analytics:read
-```
-
-**JWT sessions bypass scopes** — dashboard always has full tenant access. Scope enforcement is only for API keys.
-
----
-
-### Rotated API key — old key still working after 24h
-
-**Cause (v1.5):** The grace window caps old key's `expiresAt` at `now + 24h`. If it's still working past 24h, either:
-1. `expiresAt` wasn't actually updated during rotate (bug in transaction)
-2. Verify logic in `ApiKeysService.verify()` doesn't check `expiresAt`
-
-**Verify in DB:**
-```sql
-SELECT id, prefix, expires_at, revoked_at
-FROM api_keys
-WHERE id = 'old-key-id';
-```
-
-`expires_at` should be `~now + 24h` from when rotate was called. If it's `null` or `>24h`, rotate didn't cap it correctly.
-
-**Workaround:** Manually revoke with `DELETE /api/api-keys/:id`. Immediate effect.
-
----
-
-### `prefix` collision on API key create
-
-**Symptom:** Rare `409 Conflict` from `api_keys.prefix` unique constraint.
-
-**Cause:** 8-hex prefix = 4 bytes = 32 bits of randomness. Collision probability is ~1 in 4 billion — extremely rare but theoretically possible under massive volume.
-
-**Fix:** Just retry the create. If it happens frequently, that's a signal of a bigger issue (e.g., broken `randomBytes`).
-
-**Not fixed in v1.5** — no auto-retry. Accepted as negligible.
-
----
-
-## Dashboard UI Gotchas
-
-### Version history button, schedule card, or Airtable/Notion dropdown missing
-
-**This is the v1.3 bug that shipped a whole release late.**
-
-**Symptom (from chat screenshot):**
-- Workflow detail page has no "Version history" button
-- No "Scheduled trigger" card
-- "+ Add destination" dropdown doesn't include Airtable or Notion
-- Only HTTP / Slack / Email / Sheets show
-
-**Cause:** `apps/dashboard/src/app/features/workflows/workflow-detail.component.ts` was **never updated** in v1.3. The new `WorkflowScheduleCardComponent` and `WorkflowVersionsDrawerComponent` files existed on disk but were **never imported** into `workflow-detail.component.ts`. Angular had no reason to render them.
-
-**The last v1.3 commit only pushed `package.json`** — the actual component file was never committed. This is what happens when you trust `git status` without checking which files are staged.
-
-**Fix:**
-1. Open `workflow-detail.component.ts`
-2. Add imports:
-   ```typescript
-   import { WorkflowScheduleCardComponent } from './workflow-schedule-card.component';
-   import { WorkflowVersionsDrawerComponent } from './workflow-versions-drawer.component';
-   ```
-3. Add to `@Component.imports`:
-   ```typescript
-   imports: [
-     CommonModule, RouterLink, ReactiveFormsModule, FormsModule,
-     WorkflowScheduleCardComponent,     // ← was missing
-     WorkflowVersionsDrawerComponent,   // ← was missing
-   ],
-   ```
-4. Add `<app-workflow-schedule-card [workflowId]="wf.id" />` in template
-5. Add `@if (showVersions()) { <app-workflow-versions-drawer ... /> }` block
-6. Add `showVersions = signal(false)` to class
-7. Add Airtable/Notion options to the `<select>` in destination modal
-8. Add `@case ('airtable')` and `@case ('notion')` blocks
-
-**Verify:**
-- Local: `npm run typecheck` → 0 errors
-- Browser: refresh workflow detail → 3 buttons top-right (Copy / Export / Version history)
-- Schedule card visible under webhook URL
-- "+ Add destination" dropdown → 9 options
-
-**Prevention:** Always run the UI test locally before pushing. If you added a component file, verify it renders — `git add` doesn't guarantee it's imported anywhere.
-
----
-
-### `destinationSummary` shows "Slack/Discord webhook" for `enc:v2:` envelopes
-
-**Symptom (from chat):** Destination card shows `Slack/Discord webhook` instead of `•••••••• (encrypted)` — despite the DB storing `enc:v2:` properly.
-
-**Cause:** The `destinationSummary()` function in `workflow-detail.component.ts` checks `.startsWith('enc:v1:')`, but v1.4+ uses `enc:v2:`.
-
-```typescript
-// ❌ Current (v1.3 code)
-if (typeof cfg['webhookUrl'] === 'string')
-  return (cfg['webhookUrl'] as string).startsWith('enc:v1:')
-    ? '•••••••• (encrypted)'
-    : 'Slack/Discord webhook';
-
-// ✅ Should be (v1.5+)
-const wu = cfg['webhookUrl'] as string;
-if (wu.startsWith('enc:v1:') || wu.startsWith('enc:v2:')) {
-  return '•••••••• (encrypted)';
-}
-return 'Slack/Discord webhook';
-```
-
-**Status:** Cosmetic bug, not fixed in v1.5. Added to v2.0 roadmap. Workaround: ignore the display — DB and API are correct.
-
----
-
-### Chart shows blank / axes render "Invalid Date"
-
-**Symptom (v1.2):** Time-series chart is empty, or X-axis labels show "Invalid Date".
-
-**Cause:** MongoDB `$dateTrunc` returns `Date` objects, but the API was passing them to the frontend as-is. Angular's `| date` pipe chokes on raw `Date` from JSON (it expects ISO string or timestamp).
-
-**Fix:**
-1. In `analytics.service.ts` (backend), convert all `_id` values (which are `Date` objects) to `.toISOString()` before response
-2. In chart component, ensure `new Date(p.ts)` used for X-axis computation
-
-**Verify:** Check the `/api/analytics/timeseries` response — `ts` field should be `"2026-10-25T00:00:00Z"` (string), not a Date object.
-
----
-
-## Diagnostics
-
-### Check queue depth
-
-```bash
-curl https://relayon-workers.vercel.app/internal/status \
-  -H "X-Cron-Secret: <secret>"
-```
-
-Response:
-```json
-{ "incoming": 5, "processing": 0, "egress": 12, "timestamp": "..." }
-```
-
-**Healthy state:** `processing` should always be near 0. If it grows, `recoverStuck` isn't running.
-
----
-
-### Check egress health
-
-```bash
-curl https://relayon-workers.vercel.app/internal/egress/stats \
-  -H "X-Cron-Secret: <secret>"
-```
-
-Response:
-```json
-{ "pending": 12, "delayed": 3, "delivered24h": 308, "dlq": 2 }
-```
-
-**Healthy state:** `delivered24h >> dlq`. If `dlq > 5%` of `delivered24h`, investigate destination config.
-
----
-
-### Check list of registered adapters
-
-```bash
-curl https://relayon-workers.vercel.app/internal/adapters \
-  -H "X-Cron-Secret: <secret>"
-```
-
-Expected (v1.5 — 9 adapters):
-```json
-[
-  { "type": "http", ... },
-  { "type": "slack", ... },
-  { "type": "email", ... },
-  { "type": "sheets", ... },
-  { "type": "discord", ... },
-  { "type": "airtable", ... },
-  { "type": "notion", ... },
-  { "type": "postgres", ... },
-  { "type": "mongodb", ... }
-]
-```
-
-**If less than 9:** An adapter class isn't in `EgressModule.providers`.
-
----
-
-### Check individual event lifecycle
-
-**In MongoDB:**
-```javascript
-db.events.findOne({ correlationId: "a1578194-..." })
-```
-
-Look at:
-- `status` — should be `processed` or `failed`
-- `enrichment.error` — if set, Groq failed
-- `error` — if set, transform failed
-
-**Deliveries for the event:**
-```javascript
-db.deliveries.find({ eventId: "<mongo-id-from-above>" })
-```
-
-Look at:
-- `status` — `delivered`, `dlq`, `pending`, `delivering`
-- `attempts` — array with `statusCode`, `latencyMs`, `error`
-- `lastResponse` — most recent response snippet
-
----
-
-### Check circuit breaker state
-
-**In Upstash console** → Data Browser → search `circuit:dest:`
-
-Each key shows the current failure count. `>= 5` means circuit is open.
-
----
-
-### Check encryption round-trip
-
-**Prisma Studio → destinations → your destination → config**
-
-Expected for encrypted destinations:
-```json
-{ "webhookUrl": "enc:v2:key-2026-10:..." }
-```
-
-If plaintext on a secret field → not encrypted. See [Secrets showing plaintext](#secrets-showing-plaintext-in-prisma-studio).
-
-**API response check:**
-```bash
-curl -H "Authorization: Bearer %JWT%" ^
-  https://relayon-api.vercel.app/api/workflows/YOUR_ID/destinations
-```
-
-Expected: `{"config": {"webhookUrl": "••••••••"}}` — masked, not ciphertext, not plaintext.
-
----
-
-### Verify a specific API route is mapped (v1.3+)
-
-**API and Workers startup logs** show every mapped route:
-```
-[Nest] LOG [RouterExplorer] Mapped {/api/workflows/:workflowId/schedule, PUT} route
-```
-
-**If a route is missing from logs but the controller file exists → module not imported in `app.module.ts`.** This is the single most common NestJS runtime bug (bit us in v1.3 and v1.4).
-
----
-
-## Still Stuck?
-
-1. **Search existing issues** at [github.com/zainshah3464/relayon/issues](https://github.com/zainshah3464/relayon/issues)
-2. **Open a new issue** with:
-   - Which service is failing (API / Ingress / Workers / Dashboard)
-   - Exact error message (copy-paste, not paraphrase)
-   - Your environment (local / Vercel / Docker)
-   - Steps to reproduce
-3. **For security issues**, email `zainshahzs110@gmail.com` (do not open a public issue)
-
-**Response time:** 24-72 hours for non-urgent issues, 24 hours for security.
-```
-
----
+## Source of truth and related documentation
+
+When this guide and the checked-out code disagree, prefer the current source and generated contracts:
+
+- [`DEPLOYMENT.md`](./DEPLOYMENT.md) — Vercel and Docker Compose deployment.
+- [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) — service boundaries and event lifecycle.
+- [`docs/API_REFERENCE.md`](./docs/API_REFERENCE.md) — API overview; use live OpenAPI for exhaustive route contracts.
+- [`docs/DATABASE.md`](./docs/DATABASE.md) — PostgreSQL/Prisma model and migrations.
+- [`docs/SECURITY.md`](./docs/SECURITY.md) — threat model and security controls.
+- [`docs/TESTING.md`](./docs/TESTING.md) — automated and manual verification.
+- [`docs/CHANGELOG.md`](./docs/CHANGELOG.md) — release history.
+- [Live Swagger UI](https://relayon-api.vercel.app/api/docs)
+- [Live OpenAPI JSON](https://relayon-api.vercel.app/api/openapi.json)
+- [Repository](https://github.com/zainshah3464/relayon)
+
+**Version note:** The troubleshooting examples are operational guidance, not a claim that every listed historical symptom exists in the v3.7.0 code. Validate exact route names, schema fields, adapter contracts and environment variables against the deployed commit before applying a production change.
